@@ -252,15 +252,17 @@ export class FetchMock {
     }
   }
 
-  assertNoPendingInterceptors(): void {
-    const unconsumed = this.interceptors.filter(isPending);
+  reset(): void {
     this.interceptors = [];
     this.mswHandlers.clear();
     this._calls.clear();
     if (this.ownsServer) {
       this.server?.resetHandlers();
     }
+  }
 
+  assertNoPendingInterceptors(): void {
+    const unconsumed = this.interceptors.filter(isPending);
     if (unconsumed.length > 0) {
       const descriptions = unconsumed.map((p) => `  ${p.method} ${p.origin}${p.path}`);
       throw new Error(`Pending interceptor(s) not consumed:\n${descriptions.join('\n')}`);

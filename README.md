@@ -25,7 +25,10 @@ import { fetchMock } from 'msw-fetch-mock';
 
 beforeAll(() => fetchMock.activate({ onUnhandledRequest: 'error' }));
 afterAll(() => fetchMock.deactivate());
-afterEach(() => fetchMock.assertNoPendingInterceptors());
+afterEach(() => {
+  fetchMock.assertNoPendingInterceptors();
+  fetchMock.reset();
+});
 
 it('mocks a GET request', async () => {
   fetchMock
@@ -117,10 +120,11 @@ fetchMock.calls.nthCall(2); // 2nd call (1-indexed)
 fetchMock.calls.filterCalls({ method: 'POST', path: '/users' }, { operator: 'AND' });
 ```
 
-### Assertions
+### Assertions & Cleanup
 
 ```typescript
 fetchMock.assertNoPendingInterceptors(); // throws if unconsumed interceptors remain
+fetchMock.reset(); // clears interceptors + call history + handlers
 ```
 
 ## Documentation

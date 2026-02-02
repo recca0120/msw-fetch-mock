@@ -14,7 +14,10 @@ describe('FetchMock', () => {
     fetchMock.disableNetConnect();
   });
 
-  afterEach(() => fetchMock.assertNoPendingInterceptors());
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
 
   afterAll(() => fetchMock.deactivate());
 
@@ -255,7 +258,10 @@ describe('query matching', () => {
     fetchMock.disableNetConnect();
   });
 
-  afterEach(() => fetchMock.assertNoPendingInterceptors());
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
   afterAll(() => fetchMock.deactivate());
 
   it('should match exact query params', async () => {
@@ -281,6 +287,7 @@ describe('query matching', () => {
 
     // Clean up: the interceptor was not consumed
     expect(() => fetchMock.assertNoPendingInterceptors()).toThrow(/pending interceptor/i);
+    fetchMock.reset();
   });
 
   it('should match query params regardless of order', async () => {
@@ -479,6 +486,73 @@ describe('assertNoPendingInterceptors', () => {
   });
 });
 
+describe('reset', () => {
+  const fetchMock = new FetchMock();
+
+  beforeEach(() => {
+    fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
+  afterEach(() => fetchMock.deactivate());
+
+  it('should clear interceptors', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/health', method: 'GET' })
+      .reply(200, { ok: true });
+
+    fetchMock.reset();
+
+    expect(fetchMock.pendingInterceptors()).toHaveLength(0);
+  });
+
+  it('should clear call history', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/health', method: 'GET' })
+      .reply(200, { ok: true });
+
+    await fetch(`${API_BASE}/${API_PREFIX}/health`);
+    expect(fetchMock.calls.length).toBe(1);
+
+    fetchMock.reset();
+
+    expect(fetchMock.calls.length).toBe(0);
+  });
+
+  it('should reset MSW handlers so subsequent requests are unhandled', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/health', method: 'GET' })
+      .reply(200, { ok: true })
+      .persist();
+
+    fetchMock.reset();
+
+    await expect(fetch(`${API_BASE}/${API_PREFIX}/health`)).rejects.toThrow();
+  });
+
+  it('should allow registering new interceptors after reset', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/old', method: 'GET' })
+      .reply(200, { old: true });
+
+    fetchMock.reset();
+
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/new', method: 'GET' })
+      .reply(200, { new: true });
+
+    const res = await fetch(`${API_BASE}/${API_PREFIX}/new`);
+    expect(await res.json()).toEqual({ new: true });
+
+    fetchMock.reset();
+  });
+});
+
 describe('call history', () => {
   const fetchMock = new FetchMock();
 
@@ -487,7 +561,10 @@ describe('call history', () => {
     fetchMock.disableNetConnect();
   });
 
-  afterEach(() => fetchMock.assertNoPendingInterceptors());
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
 
   afterAll(() => fetchMock.deactivate());
 
@@ -582,7 +659,7 @@ describe('call history', () => {
     fetchMock.activate();
   });
 
-  it('should clear history on assertNoPendingInterceptors()', async () => {
+  it('should preserve history on assertNoPendingInterceptors()', async () => {
     fetchMock
       .get(`${API_BASE}/${API_PREFIX}`)
       .intercept({ path: '/posts', method: 'GET' })
@@ -592,7 +669,7 @@ describe('call history', () => {
 
     fetchMock.assertNoPendingInterceptors();
 
-    expect(fetchMock.calls.length).toBe(0);
+    expect(fetchMock.calls.length).toBe(1);
   });
 
   it('should return call history via getCallHistory()', async () => {
@@ -718,7 +795,10 @@ describe('replyWithError', () => {
     fetchMock.disableNetConnect();
   });
 
-  afterEach(() => fetchMock.assertNoPendingInterceptors());
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
   afterAll(() => fetchMock.deactivate());
 
   it('should make fetch reject with an error', async () => {
@@ -739,7 +819,10 @@ describe('delay', () => {
     fetchMock.disableNetConnect();
   });
 
-  afterEach(() => fetchMock.assertNoPendingInterceptors());
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
   afterAll(() => fetchMock.deactivate());
 
   it('should delay the response by at least the specified ms', async () => {

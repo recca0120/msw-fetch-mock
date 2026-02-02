@@ -9,7 +9,10 @@ import { fetchMock } from 'msw-fetch-mock';
 
 beforeAll(() => fetchMock.activate({ onUnhandledRequest: 'error' }));
 afterAll(() => fetchMock.deactivate());
-afterEach(() => fetchMock.assertNoPendingInterceptors());
+afterEach(() => {
+  fetchMock.assertNoPendingInterceptors();
+  fetchMock.reset();
+});
 ```
 
 ## `new FetchMock(server?)`
@@ -141,13 +144,25 @@ Clears all recorded calls. Cloudflare-compatible alias for `fetchMock.calls.clea
 
 ### `fetchMock.assertNoPendingInterceptors()`
 
-Throws an error if any registered interceptor has not been consumed. Also **automatically clears** call history and resets handlers. Use in `afterEach` to catch missing requests.
+Throws an error if any registered interceptor has not been consumed. This is a **pure assertion** — it does not clear call history, interceptors, or handlers. Use `reset()` to clean up state.
 
 ```typescript
-afterEach(() => fetchMock.assertNoPendingInterceptors());
+afterEach(() => {
+  fetchMock.assertNoPendingInterceptors();
+  fetchMock.reset();
+});
 ```
 
-> Call history is cleared automatically — no need for a separate `calls.clear()` call.
+### `fetchMock.reset()`
+
+Clears all interceptors, call history, and MSW handlers. Resets the instance to a clean state without stopping the server. Use in `afterEach` after asserting no pending interceptors.
+
+```typescript
+afterEach(() => {
+  fetchMock.assertNoPendingInterceptors();
+  fetchMock.reset();
+});
+```
 
 ### `fetchMock.pendingInterceptors()`
 

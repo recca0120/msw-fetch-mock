@@ -48,7 +48,10 @@ import { fetchMock } from 'msw-fetch-mock';
 
 beforeAll(() => fetchMock.activate());
 afterAll(() => fetchMock.deactivate());
-afterEach(() => fetchMock.assertNoPendingInterceptors());
+afterEach(() => {
+  fetchMock.assertNoPendingInterceptors();
+  fetchMock.reset();
+});
 
 it('calls API', async () => {
   fetchMock
@@ -68,7 +71,7 @@ it('calls API', async () => {
 | Import               | `import { fetchMock } from 'cloudflare:test'` | `import { fetchMock } from 'msw-fetch-mock'`       |
 | Server lifecycle     | Implicit (managed by test framework)          | Explicit (`activate()` / `deactivate()`)           |
 | Call history access  | `fetchMock.getCallHistory()`                  | `fetchMock.getCallHistory()` or `fetchMock.calls`  |
-| Call history cleanup | Automatic per test                            | Automatic via `assertNoPendingInterceptors()`      |
+| Call history cleanup | Automatic per test                            | `reset()` in `afterEach`                           |
 | Unhandled requests   | Must call `disableNetConnect()`               | `onUnhandledRequest: 'error'` by default (rejects) |
 | Runtime              | Cloudflare Workers (workerd)                  | Node.js                                            |
 
