@@ -784,6 +784,90 @@ describe('activate guard', () => {
   });
 });
 
+describe('onUnhandledRequest', () => {
+  it('should block unhandled requests when onUnhandledRequest is "error"', async () => {
+    const fm = new FetchMock();
+    fm.activate({ onUnhandledRequest: 'error' });
+
+    try {
+      await expect(fetch('http://no-such-host.test/path')).rejects.toThrow(/request/i);
+    } finally {
+      fm.deactivate();
+    }
+  });
+
+  it('should allow unhandled requests through when onUnhandledRequest is "warn"', async () => {
+    const fm = new FetchMock();
+    fm.activate({ onUnhandledRequest: 'warn' });
+
+    try {
+      const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).not.toMatch(/request handler/i);
+    } finally {
+      fm.deactivate();
+    }
+  });
+
+  it('should silently allow unhandled requests when onUnhandledRequest is "bypass"', async () => {
+    const fm = new FetchMock();
+    fm.activate({ onUnhandledRequest: 'bypass' });
+
+    try {
+      const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).not.toMatch(/request handler/i);
+    } finally {
+      fm.deactivate();
+    }
+  });
+
+  it('should invoke custom callback for unhandled requests', async () => {
+    const fm = new FetchMock();
+    let capturedUrl = '';
+    fm.activate({
+      onUnhandledRequest: (request) => {
+        capturedUrl = request.url;
+        // Not calling print.error() → request passes through
+      },
+    });
+
+    try {
+      await fetch('http://192.0.2.1:1/test').catch(() => null);
+      expect(capturedUrl).toBe('http://192.0.2.1:1/test');
+    } finally {
+      fm.deactivate();
+    }
+  });
+
+  it('should respect enableNetConnect even in error mode', async () => {
+    const fm = new FetchMock();
+    fm.activate({ onUnhandledRequest: 'error' });
+    fm.enableNetConnect('192.0.2.1:1');
+
+    try {
+      const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).not.toMatch(/request handler/i);
+    } finally {
+      fm.deactivate();
+    }
+  });
+
+  it('should not call server.listen() for external server mode', () => {
+    const externalServer = setupServer();
+    externalServer.listen();
+
+    try {
+      const fm = new FetchMock(externalServer);
+      // activate() with options should not throw or call listen() again
+      expect(() => fm.activate({ onUnhandledRequest: 'warn' })).not.toThrow();
+    } finally {
+      externalServer.close();
+    }
+  });
+});
+
 describe('singleton export', () => {
   it('should export fetchMock as a FetchMock instance', () => {
     expect(singletonFetchMock).toBeInstanceOf(FetchMock);

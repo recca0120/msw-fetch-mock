@@ -150,6 +150,14 @@ function buildResponse(status: number, responseBody: unknown, replyOptions?: Rep
 
 type NetConnectMatcher = true | false | string | RegExp | ((host: string) => boolean);
 
+type PrintAPI = { warning(): void; error(): void };
+type OnUnhandledRequestCallback = (request: Request, print: PrintAPI) => void;
+export type OnUnhandledRequest = 'bypass' | 'warn' | 'error' | OnUnhandledRequestCallback;
+
+export interface ActivateOptions {
+  onUnhandledRequest?: OnUnhandledRequest;
+}
+
 export class FetchMock {
   private readonly _calls = new MockCallHistory();
   private server: SetupServerLike | null;
@@ -166,7 +174,7 @@ export class FetchMock {
     this.ownsServer = !externalServer;
   }
 
-  activate(): void {
+  activate(options?: ActivateOptions): void {
     if (this.ownsServer) {
       const isPatched = Object.getOwnPropertySymbols(globalThis.fetch).some(
         (s) => s.description === 'isPatchedModule'
@@ -177,11 +185,19 @@ export class FetchMock {
             'Pass your existing server to new FetchMock(server) instead.'
         );
       }
+      const mode = options?.onUnhandledRequest ?? 'error';
       this.server = setupServer();
       (this.server as ReturnType<typeof setupServer>).listen({
-        onUnhandledRequest: (request: Request, print: { warning(): void; error(): void }) => {
+        onUnhandledRequest: (request: Request, print: PrintAPI) => {
           if (this.isNetConnectAllowed(request)) return;
-          print.error();
+          if (typeof mode === 'function') {
+            mode(request, print);
+          } else if (mode === 'error') {
+            print.error();
+          } else if (mode === 'warn') {
+            print.warning();
+          }
+          // 'bypass' → do nothing
         },
       });
     }
