@@ -1,0 +1,57 @@
+{
+  "name": "msw-fetch-mock",
+  "version": "0.0.1",
+  "description": "Undici-style fetch mock API built on MSW (Mock Service Worker)",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "msw",
+    "fetch",
+    "mock",
+    "testing",
+    "undici"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/recca0120/msw-fetch-mock.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "prepare": "lefthook install",
+    "build": "tsc",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepublishOnly": "tsc"
+  },
+  "peerDependencies": {
+    "msw": "^2.12.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2",
+    "lefthook": "^2.0.15",
+    "msw": "^2.12.7",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.53.1",
+    "vitest": "^4.0.17"
+  }
+}
