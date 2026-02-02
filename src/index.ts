@@ -1,4 +1,9 @@
+import { FetchMock } from './mock-server';
+
 export { createFetchMock, FetchMock } from './mock-server';
+
+/** Pre-built singleton for quick standalone use (Cloudflare migration compatible). */
+export const fetchMock = new FetchMock();
 export type {
   InterceptOptions,
   MockPool,

@@ -18,12 +18,10 @@ npm install -D msw-fetch-mock msw
 
 ## Quick Start
 
-```typescript
-import { setupServer } from 'msw/node';
-import { FetchMock } from 'msw-fetch-mock';
+### Standalone (Cloudflare migration)
 
-const server = setupServer();
-const fetchMock = new FetchMock(server);
+```typescript
+import { fetchMock } from 'msw-fetch-mock';
 
 beforeAll(() => fetchMock.activate());
 afterAll(() => fetchMock.deactivate());
@@ -42,11 +40,37 @@ it('mocks a GET request', async () => {
 });
 ```
 
+### With an existing MSW server
+
+If you already use MSW, pass your server to share a single interceptor:
+
+```typescript
+import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
+import { FetchMock } from 'msw-fetch-mock';
+
+const server = setupServer(http.get('/api/users', () => HttpResponse.json([{ id: 1 }])));
+const fetchMock = new FetchMock(server);
+
+beforeAll(() => server.listen());
+afterAll(() => server.close());
+afterEach(() => {
+  server.resetHandlers();
+  fetchMock.assertNoPendingInterceptors();
+});
+```
+
+> **Note:** Only one MSW server can be active at a time. If another server is already listening, standalone `activate()` will throw an error guiding you to use `new FetchMock(server)` instead.
+
 ## API Overview
+
+### `fetchMock` (singleton)
+
+A pre-built `FetchMock` instance for standalone use. Import and call `activate()` — no setup needed.
 
 ### `new FetchMock(server?)`
 
-Creates a `FetchMock` instance. Optionally accepts an existing MSW `SetupServer`; creates one internally if omitted.
+Creates a `FetchMock` instance. Pass an existing MSW `SetupServer` to share interceptors; omit to create one internally.
 
 ### Intercepting & Replying
 

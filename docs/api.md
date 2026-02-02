@@ -1,8 +1,20 @@
 # API Reference
 
+## `fetchMock` (singleton)
+
+A pre-built `FetchMock` instance for standalone use. No setup required — just import and call `activate()`.
+
+```typescript
+import { fetchMock } from 'msw-fetch-mock';
+
+beforeAll(() => fetchMock.activate());
+afterAll(() => fetchMock.deactivate());
+afterEach(() => fetchMock.assertNoPendingInterceptors());
+```
+
 ## `new FetchMock(server?)`
 
-Creates a `FetchMock` instance.
+Creates a `FetchMock` instance. Pass an existing MSW `SetupServer` to share interceptors; omit to create one internally.
 
 ```typescript
 import { FetchMock } from 'msw-fetch-mock';
@@ -34,6 +46,8 @@ fetchMock.deactivate(); // stop intercepting (calls server.close())
 ```
 
 > If you pass an external server that you manage yourself, `activate()` / `deactivate()` are no-ops.
+>
+> **Conflict detection:** In standalone mode, `activate()` checks whether `globalThis.fetch` is already patched by MSW. If so, it throws an error guiding you to pass your existing server via `new FetchMock(server)` instead.
 
 ### `fetchMock.calls`
 

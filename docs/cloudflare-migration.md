@@ -6,7 +6,7 @@ If you're migrating tests from Cloudflare Workers' `cloudflare:test` to a standa
 
 | cloudflare:test                                    | msw-fetch-mock                                              |
 | -------------------------------------------------- | ----------------------------------------------------------- |
-| `import { fetchMock } from 'cloudflare:test'`      | `const fetchMock = new FetchMock(server)`                   |
+| `import { fetchMock } from 'cloudflare:test'`      | `import { fetchMock } from 'msw-fetch-mock'`                |
 | `fetchMock.activate()`                             | `fetchMock.activate()`                                      |
 | `fetchMock.disableNetConnect()`                    | `fetchMock.disableNetConnect()`                             |
 | `fetchMock.enableNetConnect(matcher?)`             | `fetchMock.enableNetConnect(matcher?)`                      |
@@ -44,11 +44,7 @@ it('calls API', async () => {
 ## After (msw-fetch-mock)
 
 ```typescript
-import { setupServer } from 'msw/node';
-import { FetchMock } from 'msw-fetch-mock';
-
-const server = setupServer();
-const fetchMock = new FetchMock(server);
+import { fetchMock } from 'msw-fetch-mock';
 
 beforeAll(() => fetchMock.activate());
 afterAll(() => fetchMock.deactivate());
@@ -67,12 +63,13 @@ it('calls API', async () => {
 
 ## Key Differences
 
-| Aspect               | cloudflare:test                      | msw-fetch-mock                                    |
-| -------------------- | ------------------------------------ | ------------------------------------------------- |
-| Server lifecycle     | Implicit (managed by test framework) | Explicit (`activate()` / `deactivate()`)          |
-| Call history access  | `fetchMock.getCallHistory()`         | `fetchMock.getCallHistory()` or `fetchMock.calls` |
-| Call history cleanup | Automatic per test                   | Automatic via `assertNoPendingInterceptors()`     |
-| Network connect      | Must call `disableNetConnect()`      | MSW blocks unhandled requests by default          |
-| Runtime              | Cloudflare Workers (workerd)         | Node.js                                           |
+| Aspect               | cloudflare:test                               | msw-fetch-mock                                    |
+| -------------------- | --------------------------------------------- | ------------------------------------------------- |
+| Import               | `import { fetchMock } from 'cloudflare:test'` | `import { fetchMock } from 'msw-fetch-mock'`      |
+| Server lifecycle     | Implicit (managed by test framework)          | Explicit (`activate()` / `deactivate()`)          |
+| Call history access  | `fetchMock.getCallHistory()`                  | `fetchMock.getCallHistory()` or `fetchMock.calls` |
+| Call history cleanup | Automatic per test                            | Automatic via `assertNoPendingInterceptors()`     |
+| Network connect      | Must call `disableNetConnect()`               | MSW blocks unhandled requests by default          |
+| Runtime              | Cloudflare Workers (workerd)                  | Node.js                                           |
 
 > **Note:** `getCallHistory()` and `clearCallHistory()` are provided as Cloudflare-compatible aliases. You can use either the Cloudflare-style methods or the `fetchMock.calls` getter — they are equivalent.

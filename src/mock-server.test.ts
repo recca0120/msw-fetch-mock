@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
+import { setupServer } from 'msw/node';
 import { FetchMock } from './mock-server';
+import { fetchMock as singletonFetchMock } from './index';
 
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
@@ -753,5 +755,37 @@ describe('delay', () => {
 
     expect(response.status).toBe(200);
     expect(elapsed).toBeGreaterThanOrEqual(90); // allow 10ms tolerance
+  });
+});
+
+describe('activate guard', () => {
+  it('should throw when another MSW server is already listening', () => {
+    const externalServer = setupServer();
+    externalServer.listen();
+
+    try {
+      const standalone = new FetchMock();
+      expect(() => standalone.activate()).toThrow(/already active/i);
+    } finally {
+      externalServer.close();
+    }
+  });
+
+  it('should not throw when using external server mode', () => {
+    const externalServer = setupServer();
+    externalServer.listen();
+
+    try {
+      const shared = new FetchMock(externalServer);
+      expect(() => shared.activate()).not.toThrow();
+    } finally {
+      externalServer.close();
+    }
+  });
+});
+
+describe('singleton export', () => {
+  it('should export fetchMock as a FetchMock instance', () => {
+    expect(singletonFetchMock).toBeInstanceOf(FetchMock);
   });
 });

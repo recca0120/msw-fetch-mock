@@ -168,6 +168,15 @@ export class FetchMock {
 
   activate(): void {
     if (this.ownsServer) {
+      const isPatched = Object.getOwnPropertySymbols(globalThis.fetch).some(
+        (s) => s.description === 'isPatchedModule'
+      );
+      if (isPatched) {
+        throw new Error(
+          'Another MSW server is already active. ' +
+            'Pass your existing server to new FetchMock(server) instead.'
+        );
+      }
       this.server = setupServer();
       (this.server as ReturnType<typeof setupServer>).listen({
         onUnhandledRequest: (request: Request, print: { warning(): void; error(): void }) => {
