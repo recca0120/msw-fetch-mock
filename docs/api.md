@@ -7,7 +7,7 @@ A pre-built `FetchMock` instance for standalone use. No setup required — just 
 ```typescript
 import { fetchMock } from 'msw-fetch-mock';
 
-beforeAll(() => fetchMock.activate());
+beforeAll(() => fetchMock.activate({ onUnhandledRequest: 'error' }));
 afterAll(() => fetchMock.deactivate());
 afterEach(() => fetchMock.assertNoPendingInterceptors());
 ```
@@ -41,13 +41,46 @@ const fetchMock = new FetchMock(server);
 ### Lifecycle
 
 ```typescript
-fetchMock.activate(); // start intercepting (calls server.listen())
-fetchMock.deactivate(); // stop intercepting (calls server.close())
+fetchMock.activate(options?); // start intercepting (calls server.listen())
+fetchMock.deactivate();       // stop intercepting (calls server.close())
 ```
 
 > If you pass an external server that you manage yourself, `activate()` / `deactivate()` are no-ops.
 >
 > **Conflict detection:** In standalone mode, `activate()` checks whether `globalThis.fetch` is already patched by MSW. If so, it throws an error guiding you to pass your existing server via `new FetchMock(server)` instead.
+
+#### `ActivateOptions`
+
+| Property             | Type                 | Default   | Description                                         |
+| -------------------- | -------------------- | --------- | --------------------------------------------------- |
+| `onUnhandledRequest` | `OnUnhandledRequest` | `'error'` | How to handle requests with no matching interceptor |
+
+#### `OnUnhandledRequest`
+
+| Value                      | Behavior                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `'error'`                  | MSW prints an error and `fetch()` rejects with an `InternalError`                                                              |
+| `'warn'`                   | MSW prints a warning; the request passes through to the real network                                                           |
+| `'bypass'`                 | Silently passes through to the real network                                                                                    |
+| `(request, print) => void` | Custom callback. Call `print.error()` to block or `print.warning()` to warn. Return without calling either to silently bypass. |
+
+```typescript
+// Default — reject unmatched requests
+fetchMock.activate();
+fetchMock.activate({ onUnhandledRequest: 'error' });
+
+// Custom callback
+fetchMock.activate({
+  onUnhandledRequest: (request, print) => {
+    if (new URL(request.url).pathname === '/health') return;
+    print.error();
+  },
+});
+```
+
+> **Consumed interceptors:** Once a one-shot interceptor has been fully consumed, its MSW handler is removed. Subsequent requests to that URL are treated as unhandled and go through `onUnhandledRequest`. This prevents consumed interceptors from silently passing through.
+>
+> **Priority:** `enableNetConnect()` takes priority over `onUnhandledRequest` — allowed hosts always pass through regardless of the unhandled request mode.
 
 ### `fetchMock.calls`
 

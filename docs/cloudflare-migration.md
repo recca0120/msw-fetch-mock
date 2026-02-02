@@ -63,13 +63,13 @@ it('calls API', async () => {
 
 ## Key Differences
 
-| Aspect               | cloudflare:test                               | msw-fetch-mock                                    |
-| -------------------- | --------------------------------------------- | ------------------------------------------------- |
-| Import               | `import { fetchMock } from 'cloudflare:test'` | `import { fetchMock } from 'msw-fetch-mock'`      |
-| Server lifecycle     | Implicit (managed by test framework)          | Explicit (`activate()` / `deactivate()`)          |
-| Call history access  | `fetchMock.getCallHistory()`                  | `fetchMock.getCallHistory()` or `fetchMock.calls` |
-| Call history cleanup | Automatic per test                            | Automatic via `assertNoPendingInterceptors()`     |
-| Network connect      | Must call `disableNetConnect()`               | MSW blocks unhandled requests by default          |
-| Runtime              | Cloudflare Workers (workerd)                  | Node.js                                           |
+| Aspect               | cloudflare:test                               | msw-fetch-mock                                     |
+| -------------------- | --------------------------------------------- | -------------------------------------------------- |
+| Import               | `import { fetchMock } from 'cloudflare:test'` | `import { fetchMock } from 'msw-fetch-mock'`       |
+| Server lifecycle     | Implicit (managed by test framework)          | Explicit (`activate()` / `deactivate()`)           |
+| Call history access  | `fetchMock.getCallHistory()`                  | `fetchMock.getCallHistory()` or `fetchMock.calls`  |
+| Call history cleanup | Automatic per test                            | Automatic via `assertNoPendingInterceptors()`      |
+| Unhandled requests   | Must call `disableNetConnect()`               | `onUnhandledRequest: 'error'` by default (rejects) |
+| Runtime              | Cloudflare Workers (workerd)                  | Node.js                                            |
 
 > **Note:** `getCallHistory()` and `clearCallHistory()` are provided as Cloudflare-compatible aliases. You can use either the Cloudflare-style methods or the `fetchMock.calls` getter — they are equivalent.

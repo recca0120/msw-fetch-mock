@@ -23,7 +23,7 @@ npm install -D msw-fetch-mock msw
 ```typescript
 import { fetchMock } from 'msw-fetch-mock';
 
-beforeAll(() => fetchMock.activate());
+beforeAll(() => fetchMock.activate({ onUnhandledRequest: 'error' }));
 afterAll(() => fetchMock.deactivate());
 afterEach(() => fetchMock.assertNoPendingInterceptors());
 
@@ -61,6 +61,32 @@ afterEach(() => {
 ```
 
 > **Note:** Only one MSW server can be active at a time. If another server is already listening, standalone `activate()` will throw an error guiding you to use `new FetchMock(server)` instead.
+
+## Unhandled Requests
+
+By default `activate()` uses `'error'` mode — unmatched requests cause `fetch()` to reject. This includes requests to **consumed** interceptors (once a one-shot interceptor has been used, its handler is removed from MSW).
+
+```typescript
+// Reject unmatched requests (default)
+fetchMock.activate();
+fetchMock.activate({ onUnhandledRequest: 'error' });
+
+// Log a warning but allow passthrough
+fetchMock.activate({ onUnhandledRequest: 'warn' });
+
+// Silently allow passthrough
+fetchMock.activate({ onUnhandledRequest: 'bypass' });
+
+// Custom callback
+fetchMock.activate({
+  onUnhandledRequest: (request, print) => {
+    if (request.url.includes('/health')) return; // ignore
+    print.error(); // block everything else
+  },
+});
+```
+
+> `enableNetConnect()` takes priority over `onUnhandledRequest` — allowed hosts always pass through.
 
 ## API Overview
 
