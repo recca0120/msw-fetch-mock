@@ -868,6 +868,32 @@ describe('onUnhandledRequest', () => {
   });
 });
 
+describe('consumed interceptor', () => {
+  it('should treat consumed interceptor request as unhandled', async () => {
+    const captured: string[] = [];
+    const fm = new FetchMock();
+    fm.activate({
+      onUnhandledRequest: (request) => {
+        captured.push(request.url);
+      },
+    });
+
+    fm.get('http://example.test')
+      .intercept({ path: '/data', method: 'GET' })
+      .reply(200, { ok: true });
+
+    // Consume the interceptor
+    await fetch('http://example.test/data');
+
+    // Second request - consumed interceptor should trigger onUnhandledRequest callback
+    await fetch('http://example.test/data').catch(() => null);
+
+    expect(captured).toContain('http://example.test/data');
+
+    fm.deactivate();
+  });
+});
+
 describe('singleton export', () => {
   it('should export fetchMock as a FetchMock instance', () => {
     expect(singletonFetchMock).toBeInstanceOf(FetchMock);

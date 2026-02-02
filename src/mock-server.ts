@@ -164,6 +164,8 @@ export class FetchMock {
   private readonly ownsServer: boolean;
   private interceptors: PendingInterceptor[] = [];
   private netConnectAllowed: NetConnectMatcher = false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private mswHandlers: Map<PendingInterceptor, any> = new Map();
 
   get calls(): MockCallHistory {
     return this._calls;
@@ -220,6 +222,18 @@ export class FetchMock {
     return this.netConnectAllowed(host);
   }
 
+  /**
+   * Remove consumed MSW handlers so future requests to those URLs
+   * go through MSW's onUnhandledRequest instead of silently passing through.
+   */
+  private syncMswHandlers(): void {
+    if (!this.server || !this.ownsServer) return;
+    const activeHandlers = [...this.mswHandlers.entries()]
+      .filter(([p]) => !p.consumed || p.persist)
+      .map(([, handler]) => handler);
+    this.server.resetHandlers(...activeHandlers);
+  }
+
   getCallHistory(): MockCallHistory {
     return this._calls;
   }
@@ -230,6 +244,7 @@ export class FetchMock {
 
   deactivate(): void {
     this.interceptors = [];
+    this.mswHandlers.clear();
     this._calls.clear();
     if (this.ownsServer) {
       this.server?.close();
@@ -240,6 +255,7 @@ export class FetchMock {
   assertNoPendingInterceptors(): void {
     const unconsumed = this.interceptors.filter(isPending);
     this.interceptors = [];
+    this.mswHandlers.clear();
     this._calls.clear();
     if (this.ownsServer) {
       this.server?.resetHandlers();
@@ -293,6 +309,7 @@ export class FetchMock {
           pending.timesInvoked++;
           if (!pending.persist && pending.timesInvoked >= pending.times) {
             pending.consumed = true;
+            this.syncMswHandlers();
           }
 
           recordCall(this._calls, request, bodyText);
@@ -311,6 +328,7 @@ export class FetchMock {
               'FetchMock server is not active. Call activate() before registering interceptors.'
             );
           }
+          this.mswHandlers.set(pending, handler);
           this.server.use(handler);
         };
 
