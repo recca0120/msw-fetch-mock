@@ -4,9 +4,9 @@
 
 Creates a `FetchMock` instance.
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `server` | `SetupServer` | No | Existing MSW server. Creates one internally if omitted. |
+| Parameter | Type          | Required | Description                                             |
+| --------- | ------------- | -------- | ------------------------------------------------------- |
+| `server`  | `SetupServer` | No       | Existing MSW server. Creates one internally if omitted. |
 
 Returns: `FetchMock`
 
@@ -17,8 +17,8 @@ Returns: `FetchMock`
 ### Lifecycle
 
 ```typescript
-fetchMock.activate();    // start intercepting (calls server.listen())
-fetchMock.deactivate();  // stop intercepting (calls server.close())
+fetchMock.activate(); // start intercepting (calls server.listen())
+fetchMock.deactivate(); // stop intercepting (calls server.close())
 ```
 
 > If you pass an external server that you manage yourself, `activate()` / `deactivate()` are no-ops.
@@ -82,13 +82,13 @@ Returns: `MockInterceptor`
 
 #### `InterceptOptions`
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `path` | `string \| RegExp \| (path: string) => boolean` | Yes | URL pathname to match |
-| `method` | `'GET' \| 'POST' \| 'PUT' \| 'DELETE' \| 'PATCH'` | No | HTTP method (default: `'GET'`) |
-| `headers` | `Record<string, string \| RegExp \| (value: string) => boolean>` | No | Header matchers |
-| `body` | `string \| RegExp \| (body: string) => boolean` | No | Request body matcher |
-| `query` | `Record<string, string>` | No | Query parameter matchers (exact match) |
+| Property  | Type                                                             | Required | Description                            |
+| --------- | ---------------------------------------------------------------- | -------- | -------------------------------------- |
+| `path`    | `string \| RegExp \| (path: string) => boolean`                  | Yes      | URL pathname to match                  |
+| `method`  | `'GET' \| 'POST' \| 'PUT' \| 'DELETE' \| 'PATCH'`                | No       | HTTP method (default: `'GET'`)         |
+| `headers` | `Record<string, string \| RegExp \| (value: string) => boolean>` | No       | Header matchers                        |
+| `body`    | `string \| RegExp \| (body: string) => boolean`                  | No       | Request body matcher                   |
+| `query`   | `Record<string, string>`                                         | No       | Query parameter matchers (exact match) |
 
 #### Path Matching
 
@@ -163,11 +163,11 @@ Defines the mock response.
 
 Returns: `MockReplyChain`
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `status` | `number` | HTTP status code |
-| `body` | `unknown \| (req) => unknown` | Response body or callback |
-| `options` | `{ headers?: Record<string, string> }` | Response headers |
+| Parameter | Type                                   | Description               |
+| --------- | -------------------------------------- | ------------------------- |
+| `status`  | `number`                               | HTTP status code          |
+| `body`    | `unknown \| (req) => unknown`          | Response body or callback |
+| `options` | `{ headers?: Record<string, string> }` | Response headers          |
 
 ---
 
@@ -229,7 +229,7 @@ history.filterCalls(/POST.*\/users/);
 // Structured criteria
 history.filterCalls(
   { method: 'POST', path: '/users' },
-  { operator: 'AND' }  // default: 'OR'
+  { operator: 'AND' } // default: 'OR'
 );
 ```
 
@@ -237,7 +237,7 @@ history.filterCalls(
 
 ```typescript
 history.filterCallsByMethod('POST');
-history.filterCallsByMethod(/^P/);  // POST, PUT, PATCH
+history.filterCallsByMethod(/^P/); // POST, PUT, PATCH
 ```
 
 ### `history.filterCallsByPath(filter)`
@@ -270,16 +270,16 @@ for (const call of history) {
 
 Each recorded call contains:
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `method` | `string` | HTTP method |
-| `fullUrl` | `string` | Complete URL |
-| `origin` | `string` | URL origin (`https://example.com`) |
-| `path` | `string` | URL pathname (`/users`) |
-| `searchParams` | `Record<string, string>` | Query parameters |
-| `headers` | `Record<string, string>` | Request headers |
-| `body` | `string \| null` | Request body |
-| `protocol` | `string` | URL protocol (`https:`) |
-| `host` | `string` | URL host |
-| `port` | `string` | URL port |
-| `hash` | `string` | URL hash |
+| Property       | Type                     | Description                        |
+| -------------- | ------------------------ | ---------------------------------- |
+| `method`       | `string`                 | HTTP method                        |
+| `fullUrl`      | `string`                 | Complete URL                       |
+| `origin`       | `string`                 | URL origin (`https://example.com`) |
+| `path`         | `string`                 | URL pathname (`/users`)            |
+| `searchParams` | `Record<string, string>` | Query parameters                   |
+| `headers`      | `Record<string, string>` | Request headers                    |
+| `body`         | `string \| null`         | Request body                       |
+| `protocol`     | `string`                 | URL protocol (`https:`)            |
+| `host`         | `string`                 | URL host                           |
+| `port`         | `string`                 | URL port                           |
+| `hash`         | `string`                 | URL hash                           |

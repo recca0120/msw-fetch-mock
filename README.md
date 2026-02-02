@@ -65,10 +65,10 @@ fetchMock
 
 ```typescript
 const history = fetchMock.getCallHistory();
-history.calls();        // all calls
-history.lastCall();     // most recent
-history.firstCall();    // earliest
-history.nthCall(2);     // 2nd call (1-indexed)
+history.calls(); // all calls
+history.lastCall(); // most recent
+history.firstCall(); // earliest
+history.nthCall(2); // 2nd call (1-indexed)
 history.filterCalls({ method: 'POST', path: '/users' }, { operator: 'AND' });
 ```
 

@@ -4,15 +4,15 @@ If you're migrating tests from Cloudflare Workers' `cloudflare:test` to a standa
 
 ## API Comparison
 
-| cloudflare:test | msw-fetch-mock |
-|---|---|
-| `import { fetchMock } from 'cloudflare:test'` | `const fetchMock = createFetchMock(server)` |
-| `fetchMock.activate()` | `fetchMock.activate()` |
-| `fetchMock.disableNetConnect()` | `fetchMock.disableNetConnect()` |
-| `fetchMock.deactivate()` | `fetchMock.deactivate()` |
+| cloudflare:test                                    | msw-fetch-mock                                     |
+| -------------------------------------------------- | -------------------------------------------------- |
+| `import { fetchMock } from 'cloudflare:test'`      | `const fetchMock = createFetchMock(server)`        |
+| `fetchMock.activate()`                             | `fetchMock.activate()`                             |
+| `fetchMock.disableNetConnect()`                    | `fetchMock.disableNetConnect()`                    |
+| `fetchMock.deactivate()`                           | `fetchMock.deactivate()`                           |
 | `fetchMock.get(origin).intercept(opts).reply(...)` | `fetchMock.get(origin).intercept(opts).reply(...)` |
-| `fetchMock.getCallHistory()` | `fetchMock.getCallHistory()` |
-| `fetchMock.assertNoPendingInterceptors()` | `fetchMock.assertNoPendingInterceptors()` |
+| `fetchMock.getCallHistory()`                       | `fetchMock.getCallHistory()`                       |
+| `fetchMock.assertNoPendingInterceptors()`          | `fetchMock.assertNoPendingInterceptors()`          |
 
 ## Before (cloudflare:test)
 
@@ -66,9 +66,9 @@ it('calls API', async () => {
 
 ## Key Differences
 
-| Aspect | cloudflare:test | msw-fetch-mock |
-|--------|----------------|----------------|
-| Server lifecycle | Implicit (managed by test framework) | Explicit (`activate()` / `deactivate()`) |
-| Call history cleanup | Automatic per test | Manual (`clearCallHistory()` in `afterEach`) |
-| Network connect | Must call `disableNetConnect()` | MSW blocks unhandled requests by default |
-| Runtime | Cloudflare Workers (workerd) | Node.js |
+| Aspect               | cloudflare:test                      | msw-fetch-mock                               |
+| -------------------- | ------------------------------------ | -------------------------------------------- |
+| Server lifecycle     | Implicit (managed by test framework) | Explicit (`activate()` / `deactivate()`)     |
+| Call history cleanup | Automatic per test                   | Manual (`clearCallHistory()` in `afterEach`) |
+| Network connect      | Must call `disableNetConnect()`      | MSW blocks unhandled requests by default     |
+| Runtime              | Cloudflare Workers (workerd)         | Node.js                                      |
