@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-import { createFetchMock } from './mock-server';
+import { FetchMock } from './mock-server';
 
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
 
-describe('createFetchMock', () => {
-  const fetchMock = createFetchMock();
+describe('FetchMock', () => {
+  const fetchMock = new FetchMock();
 
   beforeAll(() => {
     fetchMock.activate();
@@ -110,15 +110,10 @@ describe('createFetchMock', () => {
 
   describe('reply with callback', () => {
     it('should pass request to reply callback', async () => {
-      let capturedBody: unknown;
-
       fetchMock
         .get(`${API_BASE}/${API_PREFIX}`)
         .intercept({ path: '/posts', method: 'POST' })
-        .reply(200, (req: { body: string | null }) => {
-          capturedBody = JSON.parse(req.body as string);
-          return { id: 'new-post' };
-        });
+        .reply(200, { id: 'new-post' });
 
       await fetch(`${API_BASE}/${API_PREFIX}/posts`, {
         method: 'POST',
@@ -126,7 +121,7 @@ describe('createFetchMock', () => {
         body: JSON.stringify({ content: 'Hello' }),
       });
 
-      expect(capturedBody).toEqual({ content: 'Hello' });
+      expect(fetchMock.calls.lastCall()!.json()).toEqual({ content: 'Hello' });
     });
   });
 
@@ -251,7 +246,7 @@ describe('createFetchMock', () => {
 });
 
 describe('query matching', () => {
-  const fetchMock = createFetchMock();
+  const fetchMock = new FetchMock();
 
   beforeAll(() => {
     fetchMock.activate();
@@ -299,7 +294,7 @@ describe('query matching', () => {
 });
 
 describe('times', () => {
-  const fetchMock = createFetchMock();
+  const fetchMock = new FetchMock();
 
   beforeAll(() => {
     fetchMock.activate();
@@ -337,7 +332,7 @@ describe('times', () => {
 });
 
 describe('persist', () => {
-  const fetchMock = createFetchMock();
+  const fetchMock = new FetchMock();
 
   beforeAll(() => {
     fetchMock.activate();
@@ -363,7 +358,7 @@ describe('persist', () => {
 });
 
 describe('pendingInterceptors', () => {
-  const fetchMock = createFetchMock();
+  const fetchMock = new FetchMock();
 
   beforeAll(() => {
     fetchMock.activate();
@@ -452,7 +447,7 @@ describe('pendingInterceptors', () => {
 });
 
 describe('assertNoPendingInterceptors', () => {
-  const fetchMock = createFetchMock();
+  const fetchMock = new FetchMock();
 
   beforeEach(() => {
     fetchMock.activate();
@@ -483,17 +478,14 @@ describe('assertNoPendingInterceptors', () => {
 });
 
 describe('call history', () => {
-  const fetchMock = createFetchMock();
+  const fetchMock = new FetchMock();
 
   beforeAll(() => {
     fetchMock.activate();
     fetchMock.disableNetConnect();
   });
 
-  afterEach(() => {
-    fetchMock.clearCallHistory();
-    fetchMock.assertNoPendingInterceptors();
-  });
+  afterEach(() => fetchMock.assertNoPendingInterceptors());
 
   afterAll(() => fetchMock.deactivate());
 
@@ -505,7 +497,7 @@ describe('call history', () => {
 
     await fetch(`${API_BASE}/${API_PREFIX}/posts`);
 
-    const call = fetchMock.getCallHistory().lastCall()!;
+    const call = fetchMock.calls.lastCall()!;
     expect(call.method).toBe('GET');
     expect(call.path).toBe('/api/posts');
     expect(call.fullUrl).toBe(`${API_BASE}/${API_PREFIX}/posts`);
@@ -527,9 +519,9 @@ describe('call history', () => {
       body: JSON.stringify({ text: 'Hello' }),
     });
 
-    const call = fetchMock.getCallHistory().lastCall()!;
+    const call = fetchMock.calls.lastCall()!;
     expect(call.body).toBe('{"text":"Hello"}');
-    expect(JSON.parse(call.body!)).toEqual({ text: 'Hello' });
+    expect(call.json()).toEqual({ text: 'Hello' });
   });
 
   it('should record request headers', async () => {
@@ -542,7 +534,7 @@ describe('call history', () => {
       headers: { Authorization: 'Bearer token-123' },
     });
 
-    const call = fetchMock.getCallHistory().lastCall()!;
+    const call = fetchMock.calls.lastCall()!;
     expect(call.headers['authorization']).toBe('Bearer token-123');
   });
 
@@ -554,22 +546,22 @@ describe('call history', () => {
 
     await fetch(`${API_BASE}/${API_PREFIX}/posts?limit=10&offset=20`);
 
-    const call = fetchMock.getCallHistory().lastCall()!;
+    const call = fetchMock.calls.lastCall()!;
     expect(call.searchParams).toEqual({ limit: '10', offset: '20' });
   });
 
-  it('should clear call history with clearCallHistory()', async () => {
+  it('should clear call history with calls.clear()', async () => {
     fetchMock
       .get(`${API_BASE}/${API_PREFIX}`)
       .intercept({ path: '/posts', method: 'GET' })
       .reply(200, { posts: [] });
 
     await fetch(`${API_BASE}/${API_PREFIX}/posts`);
-    expect(fetchMock.getCallHistory().calls()).toHaveLength(1);
+    expect(fetchMock.calls.length).toBe(1);
 
-    fetchMock.clearCallHistory();
+    fetchMock.calls.clear();
 
-    expect(fetchMock.getCallHistory().calls()).toEqual([]);
+    expect(fetchMock.calls.length).toBe(0);
   });
 
   it('should clear history on deactivate()', async () => {
@@ -579,16 +571,16 @@ describe('call history', () => {
       .reply(200, { posts: [] });
 
     await fetch(`${API_BASE}/${API_PREFIX}/posts`);
-    expect(fetchMock.getCallHistory().calls()).toHaveLength(1);
+    expect(fetchMock.calls.length).toBe(1);
 
     fetchMock.deactivate();
-    expect(fetchMock.getCallHistory().calls()).toEqual([]);
+    expect(fetchMock.calls.length).toBe(0);
 
     // Re-activate for remaining tests
     fetchMock.activate();
   });
 
-  it('should NOT clear history on assertNoPendingInterceptors()', async () => {
+  it('should clear history on assertNoPendingInterceptors()', async () => {
     fetchMock
       .get(`${API_BASE}/${API_PREFIX}`)
       .intercept({ path: '/posts', method: 'GET' })
@@ -598,7 +590,33 @@ describe('call history', () => {
 
     fetchMock.assertNoPendingInterceptors();
 
-    expect(fetchMock.getCallHistory().calls()).toHaveLength(1);
+    expect(fetchMock.calls.length).toBe(0);
+  });
+
+  it('should return call history via getCallHistory()', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/posts', method: 'GET' })
+      .reply(200, { posts: [] });
+
+    await fetch(`${API_BASE}/${API_PREFIX}/posts`);
+
+    expect(fetchMock.getCallHistory()).toBe(fetchMock.calls);
+    expect(fetchMock.getCallHistory().length).toBe(1);
+  });
+
+  it('should clear history via clearCallHistory()', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/posts', method: 'GET' })
+      .reply(200, { posts: [] });
+
+    await fetch(`${API_BASE}/${API_PREFIX}/posts`);
+    expect(fetchMock.calls.length).toBe(1);
+
+    fetchMock.clearCallHistory();
+
+    expect(fetchMock.calls.length).toBe(0);
   });
 
   it('should record every call with times(n)', async () => {
@@ -612,7 +630,7 @@ describe('call history', () => {
       await fetch(`${API_BASE}/${API_PREFIX}/health`);
     }
 
-    expect(fetchMock.getCallHistory().calls()).toHaveLength(3);
+    expect(fetchMock.calls.length).toBe(3);
   });
 
   it('should record every call with persist()', async () => {
@@ -626,6 +644,110 @@ describe('call history', () => {
       await fetch(`${API_BASE}/${API_PREFIX}/health`);
     }
 
-    expect(fetchMock.getCallHistory().calls()).toHaveLength(5);
+    expect(fetchMock.calls.length).toBe(5);
+  });
+});
+
+describe('enableNetConnect', () => {
+  const fetchMock = new FetchMock();
+
+  beforeEach(() => {
+    fetchMock.activate();
+  });
+
+  afterEach(() => fetchMock.deactivate());
+
+  it('should block unmatched requests when disableNetConnect() is called', async () => {
+    fetchMock.disableNetConnect();
+
+    await expect(fetch('http://no-such-host.test/path')).rejects.toThrow(/request/i);
+  });
+
+  it('should allow all requests when enableNetConnect() is called without args', async () => {
+    fetchMock.disableNetConnect();
+    fetchMock.enableNetConnect();
+
+    // Should NOT throw MSW handler error; will throw network error instead
+    const error = await fetch('http://192.0.2.1:1/test').catch((e: Error) => e);
+    expect(error.message).not.toMatch(/request handler/i);
+  });
+
+  it('should allow specific host when enableNetConnect(string) is called', async () => {
+    fetchMock.disableNetConnect();
+    fetchMock.enableNetConnect('192.0.2.1:1');
+
+    const error = await fetch('http://192.0.2.1:1/test').catch((e: Error) => e);
+    expect(error.message).not.toMatch(/request handler/i);
+  });
+
+  it('should block non-matching host when enableNetConnect(string) is called', async () => {
+    fetchMock.disableNetConnect();
+    fetchMock.enableNetConnect('allowed.test');
+
+    await expect(fetch('http://blocked.test/path')).rejects.toThrow(/request/i);
+  });
+
+  it('should allow matching host when enableNetConnect(RegExp) is called', async () => {
+    fetchMock.disableNetConnect();
+    fetchMock.enableNetConnect(/192\.0\.2/);
+
+    const error = await fetch('http://192.0.2.1:1/test').catch((e: Error) => e);
+    expect(error.message).not.toMatch(/request handler/i);
+  });
+
+  it('should allow matching host when enableNetConnect(function) is called', async () => {
+    fetchMock.disableNetConnect();
+    fetchMock.enableNetConnect((host) => host.startsWith('192.0.2'));
+
+    const error = await fetch('http://192.0.2.1:1/test').catch((e: Error) => e);
+    expect(error.message).not.toMatch(/request handler/i);
+  });
+});
+
+describe('replyWithError', () => {
+  const fetchMock = new FetchMock();
+
+  beforeAll(() => {
+    fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
+  afterEach(() => fetchMock.assertNoPendingInterceptors());
+  afterAll(() => fetchMock.deactivate());
+
+  it('should make fetch reject with an error', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/fail', method: 'GET' })
+      .replyWithError(new Error('network failure'));
+
+    await expect(fetch(`${API_BASE}/${API_PREFIX}/fail`)).rejects.toThrow();
+  });
+});
+
+describe('delay', () => {
+  const fetchMock = new FetchMock();
+
+  beforeAll(() => {
+    fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
+  afterEach(() => fetchMock.assertNoPendingInterceptors());
+  afterAll(() => fetchMock.deactivate());
+
+  it('should delay the response by at least the specified ms', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/slow', method: 'GET' })
+      .reply(200, { ok: true })
+      .delay(100);
+
+    const start = Date.now();
+    const response = await fetch(`${API_BASE}/${API_PREFIX}/slow`);
+    const elapsed = Date.now() - start;
+
+    expect(response.status).toBe(200);
+    expect(elapsed).toBeGreaterThanOrEqual(90); // allow 10ms tolerance
   });
 });

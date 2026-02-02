@@ -1,6 +1,5 @@
-export { createFetchMock } from './mock-server';
+export { createFetchMock, FetchMock } from './mock-server';
 export type {
-  FetchMock,
   InterceptOptions,
   MockPool,
   MockInterceptor,
@@ -8,5 +7,5 @@ export type {
   ReplyOptions,
   PendingInterceptor,
 } from './mock-server';
-export { MockCallHistory } from './mock-call-history';
-export type { MockCallHistoryLog } from './mock-call-history';
+export { MockCallHistory, MockCallHistoryLog } from './mock-call-history';
+export type { MockCallHistoryLogData, CallHistoryFilterCriteria } from './mock-call-history';
