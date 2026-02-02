@@ -15,6 +15,7 @@
     "type": "git",
     "url": "https://github.com/recca0120/msw-fetch-mock.git"
   },
+  "packageManager": "pnpm@10.12.4",
   "engines": {
     "node": ">=18"
   },
