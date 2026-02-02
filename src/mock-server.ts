@@ -334,7 +334,7 @@ export class FetchMock {
             return buildChain(delayRef);
           },
 
-          replyWithError: (_error: Error): MockReplyChain => {
+          replyWithError: (): MockReplyChain => {
             const delayRef = { ms: 0 };
 
             registerHandler(async (request) => {
