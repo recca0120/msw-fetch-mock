@@ -668,16 +668,18 @@ describe('enableNetConnect', () => {
     fetchMock.enableNetConnect();
 
     // Should NOT throw MSW handler error; will throw network error instead
-    const error = await fetch('http://192.0.2.1:1/test').catch((e: Error) => e);
-    expect(error.message).not.toMatch(/request handler/i);
+    const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toMatch(/request handler/i);
   });
 
   it('should allow specific host when enableNetConnect(string) is called', async () => {
     fetchMock.disableNetConnect();
     fetchMock.enableNetConnect('192.0.2.1:1');
 
-    const error = await fetch('http://192.0.2.1:1/test').catch((e: Error) => e);
-    expect(error.message).not.toMatch(/request handler/i);
+    const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toMatch(/request handler/i);
   });
 
   it('should block non-matching host when enableNetConnect(string) is called', async () => {
@@ -691,16 +693,18 @@ describe('enableNetConnect', () => {
     fetchMock.disableNetConnect();
     fetchMock.enableNetConnect(/192\.0\.2/);
 
-    const error = await fetch('http://192.0.2.1:1/test').catch((e: Error) => e);
-    expect(error.message).not.toMatch(/request handler/i);
+    const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toMatch(/request handler/i);
   });
 
   it('should allow matching host when enableNetConnect(function) is called', async () => {
     fetchMock.disableNetConnect();
     fetchMock.enableNetConnect((host) => host.startsWith('192.0.2'));
 
-    const error = await fetch('http://192.0.2.1:1/test').catch((e: Error) => e);
-    expect(error.message).not.toMatch(/request handler/i);
+    const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toMatch(/request handler/i);
   });
 });
 
