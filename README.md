@@ -20,17 +20,14 @@ npm install -D msw-fetch-mock msw
 
 ```typescript
 import { setupServer } from 'msw/node';
-import { createFetchMock } from 'msw-fetch-mock';
+import { FetchMock } from 'msw-fetch-mock';
 
 const server = setupServer();
-const fetchMock = createFetchMock(server);
+const fetchMock = new FetchMock(server);
 
 beforeAll(() => fetchMock.activate());
 afterAll(() => fetchMock.deactivate());
-afterEach(() => {
-  fetchMock.clearCallHistory();
-  fetchMock.assertNoPendingInterceptors();
-});
+afterEach(() => fetchMock.assertNoPendingInterceptors());
 
 it('mocks a GET request', async () => {
   fetchMock
@@ -47,7 +44,7 @@ it('mocks a GET request', async () => {
 
 ## API Overview
 
-### `createFetchMock(server?)`
+### `new FetchMock(server?)`
 
 Creates a `FetchMock` instance. Optionally accepts an existing MSW `SetupServer`; creates one internally if omitted.
 
@@ -64,12 +61,10 @@ fetchMock
 ### Call History
 
 ```typescript
-const history = fetchMock.getCallHistory();
-history.calls(); // all calls
-history.lastCall(); // most recent
-history.firstCall(); // earliest
-history.nthCall(2); // 2nd call (1-indexed)
-history.filterCalls({ method: 'POST', path: '/users' }, { operator: 'AND' });
+fetchMock.calls.lastCall(); // most recent
+fetchMock.calls.firstCall(); // earliest
+fetchMock.calls.nthCall(2); // 2nd call (1-indexed)
+fetchMock.calls.filterCalls({ method: 'POST', path: '/users' }, { operator: 'AND' });
 ```
 
 ### Assertions
