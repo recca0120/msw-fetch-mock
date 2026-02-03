@@ -51,14 +51,8 @@ describe('node-test integration', () => {
 
   describe('call history', () => {
     it('should record calls and provide access via lastCall/firstCall', async () => {
-      fetchMock
-        .get(API_BASE)
-        .intercept({ path: '/a', method: 'GET' })
-        .reply(200, { a: true });
-      fetchMock
-        .get(API_BASE)
-        .intercept({ path: '/b', method: 'GET' })
-        .reply(200, { b: true });
+      fetchMock.get(API_BASE).intercept({ path: '/a', method: 'GET' }).reply(200, { a: true });
+      fetchMock.get(API_BASE).intercept({ path: '/b', method: 'GET' }).reply(200, { b: true });
 
       await fetch(`${API_BASE}/a`);
       await fetch(`${API_BASE}/b`);
@@ -69,10 +63,7 @@ describe('node-test integration', () => {
     });
 
     it('should record POST body and parse as JSON', async () => {
-      fetchMock
-        .get(API_BASE)
-        .intercept({ path: '/data', method: 'POST' })
-        .reply(200, { ok: true });
+      fetchMock.get(API_BASE).intercept({ path: '/data', method: 'POST' }).reply(200, { ok: true });
 
       await fetch(`${API_BASE}/data`, {
         method: 'POST',
@@ -93,20 +84,14 @@ describe('node-test integration', () => {
         .intercept({ path: '/unused', method: 'GET' })
         .reply(200, { data: 'never fetched' });
 
-      assert.throws(
-        () => fetchMock.assertNoPendingInterceptors(),
-        /pending interceptor/i,
-      );
+      assert.throws(() => fetchMock.assertNoPendingInterceptors(), /pending interceptor/i);
       fetchMock.reset();
     });
   });
 
   describe('reset', () => {
     it('should clear interceptors and call history', async () => {
-      fetchMock
-        .get(API_BASE)
-        .intercept({ path: '/test', method: 'GET' })
-        .reply(200, { ok: true });
+      fetchMock.get(API_BASE).intercept({ path: '/test', method: 'GET' }).reply(200, { ok: true });
 
       await fetch(`${API_BASE}/test`);
       assert.equal(fetchMock.calls.length, 1);
@@ -162,7 +147,7 @@ describe('node-test integration', () => {
 
       await assert.rejects(
         () => fetch(`${API_BASE}/fail`),
-        (err) => err instanceof Error,
+        (err) => err instanceof Error
       );
     });
   });
