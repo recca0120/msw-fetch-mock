@@ -6,6 +6,7 @@ import type {
   InterceptOptions,
   ReplyOptions,
   ReplyCallback,
+  SingleReplyCallback,
   MockReplyChain,
   MockInterceptor,
   MockPool,
@@ -196,12 +197,32 @@ export class FetchMock {
     return FetchMock._handlerFactory;
   }
 
+  private buildResponse(
+    status: number,
+    responseBody: unknown,
+    replyOptions?: ReplyOptions,
+    defaultHeaders?: Record<string, string>,
+    addContentLength?: boolean
+  ): Response {
+    const mergedHeaders: Record<string, string> = { ...defaultHeaders };
+    if (replyOptions?.headers) {
+      Object.assign(mergedHeaders, replyOptions.headers);
+    }
+    if (addContentLength && responseBody !== null && responseBody !== undefined) {
+      mergedHeaders['Content-Length'] = String(JSON.stringify(responseBody).length);
+    }
+    const headers = Object.keys(mergedHeaders).length > 0 ? new Headers(mergedHeaders) : undefined;
+    return this.handlerFactory.buildResponse(status, responseBody, headers);
+  }
+
   private readonly _calls = new MockCallHistory();
   private adapter: MswAdapter;
   private interceptors: PendingInterceptor[] = [];
   private netConnectAllowed: NetConnectMatcher = false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mswHandlers: Map<PendingInterceptor, any> = new Map();
+  private _defaultReplyHeaders: Record<string, string> = {};
+  private _callHistoryEnabled = true;
 
   get calls(): MockCallHistory {
     return this._calls;
@@ -264,6 +285,22 @@ export class FetchMock {
     this._calls.clear();
   }
 
+  clearAllCallHistory(): void {
+    this.clearCallHistory();
+  }
+
+  defaultReplyHeaders(headers: Record<string, string>): void {
+    this._defaultReplyHeaders = headers;
+  }
+
+  enableCallHistory(): void {
+    this._callHistoryEnabled = true;
+  }
+
+  disableCallHistory(): void {
+    this._callHistoryEnabled = false;
+  }
+
   deactivate(): void {
     this.interceptors = [];
     this.mswHandlers.clear();
@@ -275,6 +312,7 @@ export class FetchMock {
     this.interceptors = [];
     this.mswHandlers.clear();
     this._calls.clear();
+    this._defaultReplyHeaders = {};
     this.adapter.resetHandlers();
   }
 
@@ -290,7 +328,15 @@ export class FetchMock {
     return this.interceptors.filter(isPending).map((p) => ({ ...p }));
   }
 
-  get(origin: string): MockPool {
+  get(origin: string | RegExp | ((origin: string) => boolean)): MockPool {
+    const originStr =
+      typeof origin === 'string'
+        ? origin
+        : origin instanceof RegExp
+          ? origin.toString()
+          : '<function>';
+    const isNonStringOrigin = typeof origin !== 'string';
+
     return {
       intercept: (options: InterceptOptions): MockInterceptor => {
         const method = options.method ?? 'GET';
@@ -301,7 +347,7 @@ export class FetchMock {
               ? '<function>'
               : options.path.toString();
         const pending: PendingInterceptor = {
-          origin,
+          origin: originStr,
           path: pathStr,
           method,
           consumed: false,
@@ -311,14 +357,42 @@ export class FetchMock {
         };
         this.interceptors.push(pending);
 
-        const urlPattern =
-          typeof options.path === 'string'
-            ? `${origin}${options.path}`
-            : new RegExp(`^${escapeRegExp(origin)}`);
+        let urlPattern: string | RegExp;
+        if (typeof origin === 'string') {
+          urlPattern =
+            typeof options.path === 'string'
+              ? `${origin}${options.path}`
+              : new RegExp(`^${escapeRegExp(origin)}`);
+        } else {
+          // Non-string origin: catch all URLs, do manual matching
+          urlPattern = /.*/;
+        }
+
+        const matchOrigin = (request: Request): boolean => {
+          if (typeof origin === 'string') return true;
+          const url = new URL(request.url);
+          if (origin instanceof RegExp) return origin.test(url.origin);
+          return origin(url.origin);
+        };
+
+        const matchPathForOrigin = (request: Request): boolean => {
+          if (isNonStringOrigin) {
+            if (typeof options.path === 'string') {
+              const url = new URL(request.url);
+              return url.pathname === options.path || url.pathname.endsWith(options.path);
+            }
+            // Non-string origin + non-string path: match against full pathname+search
+            const url = new URL(request.url);
+            const fullPath = url.pathname + url.search;
+            return matchesValue(fullPath, options.path as RegExp | ((v: string) => boolean));
+          }
+          return matchPath(request, originStr, options.path);
+        };
 
         const matchAndConsume = async (request: Request) => {
           if (!pending.persist && pending.timesInvoked >= pending.times) return;
-          if (!matchPath(request, origin, options.path)) return;
+          if (!matchOrigin(request)) return;
+          if (!matchPathForOrigin(request)) return;
           if (!matchQuery(request, options.query)) return;
           if (!matchHeaders(request, options.headers)) return;
 
@@ -331,7 +405,9 @@ export class FetchMock {
             this.syncMswHandlers();
           }
 
-          recordCall(this._calls, request, bodyText);
+          if (this._callHistoryEnabled) {
+            recordCall(this._calls, request, bodyText);
+          }
           return bodyText;
         };
 
@@ -343,7 +419,10 @@ export class FetchMock {
           this.adapter.use(handler);
         };
 
-        const buildChain = (delayRef: { ms: number }): MockReplyChain => ({
+        const buildChain = (
+          delayRef: { ms: number },
+          contentLengthRef: { enabled: boolean }
+        ): MockReplyChain => ({
           times(n: number) {
             pending.times = n;
             pending.consumed = false;
@@ -355,42 +434,76 @@ export class FetchMock {
           delay(ms: number) {
             delayRef.ms = ms;
           },
+          replyContentLength() {
+            contentLengthRef.enabled = true;
+          },
         });
 
         return {
           reply: (
-            status: number,
+            statusOrCallback: number | SingleReplyCallback,
             bodyOrCallback?: unknown | ReplyCallback,
             replyOptions?: ReplyOptions
           ): MockReplyChain => {
             const delayRef = { ms: 0 };
+            const contentLengthRef = { enabled: false };
 
-            registerHandler(async (request) => {
-              const bodyText = await matchAndConsume(request);
-              if (bodyText === undefined) return;
+            if (typeof statusOrCallback === 'function') {
+              // Single callback form: reply(callback)
+              const callback = statusOrCallback;
+              registerHandler(async (request) => {
+                const bodyText = await matchAndConsume(request);
+                if (bodyText === undefined) return;
 
-              if (delayRef.ms > 0) {
-                await new Promise((resolve) => setTimeout(resolve, delayRef.ms));
-              }
+                if (delayRef.ms > 0) {
+                  await new Promise((resolve) => setTimeout(resolve, delayRef.ms));
+                }
 
-              let responseBody: unknown;
-              if (typeof bodyOrCallback === 'function') {
-                responseBody = await (bodyOrCallback as ReplyCallback)({
-                  body: bodyText || null,
-                });
-              } else {
-                responseBody = bodyOrCallback;
-              }
+                const result = await callback({ body: bodyText || null });
+                return this.buildResponse(
+                  result.statusCode,
+                  result.data,
+                  result.responseOptions,
+                  this._defaultReplyHeaders,
+                  contentLengthRef.enabled
+                );
+              });
+            } else {
+              // Original form: reply(status, body?, options?)
+              const status = statusOrCallback;
+              registerHandler(async (request) => {
+                const bodyText = await matchAndConsume(request);
+                if (bodyText === undefined) return;
 
-              const headers = replyOptions?.headers ? new Headers(replyOptions.headers) : undefined;
-              return this.handlerFactory.buildResponse(status, responseBody, headers);
-            });
+                if (delayRef.ms > 0) {
+                  await new Promise((resolve) => setTimeout(resolve, delayRef.ms));
+                }
 
-            return buildChain(delayRef);
+                let responseBody: unknown;
+                if (typeof bodyOrCallback === 'function') {
+                  responseBody = await (bodyOrCallback as ReplyCallback)({
+                    body: bodyText || null,
+                  });
+                } else {
+                  responseBody = bodyOrCallback;
+                }
+
+                return this.buildResponse(
+                  status,
+                  responseBody,
+                  replyOptions,
+                  this._defaultReplyHeaders,
+                  contentLengthRef.enabled
+                );
+              });
+            }
+
+            return buildChain(delayRef, contentLengthRef);
           },
 
           replyWithError: (): MockReplyChain => {
             const delayRef = { ms: 0 };
+            const contentLengthRef = { enabled: false };
 
             registerHandler(async (request) => {
               const bodyText = await matchAndConsume(request);
@@ -399,7 +512,7 @@ export class FetchMock {
               return this.handlerFactory.buildErrorResponse();
             });
 
-            return buildChain(delayRef);
+            return buildChain(delayRef, contentLengthRef);
           },
         };
       },

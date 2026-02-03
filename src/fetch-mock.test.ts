@@ -979,6 +979,303 @@ describe('consumed interceptor', () => {
   });
 });
 
+describe('defaultReplyHeaders', () => {
+  const fetchMock = createFetchMock();
+
+  beforeAll(async () => {
+    await fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
+  afterAll(() => fetchMock.deactivate());
+
+  it('should add default headers to all replies', async () => {
+    fetchMock.defaultReplyHeaders({ 'X-Request-Id': 'abc-123' });
+
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/data', method: 'GET' })
+      .reply(200, { ok: true });
+
+    const response = await fetch(`${API_BASE}/${API_PREFIX}/data`);
+
+    expect(response.headers.get('X-Request-Id')).toBe('abc-123');
+  });
+
+  it('should merge default headers with per-reply headers', async () => {
+    fetchMock.defaultReplyHeaders({ 'X-Default': 'default-val' });
+
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/data', method: 'GET' })
+      .reply(200, { ok: true }, { headers: { 'X-Custom': 'custom-val' } });
+
+    const response = await fetch(`${API_BASE}/${API_PREFIX}/data`);
+
+    expect(response.headers.get('X-Default')).toBe('default-val');
+    expect(response.headers.get('X-Custom')).toBe('custom-val');
+  });
+
+  it('should let per-reply headers override default headers', async () => {
+    fetchMock.defaultReplyHeaders({ 'X-Override': 'default' });
+
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/data', method: 'GET' })
+      .reply(200, { ok: true }, { headers: { 'X-Override': 'custom' } });
+
+    const response = await fetch(`${API_BASE}/${API_PREFIX}/data`);
+
+    expect(response.headers.get('X-Override')).toBe('custom');
+  });
+
+  it('should clear default headers on reset()', async () => {
+    fetchMock.defaultReplyHeaders({ 'X-Will-Be-Cleared': 'yes' });
+    fetchMock.reset();
+
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/data', method: 'GET' })
+      .reply(200, { ok: true });
+
+    const response = await fetch(`${API_BASE}/${API_PREFIX}/data`);
+
+    expect(response.headers.get('X-Will-Be-Cleared')).toBeNull();
+  });
+});
+
+describe('replyWithError with Error parameter', () => {
+  const fetchMock = createFetchMock();
+
+  beforeAll(async () => {
+    await fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
+  afterAll(() => fetchMock.deactivate());
+
+  it('should accept Error parameter and reject the fetch', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/fail', method: 'GET' })
+      .replyWithError(new Error('custom network failure'));
+
+    await expect(fetch(`${API_BASE}/${API_PREFIX}/fail`)).rejects.toThrow();
+  });
+});
+
+describe('get(origin) with RegExp', () => {
+  const fetchMock = createFetchMock();
+
+  beforeAll(async () => {
+    await fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
+  afterAll(() => fetchMock.deactivate());
+
+  it('should accept RegExp as origin', async () => {
+    fetchMock
+      .get(/localhost/)
+      .intercept({ path: '/data', method: 'GET' })
+      .reply(200, { matched: true });
+
+    const response = await fetch(`${API_BASE}/data`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ matched: true });
+  });
+});
+
+describe('get(origin) with function', () => {
+  const fetchMock = createFetchMock();
+
+  beforeAll(async () => {
+    await fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
+  afterAll(() => fetchMock.deactivate());
+
+  it('should accept function as origin', async () => {
+    fetchMock
+      .get((origin: string) => origin.includes('localhost'))
+      .intercept({ path: '/data', method: 'GET' })
+      .reply(200, { matched: true });
+
+    const response = await fetch(`${API_BASE}/data`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ matched: true });
+  });
+});
+
+describe('reply(callback) single parameter form', () => {
+  const fetchMock = createFetchMock();
+
+  beforeAll(async () => {
+    await fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
+  afterAll(() => fetchMock.deactivate());
+
+  it('should accept single callback returning { statusCode, data }', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/echo', method: 'POST' })
+      .reply((req) => {
+        const body = req.body ? JSON.parse(req.body) : null;
+        return { statusCode: 201, data: { echo: body } };
+      });
+
+    const response = await fetch(`${API_BASE}/${API_PREFIX}/echo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ msg: 'hello' }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ echo: { msg: 'hello' } });
+  });
+});
+
+describe('clearAllCallHistory', () => {
+  const fetchMock = createFetchMock();
+
+  beforeAll(async () => {
+    await fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
+  afterAll(() => fetchMock.deactivate());
+
+  it('should be an alias for clearCallHistory()', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/posts', method: 'GET' })
+      .reply(200, { posts: [] });
+
+    await fetch(`${API_BASE}/${API_PREFIX}/posts`);
+    expect(fetchMock.calls.length).toBe(1);
+
+    fetchMock.clearAllCallHistory();
+
+    expect(fetchMock.calls.length).toBe(0);
+  });
+});
+
+describe('enableCallHistory / disableCallHistory', () => {
+  const fetchMock = createFetchMock();
+
+  beforeAll(async () => {
+    await fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
+  afterAll(() => fetchMock.deactivate());
+
+  it('should record calls by default', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/posts', method: 'GET' })
+      .reply(200, { posts: [] });
+
+    await fetch(`${API_BASE}/${API_PREFIX}/posts`);
+
+    expect(fetchMock.calls.length).toBe(1);
+  });
+
+  it('should not record calls when disableCallHistory() is called', async () => {
+    fetchMock.disableCallHistory();
+
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/posts', method: 'GET' })
+      .reply(200, { posts: [] });
+
+    await fetch(`${API_BASE}/${API_PREFIX}/posts`);
+
+    expect(fetchMock.calls.length).toBe(0);
+
+    // Re-enable for cleanup
+    fetchMock.enableCallHistory();
+  });
+
+  it('should resume recording after enableCallHistory()', async () => {
+    fetchMock.disableCallHistory();
+    fetchMock.enableCallHistory();
+
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/posts', method: 'GET' })
+      .reply(200, { posts: [] });
+
+    await fetch(`${API_BASE}/${API_PREFIX}/posts`);
+
+    expect(fetchMock.calls.length).toBe(1);
+  });
+});
+
+describe('replyContentLength', () => {
+  const fetchMock = createFetchMock();
+
+  beforeAll(async () => {
+    await fetchMock.activate();
+    fetchMock.disableNetConnect();
+  });
+
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors();
+    fetchMock.reset();
+  });
+  afterAll(() => fetchMock.deactivate());
+
+  it('should auto-add Content-Length header', async () => {
+    const body = { message: 'hello' };
+
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/data', method: 'GET' })
+      .reply(200, body)
+      .replyContentLength();
+
+    const response = await fetch(`${API_BASE}/${API_PREFIX}/data`);
+
+    const contentLength = response.headers.get('Content-Length');
+    expect(contentLength).not.toBeNull();
+    expect(Number(contentLength)).toBe(JSON.stringify(body).length);
+  });
+});
+
 describe('singleton export', () => {
   it('should export fetchMock as a FetchMock instance', () => {
     expect(singletonFetchMock).toBeInstanceOf(FetchMock);
