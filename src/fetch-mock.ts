@@ -1,8 +1,17 @@
 import { MockCallHistory } from './mock-call-history';
+import {
+  isPending,
+  escapeRegExp,
+  matchesValue,
+  matchPath,
+  matchQuery,
+  matchHeaders,
+  matchBody,
+  recordCall,
+} from './matchers';
+import { isSetupServerLike, isSetupWorkerLike, isMswAdapter } from './type-guards';
 import type {
-  PathMatcher,
-  HeaderValueMatcher,
-  BodyMatcher,
+  HttpMethod,
   InterceptOptions,
   ReplyOptions,
   ReplyCallback,
@@ -30,113 +39,6 @@ export type {
   OnUnhandledRequest,
   ActivateOptions,
 } from './types';
-
-function isPending(p: PendingInterceptor): boolean {
-  if (p.persist) return p.timesInvoked === 0;
-  return p.timesInvoked < p.times;
-}
-
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function matchesValue(value: string, matcher: string | RegExp | ((v: string) => boolean)): boolean {
-  if (typeof matcher === 'string') return value === matcher;
-  if (matcher instanceof RegExp) return matcher.test(value);
-  return matcher(value);
-}
-
-function matchPath(request: Request, origin: string, pathMatcher: PathMatcher): boolean {
-  if (typeof pathMatcher === 'string') return true; // string paths are matched by MSW URL pattern
-  const url = new URL(request.url);
-  const originPrefix = new URL(origin).pathname.replace(/\/$/, '');
-  const fullPath = url.pathname + url.search;
-  const relativePath = fullPath.startsWith(originPrefix)
-    ? fullPath.slice(originPrefix.length)
-    : fullPath;
-  return matchesValue(relativePath, pathMatcher);
-}
-
-function matchQuery(request: Request, query?: Record<string, string>): boolean {
-  if (!query) return true;
-  const url = new URL(request.url);
-  for (const [key, value] of Object.entries(query)) {
-    if (url.searchParams.get(key) !== value) return false;
-  }
-  return true;
-}
-
-function matchHeaders(request: Request, headers?: Record<string, HeaderValueMatcher>): boolean {
-  if (!headers) return true;
-  for (const [key, matcher] of Object.entries(headers)) {
-    const value = request.headers.get(key);
-    if (value === null || !matchesValue(value, matcher)) return false;
-  }
-  return true;
-}
-
-function matchBody(bodyText: string | null, bodyMatcher?: BodyMatcher): boolean {
-  if (!bodyMatcher) return true;
-  return matchesValue(bodyText ?? '', bodyMatcher);
-}
-
-function recordCall(callHistory: MockCallHistory, request: Request, bodyText: string | null) {
-  const url = new URL(request.url);
-  const requestHeaders: Record<string, string> = {};
-  request.headers.forEach((value, key) => {
-    requestHeaders[key] = value;
-  });
-  const searchParams: Record<string, string> = {};
-  url.searchParams.forEach((value, key) => {
-    searchParams[key] = value;
-  });
-  callHistory.record({
-    body: bodyText,
-    method: request.method,
-    headers: requestHeaders,
-    fullUrl: url.origin + url.pathname + url.search,
-    origin: url.origin,
-    path: url.pathname,
-    searchParams,
-    protocol: url.protocol,
-    host: url.host,
-    port: url.port,
-    hash: url.hash,
-  });
-}
-
-function isSetupServerLike(input: unknown): input is SetupServerLike {
-  return (
-    typeof input === 'object' &&
-    input !== null &&
-    'listen' in input &&
-    typeof (input as SetupServerLike).listen === 'function' &&
-    'close' in input &&
-    typeof (input as SetupServerLike).close === 'function'
-  );
-}
-
-function isSetupWorkerLike(input: unknown): input is SetupWorkerLike {
-  return (
-    typeof input === 'object' &&
-    input !== null &&
-    'start' in input &&
-    typeof (input as SetupWorkerLike).start === 'function' &&
-    'stop' in input &&
-    typeof (input as SetupWorkerLike).stop === 'function'
-  );
-}
-
-function isMswAdapter(input: unknown): input is MswAdapter {
-  return (
-    typeof input === 'object' &&
-    input !== null &&
-    'activate' in input &&
-    typeof (input as MswAdapter).activate === 'function' &&
-    'deactivate' in input &&
-    typeof (input as MswAdapter).deactivate === 'function'
-  );
-}
 
 function createServerAdapter(server: SetupServerLike): MswAdapter {
   return {
@@ -328,6 +230,108 @@ export class FetchMock {
     return this.interceptors.filter(isPending).map((p) => ({ ...p }));
   }
 
+  private resolveUrlPattern(
+    origin: string | RegExp | ((origin: string) => boolean),
+    path: InterceptOptions['path']
+  ): string | RegExp {
+    if (typeof origin === 'string') {
+      return typeof path === 'string' ? `${origin}${path}` : new RegExp(`^${escapeRegExp(origin)}`);
+    }
+    // Non-string origin: catch all URLs, do manual matching
+    return /.*/;
+  }
+
+  private matchOrigin(
+    request: Request,
+    origin: string | RegExp | ((origin: string) => boolean)
+  ): boolean {
+    if (typeof origin === 'string') return true;
+    const url = new URL(request.url);
+    if (origin instanceof RegExp) return origin.test(url.origin);
+    return origin(url.origin);
+  }
+
+  private matchPathForOrigin(
+    request: Request,
+    origin: string | RegExp | ((origin: string) => boolean),
+    originStr: string,
+    path: InterceptOptions['path']
+  ): boolean {
+    if (typeof origin !== 'string') {
+      if (typeof path === 'string') {
+        const url = new URL(request.url);
+        return url.pathname === path || url.pathname.endsWith(path);
+      }
+      // Non-string origin + non-string path: match against full pathname+search
+      const url = new URL(request.url);
+      const fullPath = url.pathname + url.search;
+      return matchesValue(fullPath, path as RegExp | ((v: string) => boolean));
+    }
+    return matchPath(request, originStr, path);
+  }
+
+  private async matchAndConsume(
+    request: Request,
+    pending: PendingInterceptor,
+    origin: string | RegExp | ((origin: string) => boolean),
+    originStr: string,
+    options: InterceptOptions
+  ): Promise<string | null | undefined> {
+    if (!pending.persist && pending.timesInvoked >= pending.times) return;
+    if (!this.matchOrigin(request, origin)) return;
+    if (!this.matchPathForOrigin(request, origin, originStr, options.path)) return;
+    if (!matchQuery(request, options.query)) return;
+    if (!matchHeaders(request, options.headers)) return;
+
+    const bodyText = (await request.text()) || null;
+    if (!matchBody(bodyText, options.body)) return;
+
+    pending.timesInvoked++;
+    if (!pending.persist && pending.timesInvoked >= pending.times) {
+      pending.consumed = true;
+      this.syncMswHandlers();
+    }
+
+    if (this._callHistoryEnabled) {
+      recordCall(this._calls, request, bodyText);
+    }
+    return bodyText;
+  }
+
+  private registerHandler(
+    pending: PendingInterceptor,
+    method: HttpMethod,
+    urlPattern: string | RegExp,
+    handlerFn: (request: Request) => Promise<Response | undefined>
+  ): void {
+    const handler = this.handlerFactory.createHandler(method, urlPattern, handlerFn);
+    this.mswHandlers.set(pending, handler);
+    this.adapter.use(handler);
+  }
+
+  private buildChain(
+    pending: PendingInterceptor,
+    delayRef: { ms: number },
+    contentLengthRef: { enabled: boolean }
+  ): MockReplyChain {
+    return {
+      times(n: number) {
+        pending.times = n;
+        pending.consumed = false;
+      },
+      persist() {
+        pending.persist = true;
+        pending.consumed = false;
+      },
+      delay(ms: number) {
+        delayRef.ms = ms;
+      },
+      replyContentLength() {
+        contentLengthRef.enabled = true;
+      },
+    };
+  }
+
   get(origin: string | RegExp | ((origin: string) => boolean)): MockPool {
     const originStr =
       typeof origin === 'string'
@@ -335,7 +339,6 @@ export class FetchMock {
         : origin instanceof RegExp
           ? origin.toString()
           : '<function>';
-    const isNonStringOrigin = typeof origin !== 'string';
 
     return {
       intercept: (options: InterceptOptions): MockInterceptor => {
@@ -357,87 +360,7 @@ export class FetchMock {
         };
         this.interceptors.push(pending);
 
-        let urlPattern: string | RegExp;
-        if (typeof origin === 'string') {
-          urlPattern =
-            typeof options.path === 'string'
-              ? `${origin}${options.path}`
-              : new RegExp(`^${escapeRegExp(origin)}`);
-        } else {
-          // Non-string origin: catch all URLs, do manual matching
-          urlPattern = /.*/;
-        }
-
-        const matchOrigin = (request: Request): boolean => {
-          if (typeof origin === 'string') return true;
-          const url = new URL(request.url);
-          if (origin instanceof RegExp) return origin.test(url.origin);
-          return origin(url.origin);
-        };
-
-        const matchPathForOrigin = (request: Request): boolean => {
-          if (isNonStringOrigin) {
-            if (typeof options.path === 'string') {
-              const url = new URL(request.url);
-              return url.pathname === options.path || url.pathname.endsWith(options.path);
-            }
-            // Non-string origin + non-string path: match against full pathname+search
-            const url = new URL(request.url);
-            const fullPath = url.pathname + url.search;
-            return matchesValue(fullPath, options.path as RegExp | ((v: string) => boolean));
-          }
-          return matchPath(request, originStr, options.path);
-        };
-
-        const matchAndConsume = async (request: Request) => {
-          if (!pending.persist && pending.timesInvoked >= pending.times) return;
-          if (!matchOrigin(request)) return;
-          if (!matchPathForOrigin(request)) return;
-          if (!matchQuery(request, options.query)) return;
-          if (!matchHeaders(request, options.headers)) return;
-
-          const bodyText = (await request.text()) || null;
-          if (!matchBody(bodyText, options.body)) return;
-
-          pending.timesInvoked++;
-          if (!pending.persist && pending.timesInvoked >= pending.times) {
-            pending.consumed = true;
-            this.syncMswHandlers();
-          }
-
-          if (this._callHistoryEnabled) {
-            recordCall(this._calls, request, bodyText);
-          }
-          return bodyText;
-        };
-
-        const registerHandler = (
-          handlerFn: (request: Request) => Promise<Response | undefined>
-        ) => {
-          const handler = this.handlerFactory.createHandler(method, urlPattern, handlerFn);
-          this.mswHandlers.set(pending, handler);
-          this.adapter.use(handler);
-        };
-
-        const buildChain = (
-          delayRef: { ms: number },
-          contentLengthRef: { enabled: boolean }
-        ): MockReplyChain => ({
-          times(n: number) {
-            pending.times = n;
-            pending.consumed = false;
-          },
-          persist() {
-            pending.persist = true;
-            pending.consumed = false;
-          },
-          delay(ms: number) {
-            delayRef.ms = ms;
-          },
-          replyContentLength() {
-            contentLengthRef.enabled = true;
-          },
-        });
+        const urlPattern = this.resolveUrlPattern(origin, options.path);
 
         return {
           reply: (
@@ -451,8 +374,14 @@ export class FetchMock {
             if (typeof statusOrCallback === 'function') {
               // Single callback form: reply(callback)
               const callback = statusOrCallback;
-              registerHandler(async (request) => {
-                const bodyText = await matchAndConsume(request);
+              this.registerHandler(pending, method, urlPattern, async (request) => {
+                const bodyText = await this.matchAndConsume(
+                  request,
+                  pending,
+                  origin,
+                  originStr,
+                  options
+                );
                 if (bodyText === undefined) return;
 
                 if (delayRef.ms > 0) {
@@ -471,8 +400,14 @@ export class FetchMock {
             } else {
               // Original form: reply(status, body?, options?)
               const status = statusOrCallback;
-              registerHandler(async (request) => {
-                const bodyText = await matchAndConsume(request);
+              this.registerHandler(pending, method, urlPattern, async (request) => {
+                const bodyText = await this.matchAndConsume(
+                  request,
+                  pending,
+                  origin,
+                  originStr,
+                  options
+                );
                 if (bodyText === undefined) return;
 
                 if (delayRef.ms > 0) {
@@ -498,21 +433,27 @@ export class FetchMock {
               });
             }
 
-            return buildChain(delayRef, contentLengthRef);
+            return this.buildChain(pending, delayRef, contentLengthRef);
           },
 
           replyWithError: (): MockReplyChain => {
             const delayRef = { ms: 0 };
             const contentLengthRef = { enabled: false };
 
-            registerHandler(async (request) => {
-              const bodyText = await matchAndConsume(request);
+            this.registerHandler(pending, method, urlPattern, async (request) => {
+              const bodyText = await this.matchAndConsume(
+                request,
+                pending,
+                origin,
+                originStr,
+                options
+              );
               if (bodyText === undefined) return;
 
               return this.handlerFactory.buildErrorResponse();
             });
 
-            return buildChain(delayRef, contentLengthRef);
+            return this.buildChain(pending, delayRef, contentLengthRef);
           },
         };
       },
