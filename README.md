@@ -4,6 +4,8 @@
 [![npm version](https://img.shields.io/npm/v/msw-fetch-mock.svg)](https://www.npmjs.com/package/msw-fetch-mock)
 [![license](https://img.shields.io/npm/l/msw-fetch-mock.svg)](https://github.com/recca0120/msw-fetch-mock/blob/main/LICENSE.md)
 
+[English](README.md) | [繁體中文](README.zh-TW.md)
+
 Undici-style fetch mock API built on [MSW](https://mswjs.io/) (Mock Service Worker).
 
 If you're familiar with Cloudflare Workers' `fetchMock` (from `cloudflare:test`) or Node.js undici's `MockAgent`, you already know this API.
@@ -28,7 +30,7 @@ npm install -D msw-fetch-mock msw
 ### Node.js (Vitest, Jest)
 
 ```typescript
-// Works with default import or explicit /node subpath
+// Works with root import or explicit /node subpath
 import { fetchMock } from 'msw-fetch-mock';
 // import { fetchMock } from 'msw-fetch-mock/node';
 
@@ -78,11 +80,10 @@ If you already use MSW, pass your server to share a single interceptor:
 ```typescript
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
-import { FetchMock } from 'msw-fetch-mock';
-import { NodeMswAdapter } from 'msw-fetch-mock/node';
+import { createFetchMock } from 'msw-fetch-mock';
 
 const server = setupServer(http.get('/api/users', () => HttpResponse.json([{ id: 1 }])));
-const fetchMock = new FetchMock(new NodeMswAdapter(server));
+const fetchMock = createFetchMock(server);
 
 beforeAll(() => server.listen());
 afterAll(() => server.close());
@@ -92,7 +93,7 @@ afterEach(() => {
 });
 ```
 
-> **Note:** Only one MSW server can be active at a time. If another server is already listening, standalone `activate()` will throw an error guiding you to use `new FetchMock(new NodeMswAdapter(server))` instead.
+> **Note:** Only one MSW server can be active at a time. If a server is already listening, standalone `activate()` will throw an error. Use `createFetchMock(server)` to share an existing server.
 
 ### Legacy (MSW v1)
 
@@ -204,6 +205,7 @@ E2E tests run on every CI push across these environments:
 | Jest CJS       | CJS (require) | Jest                |
 | Node.js Test   | ESM (import)  | Node test runner    |
 | Node.js CJS    | CJS (require) | Node test runner    |
+| Legacy CJS     | CJS (require) | Jest (MSW v1)       |
 | Vitest Browser | ESM (import)  | Vitest + Playwright |
 
 ## Documentation
@@ -236,7 +238,7 @@ pnpm test:e2e -- node-cjs
 pnpm test:e2e -- --all
 ```
 
-Available suites: `jest-esm`, `jest-cjs`, `node-test`, `node-cjs`, `vitest-browser`
+Available suites: `jest-esm`, `jest-cjs`, `node-test`, `node-cjs`, `legacy-cjs`, `vitest-browser`
 
 ## License
 

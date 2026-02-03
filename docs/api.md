@@ -425,7 +425,7 @@ Returns: `MockReplyChain`
 | `callback` | `SingleReplyCallback`                  | Full-control callback     |
 | `options`  | `{ headers?: Record<string, string> }` | Response headers          |
 
-### `interceptor.replyWithError(error)`
+### `interceptor.replyWithError(error?)`
 
 Replies with a network error (simulates a connection failure).
 
@@ -435,9 +435,9 @@ Replies with a network error (simulates a connection failure).
 
 Returns: `MockReplyChain`
 
-| Parameter | Type    | Description                              |
-| --------- | ------- | ---------------------------------------- |
-| `error`   | `Error` | The error instance (used for semantics). |
+| Parameter | Type    | Required | Description                                                                                                                       |
+| --------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `error`   | `Error` | No       | Optional error instance. Accepted for API compatibility but not used internally — the response is always a generic network error. |
 
 ---
 
