@@ -40,6 +40,11 @@ export type {
   ActivateOptions,
 } from './types';
 
+/**
+ * Thin wrapper: adapts a user-provided setupServer instance to MswAdapter.
+ * Unlike NodeMswAdapter, this does NOT manage the server lifecycle —
+ * the caller owns listen/close.
+ */
 function createServerAdapter(server: SetupServerLike): MswAdapter {
   return {
     use: (...handlers: Array<unknown>) => server.use(...handlers),
@@ -53,6 +58,11 @@ function createServerAdapter(server: SetupServerLike): MswAdapter {
   };
 }
 
+/**
+ * Thin wrapper: adapts a user-provided setupWorker instance to MswAdapter.
+ * Unlike BrowserMswAdapter, this does NOT manage the worker lifecycle —
+ * the caller owns start/stop.
+ */
 function createWorkerAdapter(worker: SetupWorkerLike): MswAdapter {
   return {
     use: (...handlers: Array<unknown>) => worker.use(...handlers),
@@ -241,33 +251,32 @@ export class FetchMock {
     return /.*/;
   }
 
-  private matchOrigin(
-    request: Request,
-    origin: string | RegExp | ((origin: string) => boolean)
-  ): boolean {
-    if (typeof origin === 'string') return true;
-    const url = new URL(request.url);
-    if (origin instanceof RegExp) return origin.test(url.origin);
-    return origin(url.origin);
-  }
-
-  private matchPathForOrigin(
+  private matchOriginAndPath(
     request: Request,
     origin: string | RegExp | ((origin: string) => boolean),
     originStr: string,
     path: InterceptOptions['path']
   ): boolean {
-    if (typeof origin !== 'string') {
-      if (typeof path === 'string') {
-        const url = new URL(request.url);
-        return url.pathname === path || url.pathname.endsWith(path);
-      }
-      // Non-string origin + non-string path: match against full pathname+search
-      const url = new URL(request.url);
-      const fullPath = url.pathname + url.search;
-      return matchesValue(fullPath, path as RegExp | ((v: string) => boolean));
+    if (typeof origin === 'string') {
+      // String origin: URL pattern already filtered by origin prefix,
+      // just match the path portion.
+      return matchPath(request, originStr, path);
     }
-    return matchPath(request, originStr, path);
+
+    // Non-string origin: URL pattern is catch-all (/.*/),
+    // so we must manually match both origin and path.
+    const url = new URL(request.url);
+
+    if (origin instanceof RegExp ? !origin.test(url.origin) : !origin(url.origin)) {
+      return false;
+    }
+
+    if (typeof path === 'string') {
+      return url.pathname === path || url.pathname.endsWith(path);
+    }
+
+    const fullPath = url.pathname + url.search;
+    return matchesValue(fullPath, path as RegExp | ((v: string) => boolean));
   }
 
   private async matchAndConsume(
@@ -278,8 +287,7 @@ export class FetchMock {
     options: InterceptOptions
   ): Promise<string | null | undefined> {
     if (!pending.persist && pending.timesInvoked >= pending.times) return;
-    if (!this.matchOrigin(request, origin)) return;
-    if (!this.matchPathForOrigin(request, origin, originStr, options.path)) return;
+    if (!this.matchOriginAndPath(request, origin, originStr, options.path)) return;
     if (!matchQuery(request, options.query)) return;
     if (!matchHeaders(request, options.headers)) return;
 
@@ -307,6 +315,26 @@ export class FetchMock {
     const handler = this.handlerFactory.createHandler(method, urlPattern, handlerFn);
     this.mswHandlers.set(pending, handler);
     this.adapter.use(handler);
+  }
+
+  private createMatchingHandler(
+    pending: PendingInterceptor,
+    origin: string | RegExp | ((origin: string) => boolean),
+    originStr: string,
+    options: InterceptOptions,
+    delayRef: { ms: number },
+    respond: (bodyText: string | null) => Promise<Response>
+  ): (request: Request) => Promise<Response | undefined> {
+    return async (request: Request) => {
+      const bodyText = await this.matchAndConsume(request, pending, origin, originStr, options);
+      if (bodyText === undefined) return;
+
+      if (delayRef.ms > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayRef.ms));
+      }
+
+      return respond(bodyText);
+    };
   }
 
   private buildChain(
@@ -372,65 +400,60 @@ export class FetchMock {
             const contentLengthRef = { enabled: false };
 
             if (typeof statusOrCallback === 'function') {
-              // Single callback form: reply(callback)
               const callback = statusOrCallback;
-              this.registerHandler(pending, method, urlPattern, async (request) => {
-                const bodyText = await this.matchAndConsume(
-                  request,
+              this.registerHandler(
+                pending,
+                method,
+                urlPattern,
+                this.createMatchingHandler(
                   pending,
                   origin,
                   originStr,
-                  options
-                );
-                if (bodyText === undefined) return;
-
-                if (delayRef.ms > 0) {
-                  await new Promise((resolve) => setTimeout(resolve, delayRef.ms));
-                }
-
-                const result = await callback({ body: bodyText || null });
-                return this.buildResponse(
-                  result.statusCode,
-                  result.data,
-                  result.responseOptions,
-                  this._defaultReplyHeaders,
-                  contentLengthRef.enabled
-                );
-              });
+                  options,
+                  delayRef,
+                  async (bodyText) => {
+                    const result = await callback({ body: bodyText });
+                    return this.buildResponse(
+                      result.statusCode,
+                      result.data,
+                      result.responseOptions,
+                      this._defaultReplyHeaders,
+                      contentLengthRef.enabled
+                    );
+                  }
+                )
+              );
             } else {
-              // Original form: reply(status, body?, options?)
               const status = statusOrCallback;
-              this.registerHandler(pending, method, urlPattern, async (request) => {
-                const bodyText = await this.matchAndConsume(
-                  request,
+              this.registerHandler(
+                pending,
+                method,
+                urlPattern,
+                this.createMatchingHandler(
                   pending,
                   origin,
                   originStr,
-                  options
-                );
-                if (bodyText === undefined) return;
-
-                if (delayRef.ms > 0) {
-                  await new Promise((resolve) => setTimeout(resolve, delayRef.ms));
-                }
-
-                let responseBody: unknown;
-                if (typeof bodyOrCallback === 'function') {
-                  responseBody = await (bodyOrCallback as ReplyCallback)({
-                    body: bodyText || null,
-                  });
-                } else {
-                  responseBody = bodyOrCallback;
-                }
-
-                return this.buildResponse(
-                  status,
-                  responseBody,
-                  replyOptions,
-                  this._defaultReplyHeaders,
-                  contentLengthRef.enabled
-                );
-              });
+                  options,
+                  delayRef,
+                  async (bodyText) => {
+                    let responseBody: unknown;
+                    if (typeof bodyOrCallback === 'function') {
+                      responseBody = await (bodyOrCallback as ReplyCallback)({
+                        body: bodyText,
+                      });
+                    } else {
+                      responseBody = bodyOrCallback;
+                    }
+                    return this.buildResponse(
+                      status,
+                      responseBody,
+                      replyOptions,
+                      this._defaultReplyHeaders,
+                      contentLengthRef.enabled
+                    );
+                  }
+                )
+              );
             }
 
             return this.buildChain(pending, delayRef, contentLengthRef);
@@ -440,18 +463,21 @@ export class FetchMock {
             const delayRef = { ms: 0 };
             const contentLengthRef = { enabled: false };
 
-            this.registerHandler(pending, method, urlPattern, async (request) => {
-              const bodyText = await this.matchAndConsume(
-                request,
+            this.registerHandler(
+              pending,
+              method,
+              urlPattern,
+              this.createMatchingHandler(
                 pending,
                 origin,
                 originStr,
-                options
-              );
-              if (bodyText === undefined) return;
-
-              return this.handlerFactory.buildErrorResponse();
-            });
+                options,
+                delayRef,
+                async () => {
+                  return this.handlerFactory.buildErrorResponse();
+                }
+              )
+            );
 
             return this.buildChain(pending, delayRef, contentLengthRef);
           },

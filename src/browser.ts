@@ -1,13 +1,13 @@
 import { FetchMock } from './fetch-mock';
 import { BrowserMswAdapter } from './browser-adapter';
-import { v2HandlerFactory } from './v2-handler-factory';
+import { httpHandlerFactory } from './http-handler-factory';
 import type { SetupWorkerLike } from './types';
 
 export { FetchMock } from './fetch-mock';
 export { BrowserMswAdapter } from './browser-adapter';
 
-/** Register MSW v2 handler factory. */
-FetchMock._handlerFactory = v2HandlerFactory;
+/** Register MSW http handler factory. */
+FetchMock._handlerFactory = httpHandlerFactory;
 
 export function createFetchMock(worker: SetupWorkerLike): FetchMock {
   return new FetchMock(new BrowserMswAdapter(worker));

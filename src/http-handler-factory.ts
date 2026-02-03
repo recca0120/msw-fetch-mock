@@ -9,7 +9,7 @@ const methods: Record<HttpMethod, typeof http.get> = {
   PATCH: http.patch,
 };
 
-export const v2HandlerFactory: HandlerFactory = {
+export const httpHandlerFactory: HandlerFactory = {
   createHandler(method, urlPattern, handlerFn) {
     return methods[method](urlPattern, async ({ request }) => handlerFn(request));
   },
