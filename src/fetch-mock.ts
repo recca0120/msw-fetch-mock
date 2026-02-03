@@ -1,59 +1,33 @@
 import { http, HttpResponse, type StrictRequest, type DefaultBodyType } from 'msw';
-import { setupServer } from 'msw/node';
 import { MockCallHistory } from './mock-call-history';
+import type {
+  HttpMethod,
+  PathMatcher,
+  HeaderValueMatcher,
+  BodyMatcher,
+  InterceptOptions,
+  ReplyOptions,
+  ReplyCallback,
+  MockReplyChain,
+  MockInterceptor,
+  MockPool,
+  PendingInterceptor,
+  NetConnectMatcher,
+  OnUnhandledRequest,
+  ActivateOptions,
+  MswAdapter,
+} from './types';
 
-/** Structural type to avoid cross-package nominal type mismatch on MSW's private fields */
-interface SetupServerLike {
-  use(...handlers: Array<unknown>): void;
-  resetHandlers(...handlers: Array<unknown>): void;
-  listen(options?: Record<string, unknown>): void;
-  close(): void;
-}
-
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-type PathMatcher = string | RegExp | ((path: string) => boolean);
-type HeaderValueMatcher = string | RegExp | ((value: string) => boolean);
-type BodyMatcher = string | RegExp | ((body: string) => boolean);
-
-export interface InterceptOptions {
-  path: PathMatcher;
-  method?: HttpMethod;
-  headers?: Record<string, HeaderValueMatcher>;
-  body?: BodyMatcher;
-  query?: Record<string, string>;
-}
-
-export interface ReplyOptions {
-  headers?: Record<string, string>;
-}
-
-type ReplyCallback = (req: { body: string | null }) => unknown | Promise<unknown>;
-
-export interface MockReplyChain {
-  times(n: number): void;
-  persist(): void;
-  delay(ms: number): void;
-}
-
-export interface MockInterceptor {
-  reply(status: number, body?: unknown, options?: ReplyOptions): MockReplyChain;
-  reply(status: number, callback: ReplyCallback): MockReplyChain;
-  replyWithError(error: Error): MockReplyChain;
-}
-
-export interface MockPool {
-  intercept(options: InterceptOptions): MockInterceptor;
-}
-
-export interface PendingInterceptor {
-  origin: string;
-  path: string;
-  method: string;
-  consumed: boolean;
-  times: number;
-  timesInvoked: number;
-  persist: boolean;
-}
+export type {
+  InterceptOptions,
+  ReplyOptions,
+  MockReplyChain,
+  MockInterceptor,
+  MockPool,
+  PendingInterceptor,
+  OnUnhandledRequest,
+  ActivateOptions,
+} from './types';
 
 function isPending(p: PendingInterceptor): boolean {
   if (p.persist) return p.timesInvoked === 0;
@@ -148,20 +122,9 @@ function buildResponse(status: number, responseBody: unknown, replyOptions?: Rep
   return HttpResponse.json(responseBody, { status, headers });
 }
 
-type NetConnectMatcher = true | false | string | RegExp | ((host: string) => boolean);
-
-type PrintAPI = { warning(): void; error(): void };
-type OnUnhandledRequestCallback = (request: Request, print: PrintAPI) => void;
-export type OnUnhandledRequest = 'bypass' | 'warn' | 'error' | OnUnhandledRequestCallback;
-
-export interface ActivateOptions {
-  onUnhandledRequest?: OnUnhandledRequest;
-}
-
 export class FetchMock {
   private readonly _calls = new MockCallHistory();
-  private server: SetupServerLike | null;
-  private readonly ownsServer: boolean;
+  private adapter: MswAdapter | null;
   private interceptors: PendingInterceptor[] = [];
   private netConnectAllowed: NetConnectMatcher = false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,38 +134,31 @@ export class FetchMock {
     return this._calls;
   }
 
-  constructor(externalServer?: SetupServerLike) {
-    this.server = externalServer ?? null;
-    this.ownsServer = !externalServer;
+  constructor(adapter?: MswAdapter) {
+    this.adapter = adapter ?? null;
   }
 
-  activate(options?: ActivateOptions): void {
-    if (this.ownsServer) {
-      const isPatched = Object.getOwnPropertySymbols(globalThis.fetch).some(
-        (s) => s.description === 'isPatchedModule'
+  async activate(options?: ActivateOptions): Promise<void> {
+    if (!this.adapter) {
+      throw new Error(
+        'FetchMock has no adapter. Use createFetchMock() from msw-fetch-mock/node or msw-fetch-mock/browser.'
       );
-      if (isPatched) {
-        throw new Error(
-          'Another MSW server is already active. ' +
-            'Pass your existing server to new FetchMock(server) instead.'
-        );
-      }
-      const mode = options?.onUnhandledRequest ?? 'error';
-      this.server = setupServer();
-      (this.server as ReturnType<typeof setupServer>).listen({
-        onUnhandledRequest: (request: Request, print: PrintAPI) => {
-          if (this.isNetConnectAllowed(request)) return;
-          if (typeof mode === 'function') {
-            mode(request, print);
-          } else if (mode === 'error') {
-            print.error();
-          } else if (mode === 'warn') {
-            print.warning();
-          }
-          // 'bypass' → do nothing
-        },
-      });
     }
+
+    const mode = options?.onUnhandledRequest ?? 'error';
+    await this.adapter.activate({
+      onUnhandledRequest: (request: Request, print: { warning(): void; error(): void }) => {
+        if (this.isNetConnectAllowed(request)) return;
+        if (typeof mode === 'function') {
+          mode(request, print);
+        } else if (mode === 'error') {
+          print.error();
+        } else if (mode === 'warn') {
+          print.warning();
+        }
+        // 'bypass' → do nothing
+      },
+    });
   }
 
   disableNetConnect(): void {
@@ -227,11 +183,11 @@ export class FetchMock {
    * go through MSW's onUnhandledRequest instead of silently passing through.
    */
   private syncMswHandlers(): void {
-    if (!this.server || !this.ownsServer) return;
+    if (!this.adapter) return;
     const activeHandlers = [...this.mswHandlers.entries()]
       .filter(([p]) => !p.consumed || p.persist)
       .map(([, handler]) => handler);
-    this.server.resetHandlers(...activeHandlers);
+    this.adapter.resetHandlers(...activeHandlers);
   }
 
   getCallHistory(): MockCallHistory {
@@ -246,19 +202,14 @@ export class FetchMock {
     this.interceptors = [];
     this.mswHandlers.clear();
     this._calls.clear();
-    if (this.ownsServer) {
-      this.server?.close();
-      this.server = null;
-    }
+    this.adapter?.deactivate();
   }
 
   reset(): void {
     this.interceptors = [];
     this.mswHandlers.clear();
     this._calls.clear();
-    if (this.ownsServer) {
-      this.server?.resetHandlers();
-    }
+    this.adapter?.resetHandlers();
   }
 
   assertNoPendingInterceptors(): void {
@@ -325,13 +276,13 @@ export class FetchMock {
             urlPattern,
             async ({ request }: { request: StrictRequest<DefaultBodyType> }) => handlerFn(request)
           );
-          if (!this.server) {
+          if (!this.adapter) {
             throw new Error(
-              'FetchMock server is not active. Call activate() before registering interceptors.'
+              'FetchMock has no adapter. Use createFetchMock() from msw-fetch-mock/node or msw-fetch-mock/browser.'
             );
           }
           this.mswHandlers.set(pending, handler);
-          this.server.use(handler);
+          this.adapter.use(handler);
         };
 
         const buildChain = (delayRef: { ms: number }): MockReplyChain => ({
@@ -395,8 +346,4 @@ export class FetchMock {
       },
     };
   }
-}
-
-export function createFetchMock(externalServer?: SetupServerLike): FetchMock {
-  return new FetchMock(externalServer);
 }

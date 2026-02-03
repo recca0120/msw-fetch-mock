@@ -1,8 +1,16 @@
 # API Reference
 
+## Import Paths
+
+| Path                     | Environment                  | MSW dependency |
+| ------------------------ | ---------------------------- | -------------- |
+| `msw-fetch-mock`         | Node.js (re-exports `/node`) | `msw/node`     |
+| `msw-fetch-mock/node`    | Node.js                      | `msw/node`     |
+| `msw-fetch-mock/browser` | Browser                      | `msw/browser`  |
+
 ## `fetchMock` (singleton)
 
-A pre-built `FetchMock` instance for standalone use. No setup required — just import and call `activate()`.
+A pre-built `FetchMock` instance for standalone Node.js use. No setup required — just import and call `activate()`.
 
 ```typescript
 import { fetchMock } from 'msw-fetch-mock';
@@ -15,27 +23,57 @@ afterEach(() => {
 });
 ```
 
-## `new FetchMock(server?)`
+## `createFetchMock(server?)` (Node)
 
-Creates a `FetchMock` instance. Pass an existing MSW `SetupServer` to share interceptors; omit to create one internally.
+Creates a `FetchMock` with `NodeMswAdapter`. Optionally pass an existing MSW server.
+
+```typescript
+import { createFetchMock } from 'msw-fetch-mock/node';
+import { setupServer } from 'msw/node';
+
+// Standalone
+const fetchMock = createFetchMock();
+
+// With external MSW server
+const server = setupServer();
+const fetchMock = createFetchMock(server);
+```
+
+## `createFetchMock(worker)` (Browser)
+
+Creates a `FetchMock` with `BrowserMswAdapter`. Requires an MSW worker.
+
+```typescript
+import { setupWorker } from 'msw/browser';
+import { createFetchMock } from 'msw-fetch-mock/browser';
+
+const worker = setupWorker();
+const fetchMock = createFetchMock(worker);
+
+beforeAll(async () => {
+  await fetchMock.activate({ onUnhandledRequest: 'error' });
+});
+```
+
+## `new FetchMock(adapter?)`
+
+Creates a `FetchMock` instance with an explicit `MswAdapter`.
 
 ```typescript
 import { FetchMock } from 'msw-fetch-mock';
+import { NodeMswAdapter } from 'msw-fetch-mock/node';
+import { BrowserMswAdapter } from 'msw-fetch-mock/browser';
 
-// Standalone (creates internal MSW server)
-const fetchMock = new FetchMock();
+// Node with external server
+const fetchMock = new FetchMock(new NodeMswAdapter(server));
 
-// With external MSW server
-import { setupServer } from 'msw/node';
-const server = setupServer();
-const fetchMock = new FetchMock(server);
+// Browser with worker
+const fetchMock = new FetchMock(new BrowserMswAdapter(worker));
 ```
 
-| Parameter | Type          | Required | Description                                             |
-| --------- | ------------- | -------- | ------------------------------------------------------- |
-| `server`  | `SetupServer` | No       | Existing MSW server. Creates one internally if omitted. |
-
-> `createFetchMock(server?)` is also available as a backward-compatible factory function.
+| Parameter | Type         | Required | Description                                           |
+| --------- | ------------ | -------- | ----------------------------------------------------- |
+| `adapter` | `MswAdapter` | No       | Environment adapter. Use `createFetchMock()` instead. |
 
 ---
 
@@ -44,13 +82,13 @@ const fetchMock = new FetchMock(server);
 ### Lifecycle
 
 ```typescript
-fetchMock.activate(options?); // start intercepting (calls server.listen())
-fetchMock.deactivate();       // stop intercepting (calls server.close())
+await fetchMock.activate(options?); // start intercepting (async — browser needs worker.start())
+fetchMock.deactivate();             // stop intercepting
 ```
 
-> If you pass an external server that you manage yourself, `activate()` / `deactivate()` are no-ops.
+> `activate()` returns `Promise<void>`. In Node.js, the promise resolves synchronously. In the browser, it waits for the Service Worker to start. Vitest and Jest handle async `beforeAll` natively.
 >
-> **Conflict detection:** In standalone mode, `activate()` checks whether `globalThis.fetch` is already patched by MSW. If so, it throws an error guiding you to pass your existing server via `new FetchMock(server)` instead.
+> **Conflict detection (Node only):** In standalone mode, `activate()` checks whether `globalThis.fetch` is already patched by MSW. If so, it throws an error guiding you to use `new FetchMock(new NodeMswAdapter(server))` instead.
 
 #### `ActivateOptions`
 

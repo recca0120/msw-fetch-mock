@@ -1,16 +1,17 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
-import { FetchMock } from './mock-server';
-import { fetchMock as singletonFetchMock } from './index';
+import { FetchMock } from './fetch-mock';
+import { NodeMswAdapter } from './node-adapter';
+import { createFetchMock, fetchMock as singletonFetchMock } from './node';
 
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
 
 describe('FetchMock', () => {
-  const fetchMock = new FetchMock();
+  const fetchMock = createFetchMock();
 
-  beforeAll(() => {
-    fetchMock.activate();
+  beforeAll(async () => {
+    await fetchMock.activate();
     fetchMock.disableNetConnect();
   });
 
@@ -251,10 +252,10 @@ describe('FetchMock', () => {
 });
 
 describe('query matching', () => {
-  const fetchMock = new FetchMock();
+  const fetchMock = createFetchMock();
 
-  beforeAll(() => {
-    fetchMock.activate();
+  beforeAll(async () => {
+    await fetchMock.activate();
     fetchMock.disableNetConnect();
   });
 
@@ -303,10 +304,10 @@ describe('query matching', () => {
 });
 
 describe('times', () => {
-  const fetchMock = new FetchMock();
+  const fetchMock = createFetchMock();
 
-  beforeAll(() => {
-    fetchMock.activate();
+  beforeAll(async () => {
+    await fetchMock.activate();
     fetchMock.disableNetConnect();
   });
 
@@ -341,10 +342,10 @@ describe('times', () => {
 });
 
 describe('persist', () => {
-  const fetchMock = new FetchMock();
+  const fetchMock = createFetchMock();
 
-  beforeAll(() => {
-    fetchMock.activate();
+  beforeAll(async () => {
+    await fetchMock.activate();
     fetchMock.disableNetConnect();
   });
 
@@ -367,10 +368,10 @@ describe('persist', () => {
 });
 
 describe('pendingInterceptors', () => {
-  const fetchMock = new FetchMock();
+  const fetchMock = createFetchMock();
 
-  beforeAll(() => {
-    fetchMock.activate();
+  beforeAll(async () => {
+    await fetchMock.activate();
     fetchMock.disableNetConnect();
   });
 
@@ -456,10 +457,10 @@ describe('pendingInterceptors', () => {
 });
 
 describe('assertNoPendingInterceptors', () => {
-  const fetchMock = new FetchMock();
+  const fetchMock = createFetchMock();
 
-  beforeEach(() => {
-    fetchMock.activate();
+  beforeEach(async () => {
+    await fetchMock.activate();
     fetchMock.disableNetConnect();
   });
 
@@ -487,10 +488,10 @@ describe('assertNoPendingInterceptors', () => {
 });
 
 describe('reset', () => {
-  const fetchMock = new FetchMock();
+  const fetchMock = createFetchMock();
 
-  beforeEach(() => {
-    fetchMock.activate();
+  beforeEach(async () => {
+    await fetchMock.activate();
     fetchMock.disableNetConnect();
   });
 
@@ -554,10 +555,10 @@ describe('reset', () => {
 });
 
 describe('call history', () => {
-  const fetchMock = new FetchMock();
+  const fetchMock = createFetchMock();
 
-  beforeAll(() => {
-    fetchMock.activate();
+  beforeAll(async () => {
+    await fetchMock.activate();
     fetchMock.disableNetConnect();
   });
 
@@ -656,7 +657,7 @@ describe('call history', () => {
     expect(fetchMock.calls.length).toBe(0);
 
     // Re-activate for remaining tests
-    fetchMock.activate();
+    await fetchMock.activate();
   });
 
   it('should preserve history on assertNoPendingInterceptors()', async () => {
@@ -728,10 +729,10 @@ describe('call history', () => {
 });
 
 describe('enableNetConnect', () => {
-  const fetchMock = new FetchMock();
+  const fetchMock = createFetchMock();
 
-  beforeEach(() => {
-    fetchMock.activate();
+  beforeEach(async () => {
+    await fetchMock.activate();
   });
 
   afterEach(() => fetchMock.deactivate());
@@ -788,10 +789,10 @@ describe('enableNetConnect', () => {
 });
 
 describe('replyWithError', () => {
-  const fetchMock = new FetchMock();
+  const fetchMock = createFetchMock();
 
-  beforeAll(() => {
-    fetchMock.activate();
+  beforeAll(async () => {
+    await fetchMock.activate();
     fetchMock.disableNetConnect();
   });
 
@@ -812,10 +813,10 @@ describe('replyWithError', () => {
 });
 
 describe('delay', () => {
-  const fetchMock = new FetchMock();
+  const fetchMock = createFetchMock();
 
-  beforeAll(() => {
-    fetchMock.activate();
+  beforeAll(async () => {
+    await fetchMock.activate();
     fetchMock.disableNetConnect();
   });
 
@@ -842,25 +843,25 @@ describe('delay', () => {
 });
 
 describe('activate guard', () => {
-  it('should throw when another MSW server is already listening', () => {
+  it('should throw when another MSW server is already listening', async () => {
     const externalServer = setupServer();
     externalServer.listen();
 
     try {
-      const standalone = new FetchMock();
-      expect(() => standalone.activate()).toThrow(/already active/i);
+      const standalone = createFetchMock();
+      await expect(standalone.activate()).rejects.toThrow(/already active/i);
     } finally {
       externalServer.close();
     }
   });
 
-  it('should not throw when using external server mode', () => {
+  it('should not throw when using external server mode', async () => {
     const externalServer = setupServer();
     externalServer.listen();
 
     try {
-      const shared = new FetchMock(externalServer);
-      expect(() => shared.activate()).not.toThrow();
+      const shared = new FetchMock(new NodeMswAdapter(externalServer));
+      await expect(shared.activate()).resolves.toBeUndefined();
     } finally {
       externalServer.close();
     }
@@ -869,8 +870,8 @@ describe('activate guard', () => {
 
 describe('onUnhandledRequest', () => {
   it('should block unhandled requests when onUnhandledRequest is "error"', async () => {
-    const fm = new FetchMock();
-    fm.activate({ onUnhandledRequest: 'error' });
+    const fm = createFetchMock();
+    await fm.activate({ onUnhandledRequest: 'error' });
 
     try {
       await expect(fetch('http://no-such-host.test/path')).rejects.toThrow(/request/i);
@@ -880,8 +881,8 @@ describe('onUnhandledRequest', () => {
   });
 
   it('should allow unhandled requests through when onUnhandledRequest is "warn"', async () => {
-    const fm = new FetchMock();
-    fm.activate({ onUnhandledRequest: 'warn' });
+    const fm = createFetchMock();
+    await fm.activate({ onUnhandledRequest: 'warn' });
 
     try {
       const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
@@ -893,8 +894,8 @@ describe('onUnhandledRequest', () => {
   });
 
   it('should silently allow unhandled requests when onUnhandledRequest is "bypass"', async () => {
-    const fm = new FetchMock();
-    fm.activate({ onUnhandledRequest: 'bypass' });
+    const fm = createFetchMock();
+    await fm.activate({ onUnhandledRequest: 'bypass' });
 
     try {
       const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
@@ -906,9 +907,9 @@ describe('onUnhandledRequest', () => {
   });
 
   it('should invoke custom callback for unhandled requests', async () => {
-    const fm = new FetchMock();
+    const fm = createFetchMock();
     let capturedUrl = '';
-    fm.activate({
+    await fm.activate({
       onUnhandledRequest: (request) => {
         capturedUrl = request.url;
         // Not calling print.error() → request passes through
@@ -924,8 +925,8 @@ describe('onUnhandledRequest', () => {
   });
 
   it('should respect enableNetConnect even in error mode', async () => {
-    const fm = new FetchMock();
-    fm.activate({ onUnhandledRequest: 'error' });
+    const fm = createFetchMock();
+    await fm.activate({ onUnhandledRequest: 'error' });
     fm.enableNetConnect('192.0.2.1:1');
 
     try {
@@ -937,14 +938,14 @@ describe('onUnhandledRequest', () => {
     }
   });
 
-  it('should not call server.listen() for external server mode', () => {
+  it('should not call server.listen() for external server mode', async () => {
     const externalServer = setupServer();
     externalServer.listen();
 
     try {
-      const fm = new FetchMock(externalServer);
+      const fm = new FetchMock(new NodeMswAdapter(externalServer));
       // activate() with options should not throw or call listen() again
-      expect(() => fm.activate({ onUnhandledRequest: 'warn' })).not.toThrow();
+      await expect(fm.activate({ onUnhandledRequest: 'warn' })).resolves.toBeUndefined();
     } finally {
       externalServer.close();
     }
@@ -954,8 +955,8 @@ describe('onUnhandledRequest', () => {
 describe('consumed interceptor', () => {
   it('should treat consumed interceptor request as unhandled', async () => {
     const captured: string[] = [];
-    const fm = new FetchMock();
-    fm.activate({
+    const fm = createFetchMock();
+    await fm.activate({
       onUnhandledRequest: (request) => {
         captured.push(request.url);
       },

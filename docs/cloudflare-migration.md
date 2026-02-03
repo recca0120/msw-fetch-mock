@@ -46,7 +46,7 @@ it('calls API', async () => {
 ```typescript
 import { fetchMock } from 'msw-fetch-mock';
 
-beforeAll(() => fetchMock.activate());
+beforeAll(async () => fetchMock.activate());
 afterAll(() => fetchMock.deactivate());
 afterEach(() => {
   fetchMock.assertNoPendingInterceptors();

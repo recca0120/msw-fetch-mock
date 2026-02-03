@@ -8,6 +8,8 @@ Undici-style fetch mock API built on [MSW](https://mswjs.io/) (Mock Service Work
 
 If you're familiar with Cloudflare Workers' `fetchMock` (from `cloudflare:test`) or Node.js undici's `MockAgent`, you already know this API.
 
+Supports both **Node.js** (`msw/node`) and **Browser** (`msw/browser`) environments via subpath exports.
+
 ## Install
 
 ```bash
@@ -18,10 +20,12 @@ npm install -D msw-fetch-mock msw
 
 ## Quick Start
 
-### Standalone (Cloudflare migration)
+### Node.js (Vitest, Jest)
 
 ```typescript
+// Works with default import or explicit /node subpath
 import { fetchMock } from 'msw-fetch-mock';
+// import { fetchMock } from 'msw-fetch-mock/node';
 
 beforeAll(() => fetchMock.activate({ onUnhandledRequest: 'error' }));
 afterAll(() => fetchMock.deactivate());
@@ -43,6 +47,25 @@ it('mocks a GET request', async () => {
 });
 ```
 
+### Browser (Storybook, Vitest Browser Mode)
+
+```typescript
+import { setupWorker } from 'msw/browser';
+import { createFetchMock } from 'msw-fetch-mock/browser';
+
+const worker = setupWorker();
+const fetchMock = createFetchMock(worker);
+
+beforeAll(async () => {
+  await fetchMock.activate({ onUnhandledRequest: 'error' });
+});
+afterAll(() => fetchMock.deactivate());
+afterEach(() => {
+  fetchMock.assertNoPendingInterceptors();
+  fetchMock.reset();
+});
+```
+
 ### With an existing MSW server
 
 If you already use MSW, pass your server to share a single interceptor:
@@ -51,9 +74,10 @@ If you already use MSW, pass your server to share a single interceptor:
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 import { FetchMock } from 'msw-fetch-mock';
+import { NodeMswAdapter } from 'msw-fetch-mock/node';
 
 const server = setupServer(http.get('/api/users', () => HttpResponse.json([{ id: 1 }])));
-const fetchMock = new FetchMock(server);
+const fetchMock = new FetchMock(new NodeMswAdapter(server));
 
 beforeAll(() => server.listen());
 afterAll(() => server.close());
@@ -63,7 +87,7 @@ afterEach(() => {
 });
 ```
 
-> **Note:** Only one MSW server can be active at a time. If another server is already listening, standalone `activate()` will throw an error guiding you to use `new FetchMock(server)` instead.
+> **Note:** Only one MSW server can be active at a time. If another server is already listening, standalone `activate()` will throw an error guiding you to use `new FetchMock(new NodeMswAdapter(server))` instead.
 
 ## Unhandled Requests
 
@@ -93,13 +117,29 @@ fetchMock.activate({
 
 ## API Overview
 
+### Import Paths
+
+| Path                     | Environment                  | MSW dependency |
+| ------------------------ | ---------------------------- | -------------- |
+| `msw-fetch-mock`         | Node.js (re-exports `/node`) | `msw/node`     |
+| `msw-fetch-mock/node`    | Node.js                      | `msw/node`     |
+| `msw-fetch-mock/browser` | Browser                      | `msw/browser`  |
+
 ### `fetchMock` (singleton)
 
 A pre-built `FetchMock` instance for standalone use. Import and call `activate()` — no setup needed.
+Available from `msw-fetch-mock` and `msw-fetch-mock/node`.
 
-### `new FetchMock(server?)`
+### `createFetchMock(server?)` / `createFetchMock(worker)`
 
-Creates a `FetchMock` instance. Pass an existing MSW `SetupServer` to share interceptors; omit to create one internally.
+Factory function that creates a `FetchMock` with the appropriate adapter.
+
+- Node: `createFetchMock(server?)` — optionally pass an existing MSW `SetupServer`
+- Browser: `createFetchMock(worker)` — pass an MSW `SetupWorker` (required)
+
+### `new FetchMock(adapter?)`
+
+Creates a `FetchMock` instance with an explicit `MswAdapter`. Use `NodeMswAdapter` or `BrowserMswAdapter`.
 
 ### Intercepting & Replying
 
