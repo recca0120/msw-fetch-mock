@@ -17,16 +17,28 @@ export interface ReplyOptions {
 
 export type ReplyCallback = (req: { body: string | null }) => unknown | Promise<unknown>;
 
+export interface SingleReplyResult {
+  statusCode: number;
+  data: unknown;
+  responseOptions?: ReplyOptions;
+}
+
+export type SingleReplyCallback = (req: {
+  body: string | null;
+}) => SingleReplyResult | Promise<SingleReplyResult>;
+
 export interface MockReplyChain {
   times(n: number): void;
   persist(): void;
   delay(ms: number): void;
+  replyContentLength(): void;
 }
 
 export interface MockInterceptor {
   reply(status: number, body?: unknown, options?: ReplyOptions): MockReplyChain;
   reply(status: number, callback: ReplyCallback): MockReplyChain;
-  replyWithError(error: Error): MockReplyChain;
+  reply(callback: SingleReplyCallback): MockReplyChain;
+  replyWithError(error?: Error): MockReplyChain;
 }
 
 export interface MockPool {
