@@ -6,8 +6,8 @@ PKG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 E2E_DIR="$PKG_DIR/e2e"
 TARBALL=""
 
-DEFAULT_SUITES=(jest-esm jest-cjs node-test node-cjs)
-ALL_SUITES=(jest-esm jest-cjs node-test node-cjs vitest-browser)
+DEFAULT_SUITES=(jest-esm jest-cjs node-test node-cjs legacy-cjs)
+ALL_SUITES=(jest-esm jest-cjs node-test node-cjs legacy-cjs vitest-browser)
 
 cleanup() {
   # Restore e2e package.json files

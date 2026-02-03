@@ -124,6 +124,21 @@ jobs:
       - run: cd e2e/node-cjs && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
       - run: cd e2e/node-cjs && npm test
 
+  e2e-legacy-cjs:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-tarball
+          path: .
+      - run: cd e2e/legacy-cjs && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
+      - run: cd e2e/legacy-cjs && npm test
+
   e2e-vitest-browser:
     needs: build
     runs-on: ubuntu-latest
