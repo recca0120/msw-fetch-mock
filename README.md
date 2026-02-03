@@ -172,6 +172,32 @@ fetchMock.reset(); // clears interceptors + call history + handlers
 - [API Reference](docs/api.md) — full API details, matching options, reply callbacks
 - [Cloudflare Workers Migration](docs/cloudflare-migration.md) — migrating from `cloudflare:test` fetchMock
 
+## Development
+
+```bash
+pnpm install
+pnpm build        # build with tsup
+pnpm test         # unit tests (vitest)
+pnpm test:e2e     # e2e tests (jest-esm, jest-cjs, node-test, node-cjs)
+```
+
+### E2E Tests
+
+E2E tests verify the published package works across different runtimes and module systems. The script builds, packs a tarball via `npm pack`, and installs it into each `e2e/` project — mirroring CI exactly.
+
+```bash
+# Run default suites (skip vitest-browser)
+pnpm test:e2e
+
+# Run a single suite
+pnpm test:e2e -- node-cjs
+
+# Run all suites including vitest-browser (auto-installs Playwright)
+pnpm test:e2e -- --all
+```
+
+Available suites: `jest-esm`, `jest-cjs`, `node-test`, `node-cjs`, `vitest-browser`
+
 ## License
 
 [MIT](LICENSE.md)
