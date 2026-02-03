@@ -24,23 +24,39 @@
   "exports": {
     ".": {
       "source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": {
+        "import": "./dist/index.d.ts",
+        "require": "./dist/index.d.cts"
+      },
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./node": {
       "source": "./src/node.ts",
-      "types": "./dist/node.d.ts",
-      "import": "./dist/node.js"
+      "types": {
+        "import": "./dist/node.d.ts",
+        "require": "./dist/node.d.cts"
+      },
+      "import": "./dist/node.js",
+      "require": "./dist/node.cjs"
     },
     "./browser": {
       "source": "./src/browser.ts",
-      "types": "./dist/browser.d.ts",
-      "import": "./dist/browser.js"
+      "types": {
+        "import": "./dist/browser.d.ts",
+        "require": "./dist/browser.d.cts"
+      },
+      "import": "./dist/browser.js",
+      "require": "./dist/browser.cjs"
     },
     "./legacy": {
       "source": "./src/legacy.ts",
-      "types": "./dist/legacy.d.ts",
-      "import": "./dist/legacy.js"
+      "types": {
+        "import": "./dist/legacy.d.ts",
+        "require": "./dist/legacy.d.cts"
+      },
+      "import": "./dist/legacy.js",
+      "require": "./dist/legacy.cjs"
     }
   },
   "files": [
@@ -51,14 +67,15 @@
   ],
   "scripts": {
     "prepare": "lefthook install",
-    "build": "tsc",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepublishOnly": "tsc"
+    "prepublishOnly": "tsup"
   },
   "peerDependencies": {
     "msw": "^1.0.0 || ^2.12.7"
@@ -69,6 +86,7 @@
     "lefthook": "^2.0.15",
     "msw": "^2.12.7",
     "prettier": "^3.8.1",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.53.1",
     "vitest": "^4.0.17"

@@ -1,13 +1,10 @@
 const { describe, it, expect, beforeAll, afterEach, afterAll } = require('@jest/globals');
+const { createFetchMock } = require('msw-fetch-mock');
 
 const API_BASE = 'http://localhost:8787';
-let createFetchMock;
-let fetchMock;
+const fetchMock = createFetchMock();
 
 beforeAll(async () => {
-  const mod = await import('msw-fetch-mock');
-  createFetchMock = mod.createFetchMock;
-  fetchMock = createFetchMock();
   await fetchMock.activate();
   fetchMock.disableNetConnect();
 });
@@ -19,7 +16,7 @@ afterEach(() => {
 
 afterAll(() => fetchMock.deactivate());
 
-describe('jest-cjs integration (dynamic import)', () => {
+describe('jest-cjs integration (require)', () => {
   describe('intercept + reply', () => {
     it('should intercept GET request and return JSON', async () => {
       fetchMock
