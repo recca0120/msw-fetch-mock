@@ -501,7 +501,7 @@ export class FetchMock {
             return buildChain(delayRef, contentLengthRef);
           },
 
-          replyWithError: (_error?: Error): MockReplyChain => {
+          replyWithError: (): MockReplyChain => {
             const delayRef = { ms: 0 };
             const contentLengthRef = { enabled: false };
 
