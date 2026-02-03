@@ -24,11 +24,16 @@ export class NativeFetchAdapter implements MswAdapter {
 
       this.options.onUnhandledRequest(request, {
         warning() {
-          console.warn(`[msw-fetch-mock] Warning: unhandled ${request.method} ${request.url}`);
+          console.warn(
+            `[msw-fetch-mock] Warning: intercepted a request without a matching request handler:\n\n` +
+              `  \u2022 ${request.method} ${request.url}\n\n` +
+              `If you still wish to intercept this unhandled request, please create a request handler for it.`
+          );
         },
         error() {
           throw new TypeError(
-            `[msw-fetch-mock] Request handler not found for ${request.method} ${request.url}`
+            `[msw-fetch-mock] Cannot bypass a request when using the \"error\" strategy for the \"onUnhandledRequest\" option.\n\n` +
+              `  \u2022 ${request.method} ${request.url}\n`
           );
         },
       });

@@ -19,6 +19,8 @@ export function createFetchMock(server?: SetupServerLike): FetchMock {
 /** Pre-built singleton for quick standalone use (Cloudflare migration compatible). */
 export const fetchMock = createFetchMock();
 
+export type { SetupServerLike } from './types';
+export { MockCallHistory, MockCallHistoryLog } from './exports';
 export type {
   ActivateOptions,
   OnUnhandledRequest,
@@ -32,8 +34,7 @@ export type {
   SingleReplyResult,
   PendingInterceptor,
   MswAdapter,
-  SetupServerLike,
   HandlerFactory,
-} from './types';
-export { MockCallHistory, MockCallHistoryLog } from './mock-call-history';
-export type { MockCallHistoryLogData, CallHistoryFilterCriteria } from './mock-call-history';
+  MockCallHistoryLogData,
+  CallHistoryFilterCriteria,
+} from './exports';

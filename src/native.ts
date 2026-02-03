@@ -19,6 +19,7 @@ export function createFetchMock(): FetchMock {
 /** Pre-built singleton for quick standalone use. */
 export const fetchMock = createFetchMock();
 
+export { MockCallHistory, MockCallHistoryLog } from './exports';
 export type {
   ActivateOptions,
   OnUnhandledRequest,
@@ -33,6 +34,6 @@ export type {
   PendingInterceptor,
   MswAdapter,
   HandlerFactory,
-} from './types';
-export { MockCallHistory, MockCallHistoryLog } from './mock-call-history';
-export type { MockCallHistoryLogData, CallHistoryFilterCriteria } from './mock-call-history';
+  MockCallHistoryLogData,
+  CallHistoryFilterCriteria,
+} from './exports';

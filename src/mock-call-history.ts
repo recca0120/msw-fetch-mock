@@ -44,6 +44,10 @@ export class MockCallHistoryLog {
     return JSON.parse(this.body);
   }
 
+  /**
+   * Returns a Map representation of this call log.
+   * Provided for compatibility with the `cloudflare:test` fetchMock API.
+   */
   toMap(): Map<string, string | null | Record<string, string>> {
     return new Map<string, string | null | Record<string, string>>([
       ['body', this.body],
@@ -60,6 +64,10 @@ export class MockCallHistoryLog {
     ]);
   }
 
+  /**
+   * Returns a pipe-separated string representation of this call log.
+   * Provided for compatibility with the `cloudflare:test` fetchMock API.
+   */
   toString(): string {
     return [
       `method->${this.method}`,
@@ -163,6 +171,13 @@ export class MockCallHistory {
     );
   }
 
+  /**
+   * Filter helper — matches a single field by exact string or RegExp.
+   *
+   * The `filterCallsByXxx` methods below mirror the `cloudflare:test` fetchMock
+   * API so that tests written for Cloudflare Workers can be reused with this library
+   * without modification.
+   */
   private filterBy(
     field: keyof MockCallHistoryLogData,
     filter: string | RegExp
@@ -172,34 +187,42 @@ export class MockCallHistory {
     );
   }
 
+  /** Filter calls by HTTP method. Mirrors `cloudflare:test` fetchMock API. */
   filterCallsByMethod(filter: string | RegExp): MockCallHistoryLog[] {
     return this.filterBy('method', filter);
   }
 
+  /** Filter calls by path. Mirrors `cloudflare:test` fetchMock API. */
   filterCallsByPath(filter: string | RegExp): MockCallHistoryLog[] {
     return this.filterBy('path', filter);
   }
 
+  /** Filter calls by origin. Mirrors `cloudflare:test` fetchMock API. */
   filterCallsByOrigin(filter: string | RegExp): MockCallHistoryLog[] {
     return this.filterBy('origin', filter);
   }
 
+  /** Filter calls by protocol. Mirrors `cloudflare:test` fetchMock API. */
   filterCallsByProtocol(filter: string | RegExp): MockCallHistoryLog[] {
     return this.filterBy('protocol', filter);
   }
 
+  /** Filter calls by host. Mirrors `cloudflare:test` fetchMock API. */
   filterCallsByHost(filter: string | RegExp): MockCallHistoryLog[] {
     return this.filterBy('host', filter);
   }
 
+  /** Filter calls by port. Mirrors `cloudflare:test` fetchMock API. */
   filterCallsByPort(filter: string | RegExp): MockCallHistoryLog[] {
     return this.filterBy('port', filter);
   }
 
+  /** Filter calls by URL hash. Mirrors `cloudflare:test` fetchMock API. */
   filterCallsByHash(filter: string | RegExp): MockCallHistoryLog[] {
     return this.filterBy('hash', filter);
   }
 
+  /** Filter calls by full URL. Mirrors `cloudflare:test` fetchMock API. */
   filterCallsByFullUrl(filter: string | RegExp): MockCallHistoryLog[] {
     return this.filterBy('fullUrl', filter);
   }
