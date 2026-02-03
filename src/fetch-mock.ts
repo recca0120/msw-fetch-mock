@@ -1,7 +1,5 @@
-import { http, HttpResponse, type StrictRequest, type DefaultBodyType } from 'msw';
 import { MockCallHistory } from './mock-call-history';
 import type {
-  HttpMethod,
   PathMatcher,
   HeaderValueMatcher,
   BodyMatcher,
@@ -18,6 +16,7 @@ import type {
   ResolvedActivateOptions,
   SetupServerLike,
   SetupWorkerLike,
+  HandlerFactory,
 } from './types';
 
 export type {
@@ -44,17 +43,6 @@ function matchesValue(value: string, matcher: string | RegExp | ((v: string) => 
   if (typeof matcher === 'string') return value === matcher;
   if (matcher instanceof RegExp) return matcher.test(value);
   return matcher(value);
-}
-
-function getHttpMethod(method: HttpMethod) {
-  const methods = {
-    GET: http.get,
-    POST: http.post,
-    PUT: http.put,
-    DELETE: http.delete,
-    PATCH: http.patch,
-  };
-  return methods[method];
 }
 
 function matchPath(request: Request, origin: string, pathMatcher: PathMatcher): boolean {
@@ -114,14 +102,6 @@ function recordCall(callHistory: MockCallHistory, request: Request, bodyText: st
     port: url.port,
     hash: url.hash,
   });
-}
-
-function buildResponse(status: number, responseBody: unknown, replyOptions?: ReplyOptions) {
-  const headers = replyOptions?.headers ? new Headers(replyOptions.headers) : undefined;
-  if (responseBody === null || responseBody === undefined) {
-    return new HttpResponse(null, { status, headers });
-  }
-  return HttpResponse.json(responseBody, { status, headers });
 }
 
 function isSetupServerLike(input: unknown): input is SetupServerLike {
@@ -203,6 +183,18 @@ function resolveAdapter(input?: SetupServerLike | SetupWorkerLike | MswAdapter):
 export class FetchMock {
   /** @internal */
   static _defaultAdapterFactory?: () => MswAdapter;
+  /** @internal */
+  static _handlerFactory?: HandlerFactory;
+
+  private get handlerFactory(): HandlerFactory {
+    if (!FetchMock._handlerFactory) {
+      throw new Error(
+        'Handler factory not registered. ' +
+          'Import from msw-fetch-mock/node or msw-fetch-mock/browser.'
+      );
+    }
+    return FetchMock._handlerFactory;
+  }
 
   private readonly _calls = new MockCallHistory();
   private adapter: MswAdapter;
@@ -324,7 +316,7 @@ export class FetchMock {
             ? `${origin}${options.path}`
             : new RegExp(`^${escapeRegExp(origin)}`);
 
-        const matchAndConsume = async (request: StrictRequest<DefaultBodyType>) => {
+        const matchAndConsume = async (request: Request) => {
           if (!pending.persist && pending.timesInvoked >= pending.times) return;
           if (!matchPath(request, origin, options.path)) return;
           if (!matchQuery(request, options.query)) return;
@@ -344,12 +336,9 @@ export class FetchMock {
         };
 
         const registerHandler = (
-          handlerFn: (request: StrictRequest<DefaultBodyType>) => Promise<Response | undefined>
+          handlerFn: (request: Request) => Promise<Response | undefined>
         ) => {
-          const handler = getHttpMethod(method)(
-            urlPattern,
-            async ({ request }: { request: StrictRequest<DefaultBodyType> }) => handlerFn(request)
-          );
+          const handler = this.handlerFactory.createHandler(method, urlPattern, handlerFn);
           this.mswHandlers.set(pending, handler);
           this.adapter.use(handler);
         };
@@ -393,7 +382,8 @@ export class FetchMock {
                 responseBody = bodyOrCallback;
               }
 
-              return buildResponse(status, responseBody, replyOptions);
+              const headers = replyOptions?.headers ? new Headers(replyOptions.headers) : undefined;
+              return this.handlerFactory.buildResponse(status, responseBody, headers);
             });
 
             return buildChain(delayRef);
@@ -406,7 +396,7 @@ export class FetchMock {
               const bodyText = await matchAndConsume(request);
               if (bodyText === undefined) return;
 
-              return HttpResponse.error();
+              return this.handlerFactory.buildErrorResponse();
             });
 
             return buildChain(delayRef);
