@@ -1,6 +1,18 @@
 import { setupServer } from 'msw/node';
 import type { MswAdapter, ResolvedActivateOptions, SetupServerLike } from './types';
 
+/**
+ * MSW adapter that owns and manages its own `setupServer` lifecycle.
+ *
+ * **Difference from `createServerAdapter` (in fetch-mock.ts):**
+ * - `NodeMswAdapter` creates a `setupServer()` on `activate()` and calls
+ *   `close()` on `deactivate()` — it owns the server lifecycle.
+ * - `createServerAdapter` wraps a user-provided server and does not manage
+ *   its lifecycle — the caller owns `listen()` / `close()`.
+ *
+ * When an external server is passed via the constructor, `NodeMswAdapter`
+ * delegates to it without managing lifecycle (similar to `createServerAdapter`).
+ */
 export class NodeMswAdapter implements MswAdapter {
   private server: SetupServerLike | null;
   private readonly ownsServer: boolean;

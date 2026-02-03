@@ -1,0 +1,11 @@
+{
+  "name": "integration-native-esm",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test fetch-mock.test.mjs"
+  },
+  "dependencies": {
+    "msw-fetch-mock": "file:../../"
+  }
+}

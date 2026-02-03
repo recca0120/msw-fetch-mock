@@ -13,6 +13,8 @@ export function createFetchMock(worker: SetupWorkerLike): FetchMock {
   return new FetchMock(new BrowserMswAdapter(worker));
 }
 
+export type { SetupWorkerLike } from './types';
+export { MockCallHistory, MockCallHistoryLog } from './exports';
 export type {
   ActivateOptions,
   OnUnhandledRequest,
@@ -21,10 +23,12 @@ export type {
   MockInterceptor,
   MockReplyChain,
   ReplyOptions,
+  ReplyCallback,
+  SingleReplyCallback,
+  SingleReplyResult,
   PendingInterceptor,
   MswAdapter,
-  SetupWorkerLike,
   HandlerFactory,
-} from './types';
-export { MockCallHistory, MockCallHistoryLog } from './mock-call-history';
-export type { MockCallHistoryLogData, CallHistoryFilterCriteria } from './mock-call-history';
+  MockCallHistoryLogData,
+  CallHistoryFilterCriteria,
+} from './exports';

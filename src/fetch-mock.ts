@@ -41,9 +41,18 @@ export type {
 } from './types';
 
 /**
- * Thin wrapper: adapts a user-provided setupServer instance to MswAdapter.
- * Unlike NodeMswAdapter, this does NOT manage the server lifecycle —
- * the caller owns listen/close.
+ * Thin wrapper: adapts a user-provided `setupServer` instance to {@link MswAdapter}.
+ *
+ * **Difference from {@link NodeMswAdapter}:**
+ * - `createServerAdapter` does NOT own the server lifecycle — the caller is
+ *   responsible for `listen()` / `close()`.
+ * - `NodeMswAdapter` creates and manages its own `setupServer` internally
+ *   (calls `listen()` on activate and `close()` on deactivate).
+ *
+ * Both exist intentionally: `NodeMswAdapter` is used by `createFetchMock()`
+ * for standalone usage, while `createServerAdapter` supports the
+ * `new FetchMock(existingServer)` pattern where the user already has an MSW
+ * server running.
  */
 function createServerAdapter(server: SetupServerLike): MswAdapter {
   return {
@@ -189,14 +198,21 @@ export class FetchMock {
     this.adapter.resetHandlers(...activeHandlers);
   }
 
+  /**
+   * Returns the call history instance.
+   * Provided for compatibility with the `cloudflare:test` fetchMock API.
+   * Equivalent to the `calls` getter.
+   */
   getCallHistory(): MockCallHistory {
     return this._calls;
   }
 
+  /** Clears recorded call history. Mirrors `cloudflare:test` fetchMock API. */
   clearCallHistory(): void {
     this._calls.clear();
   }
 
+  /** Alias for `clearCallHistory()`. Mirrors `cloudflare:test` fetchMock API. */
   clearAllCallHistory(): void {
     this.clearCallHistory();
   }
