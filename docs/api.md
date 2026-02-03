@@ -15,7 +15,9 @@ A pre-built `FetchMock` instance for standalone Node.js use. No setup required â
 ```typescript
 import { fetchMock } from 'msw-fetch-mock';
 
-beforeAll(() => fetchMock.activate({ onUnhandledRequest: 'error' }));
+beforeAll(async () => {
+  await fetchMock.activate({ onUnhandledRequest: 'error' });
+});
 afterAll(() => fetchMock.deactivate());
 afterEach(() => {
   fetchMock.assertNoPendingInterceptors();
@@ -107,11 +109,11 @@ fetchMock.deactivate();             // stop intercepting
 
 ```typescript
 // Default â€” reject unmatched requests
-fetchMock.activate();
-fetchMock.activate({ onUnhandledRequest: 'error' });
+await fetchMock.activate();
+await fetchMock.activate({ onUnhandledRequest: 'error' });
 
 // Custom callback
-fetchMock.activate({
+await fetchMock.activate({
   onUnhandledRequest: (request, print) => {
     if (new URL(request.url).pathname === '/health') return;
     print.error();
