@@ -5,6 +5,9 @@ import type { SetupServerLike } from './types';
 export { FetchMock } from './fetch-mock';
 export { NodeMswAdapter } from './node-adapter';
 
+/** Register Node.js as the default adapter environment so `new FetchMock()` works. */
+FetchMock._defaultAdapterFactory = () => new NodeMswAdapter();
+
 export function createFetchMock(server?: SetupServerLike): FetchMock {
   return new FetchMock(new NodeMswAdapter(server));
 }

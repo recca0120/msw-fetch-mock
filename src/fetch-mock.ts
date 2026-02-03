@@ -15,6 +15,9 @@ import type {
   NetConnectMatcher,
   ActivateOptions,
   MswAdapter,
+  ResolvedActivateOptions,
+  SetupServerLike,
+  SetupWorkerLike,
 } from './types';
 
 export type {
@@ -121,9 +124,88 @@ function buildResponse(status: number, responseBody: unknown, replyOptions?: Rep
   return HttpResponse.json(responseBody, { status, headers });
 }
 
+function isSetupServerLike(input: unknown): input is SetupServerLike {
+  return (
+    typeof input === 'object' &&
+    input !== null &&
+    'listen' in input &&
+    typeof (input as SetupServerLike).listen === 'function' &&
+    'close' in input &&
+    typeof (input as SetupServerLike).close === 'function'
+  );
+}
+
+function isSetupWorkerLike(input: unknown): input is SetupWorkerLike {
+  return (
+    typeof input === 'object' &&
+    input !== null &&
+    'start' in input &&
+    typeof (input as SetupWorkerLike).start === 'function' &&
+    'stop' in input &&
+    typeof (input as SetupWorkerLike).stop === 'function'
+  );
+}
+
+function isMswAdapter(input: unknown): input is MswAdapter {
+  return (
+    typeof input === 'object' &&
+    input !== null &&
+    'activate' in input &&
+    typeof (input as MswAdapter).activate === 'function' &&
+    'deactivate' in input &&
+    typeof (input as MswAdapter).deactivate === 'function'
+  );
+}
+
+function createServerAdapter(server: SetupServerLike): MswAdapter {
+  return {
+    use: (...handlers: Array<unknown>) => server.use(...handlers),
+    resetHandlers: (...handlers: Array<unknown>) => server.resetHandlers(...handlers),
+    activate(options: ResolvedActivateOptions) {
+      server.listen({ onUnhandledRequest: options.onUnhandledRequest });
+    },
+    deactivate() {
+      server.close();
+    },
+  };
+}
+
+function createWorkerAdapter(worker: SetupWorkerLike): MswAdapter {
+  return {
+    use: (...handlers: Array<unknown>) => worker.use(...handlers),
+    resetHandlers: (...handlers: Array<unknown>) => worker.resetHandlers(...handlers),
+    async activate(options: ResolvedActivateOptions) {
+      await worker.start({ onUnhandledRequest: options.onUnhandledRequest });
+    },
+    deactivate() {
+      worker.stop();
+    },
+  };
+}
+
+function resolveAdapter(input?: SetupServerLike | SetupWorkerLike | MswAdapter): MswAdapter {
+  if (!input) {
+    if (!FetchMock._defaultAdapterFactory) {
+      throw new Error(
+        'FetchMock requires a server, worker, or adapter argument. ' +
+          'Use createFetchMock() from msw-fetch-mock/node or msw-fetch-mock/browser, ' +
+          'or pass a setupServer/setupWorker instance directly.'
+      );
+    }
+    return FetchMock._defaultAdapterFactory();
+  }
+  if (isMswAdapter(input)) return input;
+  if (isSetupServerLike(input)) return createServerAdapter(input);
+  if (isSetupWorkerLike(input)) return createWorkerAdapter(input);
+  throw new Error('Invalid argument: expected a setupServer, setupWorker, or MswAdapter instance.');
+}
+
 export class FetchMock {
+  /** @internal */
+  static _defaultAdapterFactory?: () => MswAdapter;
+
   private readonly _calls = new MockCallHistory();
-  private adapter: MswAdapter | null;
+  private adapter: MswAdapter;
   private interceptors: PendingInterceptor[] = [];
   private netConnectAllowed: NetConnectMatcher = false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,17 +215,11 @@ export class FetchMock {
     return this._calls;
   }
 
-  constructor(adapter?: MswAdapter) {
-    this.adapter = adapter ?? null;
+  constructor(input?: SetupServerLike | SetupWorkerLike | MswAdapter) {
+    this.adapter = resolveAdapter(input);
   }
 
   async activate(options?: ActivateOptions): Promise<void> {
-    if (!this.adapter) {
-      throw new Error(
-        'FetchMock has no adapter. Use createFetchMock() from msw-fetch-mock/node or msw-fetch-mock/browser.'
-      );
-    }
-
     const mode = options?.onUnhandledRequest ?? 'error';
     await this.adapter.activate({
       onUnhandledRequest: (request: Request, print: { warning(): void; error(): void }) => {
@@ -182,7 +258,6 @@ export class FetchMock {
    * go through MSW's onUnhandledRequest instead of silently passing through.
    */
   private syncMswHandlers(): void {
-    if (!this.adapter) return;
     const activeHandlers = [...this.mswHandlers.entries()]
       .filter(([p]) => !p.consumed || p.persist)
       .map(([, handler]) => handler);
@@ -201,14 +276,14 @@ export class FetchMock {
     this.interceptors = [];
     this.mswHandlers.clear();
     this._calls.clear();
-    this.adapter?.deactivate();
+    this.adapter.deactivate();
   }
 
   reset(): void {
     this.interceptors = [];
     this.mswHandlers.clear();
     this._calls.clear();
-    this.adapter?.resetHandlers();
+    this.adapter.resetHandlers();
   }
 
   assertNoPendingInterceptors(): void {
@@ -275,11 +350,6 @@ export class FetchMock {
             urlPattern,
             async ({ request }: { request: StrictRequest<DefaultBodyType> }) => handlerFn(request)
           );
-          if (!this.adapter) {
-            throw new Error(
-              'FetchMock has no adapter. Use createFetchMock() from msw-fetch-mock/node or msw-fetch-mock/browser.'
-            );
-          }
           this.mswHandlers.set(pending, handler);
           this.adapter.use(handler);
         };

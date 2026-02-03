@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
 import { FetchMock } from './fetch-mock';
 import { NodeMswAdapter } from './node-adapter';
 import { createFetchMock, fetchMock as singletonFetchMock } from './node';
+import type { SetupServerLike, SetupWorkerLike, MswAdapter } from './types';
 
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
@@ -981,5 +982,180 @@ describe('consumed interceptor', () => {
 describe('singleton export', () => {
   it('should export fetchMock as a FetchMock instance', () => {
     expect(singletonFetchMock).toBeInstanceOf(FetchMock);
+  });
+});
+
+describe('constructor auto-detection', () => {
+  function createStubServer(): SetupServerLike {
+    return {
+      use: vi.fn(),
+      resetHandlers: vi.fn(),
+      listen: vi.fn(),
+      close: vi.fn(),
+    };
+  }
+
+  function createStubWorker(): SetupWorkerLike {
+    return {
+      use: vi.fn(),
+      resetHandlers: vi.fn(),
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+    };
+  }
+
+  function createStubAdapter(): MswAdapter {
+    return {
+      use: vi.fn(),
+      resetHandlers: vi.fn(),
+      activate: vi.fn(),
+      deactivate: vi.fn(),
+    };
+  }
+
+  describe('SetupServerLike', () => {
+    it('should call server.listen() on activate', async () => {
+      const server = createStubServer();
+      const fm = new FetchMock(server);
+
+      await fm.activate();
+
+      expect(server.listen).toHaveBeenCalledWith(
+        expect.objectContaining({ onUnhandledRequest: expect.any(Function) })
+      );
+    });
+
+    it('should call server.close() on deactivate', () => {
+      const server = createStubServer();
+      const fm = new FetchMock(server);
+
+      fm.deactivate();
+
+      expect(server.close).toHaveBeenCalled();
+    });
+
+    it('should delegate use() via interceptor registration', async () => {
+      const server = createStubServer();
+      const fm = new FetchMock(server);
+      await fm.activate();
+
+      fm.get('http://example.test').intercept({ path: '/data' }).reply(200, { ok: true });
+
+      expect(server.use).toHaveBeenCalled();
+    });
+
+    it('should delegate resetHandlers() via reset()', async () => {
+      const server = createStubServer();
+      const fm = new FetchMock(server);
+      await fm.activate();
+
+      fm.reset();
+
+      expect(server.resetHandlers).toHaveBeenCalled();
+    });
+  });
+
+  describe('SetupWorkerLike', () => {
+    it('should call worker.start() on activate', async () => {
+      const worker = createStubWorker();
+      const fm = new FetchMock(worker);
+
+      await fm.activate();
+
+      expect(worker.start).toHaveBeenCalledWith(
+        expect.objectContaining({ onUnhandledRequest: expect.any(Function) })
+      );
+    });
+
+    it('should call worker.stop() on deactivate', () => {
+      const worker = createStubWorker();
+      const fm = new FetchMock(worker);
+
+      fm.deactivate();
+
+      expect(worker.stop).toHaveBeenCalled();
+    });
+
+    it('should delegate use() via interceptor registration', async () => {
+      const worker = createStubWorker();
+      const fm = new FetchMock(worker);
+      await fm.activate();
+
+      fm.get('http://example.test').intercept({ path: '/data' }).reply(200, { ok: true });
+
+      expect(worker.use).toHaveBeenCalled();
+    });
+
+    it('should delegate resetHandlers() via reset()', async () => {
+      const worker = createStubWorker();
+      const fm = new FetchMock(worker);
+      await fm.activate();
+
+      fm.reset();
+
+      expect(worker.resetHandlers).toHaveBeenCalled();
+    });
+  });
+
+  describe('MswAdapter (backward compat)', () => {
+    it('should use adapter directly on activate', async () => {
+      const adapter = createStubAdapter();
+      const fm = new FetchMock(adapter);
+
+      await fm.activate();
+
+      expect(adapter.activate).toHaveBeenCalled();
+    });
+
+    it('should use adapter directly on deactivate', () => {
+      const adapter = createStubAdapter();
+      const fm = new FetchMock(adapter);
+
+      fm.deactivate();
+
+      expect(adapter.deactivate).toHaveBeenCalled();
+    });
+  });
+
+  describe('invalid input', () => {
+    it('should throw for an object that matches no known type', () => {
+      expect(() => new FetchMock({} as never)).toThrow(/invalid/i);
+    });
+  });
+
+  describe('no args (standalone Node)', () => {
+    it('should auto-create standalone adapter and work end-to-end', async () => {
+      const fm = new FetchMock();
+      await fm.activate();
+
+      try {
+        fm.get('http://standalone.test').intercept({ path: '/ping' }).reply(200, { pong: true });
+
+        const res = await fetch('http://standalone.test/ping');
+        expect(await res.json()).toEqual({ pong: true });
+      } finally {
+        fm.deactivate();
+      }
+    });
+  });
+
+  describe('end-to-end with real setupServer', () => {
+    it('should intercept and reply when passed setupServer() directly', async () => {
+      const server = setupServer();
+      const fm = new FetchMock(server);
+      await fm.activate();
+
+      try {
+        fm.get('http://e2e.test')
+          .intercept({ path: '/data' })
+          .reply(200, { result: 'auto-detected' });
+
+        const res = await fetch('http://e2e.test/data');
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ result: 'auto-detected' });
+      } finally {
+        fm.deactivate();
+      }
+    });
   });
 });
