@@ -1,6 +1,5 @@
 import { MockCallHistory } from './mock-call-history';
 import type {
-  HttpMethod,
   PathMatcher,
   HeaderValueMatcher,
   BodyMatcher,

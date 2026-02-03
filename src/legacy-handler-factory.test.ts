@@ -3,10 +3,13 @@ import { createLegacyHandlerFactory, type LegacyRestApi } from './legacy-handler
 
 /* ---------- MSW legacy (v1) API mocks ---------- */
 
-function createMockRestApi(): LegacyRestApi & { _resolvers: Map<string, Function> } {
-  const resolvers = new Map<string, Function>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type V1Resolver = (...args: any[]) => any;
 
-  const createMethod = (httpMethod: string) => (url: string | RegExp, resolver: Function) => {
+function createMockRestApi(): LegacyRestApi & { _resolvers: Map<string, V1Resolver> } {
+  const resolvers = new Map<string, V1Resolver>();
+
+  const createMethod = (httpMethod: string) => (url: string | RegExp, resolver: V1Resolver) => {
     const key = `${httpMethod} ${url}`;
     resolvers.set(key, resolver);
     return { key, method: httpMethod, url };
@@ -41,6 +44,7 @@ function createMockV1Request(options: {
 function createMockV1Res() {
   const collected: unknown[] = [];
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const res: any = (...transformers: unknown[]) => {
     collected.push(...transformers);
     return { _type: 'response', transformers: collected };
