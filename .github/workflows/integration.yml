@@ -35,7 +35,8 @@ jobs:
         with:
           name: dist
           path: dist/
-      - run: cd integration/jest-esm && npm install --ignore-scripts
+      - run: npm pkg delete scripts.prepare
+      - run: cd integration/jest-esm && npm install
       - run: cd integration/jest-esm && npm test
 
   jest-cjs:
@@ -50,7 +51,8 @@ jobs:
         with:
           name: dist
           path: dist/
-      - run: cd integration/jest-cjs && npm install --ignore-scripts
+      - run: npm pkg delete scripts.prepare
+      - run: cd integration/jest-cjs && npm install
       - run: cd integration/jest-cjs && npm test
 
   node-test:
@@ -65,7 +67,8 @@ jobs:
         with:
           name: dist
           path: dist/
-      - run: cd integration/node-test && npm install --ignore-scripts
+      - run: npm pkg delete scripts.prepare
+      - run: cd integration/node-test && npm install
       - run: cd integration/node-test && npm test
 
   vitest-browser:
@@ -80,6 +83,7 @@ jobs:
         with:
           name: dist
           path: dist/
-      - run: cd integration/vitest-browser && npm install --ignore-scripts
+      - run: npm pkg delete scripts.prepare
+      - run: cd integration/vitest-browser && npm install
       - run: cd integration/vitest-browser && npx playwright install --with-deps chromium
       - run: cd integration/vitest-browser && npm test
