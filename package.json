@@ -1,6 +1,6 @@
 {
   "name": "msw-fetch-mock",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Undici-style fetch mock API built on MSW (Mock Service Worker)",
   "type": "module",
   "license": "MIT",
@@ -9,7 +9,9 @@
     "fetch",
     "mock",
     "testing",
-    "undici"
+    "undici",
+    "browser",
+    "service-worker"
   ],
   "repository": {
     "type": "git",
@@ -24,6 +26,16 @@
       "source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./node": {
+      "source": "./src/node.ts",
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    },
+    "./browser": {
+      "source": "./src/browser.ts",
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
     }
   },
   "files": [

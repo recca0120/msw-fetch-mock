@@ -46,3 +46,81 @@ jobs:
           cache: pnpm
       - run: pnpm install
       - run: pnpm test:run
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm build
+      - run: npm pack && mv msw-fetch-mock-*.tgz msw-fetch-mock.tgz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-tarball
+          path: msw-fetch-mock.tgz
+
+  e2e-jest-esm:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-tarball
+          path: .
+      - run: cd e2e/jest-esm && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
+      - run: cd e2e/jest-esm && npm test
+
+  e2e-jest-cjs:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-tarball
+          path: .
+      - run: cd e2e/jest-cjs && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
+      - run: cd e2e/jest-cjs && npm test
+
+  e2e-node-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-tarball
+          path: .
+      - run: cd e2e/node-test && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
+      - run: cd e2e/node-test && npm test
+
+  e2e-vitest-browser:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-tarball
+          path: .
+      - run: cd e2e/vitest-browser && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
+      - run: cd e2e/vitest-browser && npx playwright install --with-deps chromium
+      - run: cd e2e/vitest-browser && npm test

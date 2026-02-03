@@ -7,7 +7,7 @@ If you're migrating tests from Cloudflare Workers' `cloudflare:test` to a standa
 | cloudflare:test                                    | msw-fetch-mock                                              |
 | -------------------------------------------------- | ----------------------------------------------------------- |
 | `import { fetchMock } from 'cloudflare:test'`      | `import { fetchMock } from 'msw-fetch-mock'`                |
-| `fetchMock.activate()`                             | `fetchMock.activate()`                                      |
+| `fetchMock.activate()`                             | `await fetchMock.activate()`                                |
 | `fetchMock.disableNetConnect()`                    | `fetchMock.disableNetConnect()`                             |
 | `fetchMock.enableNetConnect(matcher?)`             | `fetchMock.enableNetConnect(matcher?)`                      |
 | `fetchMock.deactivate()`                           | `fetchMock.deactivate()`                                    |
@@ -46,7 +46,9 @@ it('calls API', async () => {
 ```typescript
 import { fetchMock } from 'msw-fetch-mock';
 
-beforeAll(() => fetchMock.activate());
+beforeAll(async () => {
+  await fetchMock.activate();
+});
 afterAll(() => fetchMock.deactivate());
 afterEach(() => {
   fetchMock.assertNoPendingInterceptors();
