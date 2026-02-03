@@ -1,13 +1,11 @@
-const { describe, it, expect, beforeAll, afterEach, afterAll } = require('@jest/globals');
+const { describe, it, before, afterEach, after } = require('node:test');
+const assert = require('node:assert/strict');
+const { createFetchMock } = require('msw-fetch-mock/node');
 
 const API_BASE = 'http://localhost:8787';
-let createFetchMock;
-let fetchMock;
+const fetchMock = createFetchMock();
 
-beforeAll(async () => {
-  const mod = await import('msw-fetch-mock');
-  createFetchMock = mod.createFetchMock;
-  fetchMock = createFetchMock();
+before(async () => {
   await fetchMock.activate();
   fetchMock.disableNetConnect();
 });
@@ -17,9 +15,9 @@ afterEach(() => {
   fetchMock.reset();
 });
 
-afterAll(() => fetchMock.deactivate());
+after(() => fetchMock.deactivate());
 
-describe('jest-cjs integration (dynamic import)', () => {
+describe('node-cjs integration (require)', () => {
   describe('intercept + reply', () => {
     it('should intercept GET request and return JSON', async () => {
       fetchMock
@@ -30,8 +28,8 @@ describe('jest-cjs integration (dynamic import)', () => {
       const response = await fetch(`${API_BASE}/posts`);
       const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data).toEqual({ posts: [{ id: '1' }] });
+      assert.equal(response.status, 200);
+      assert.deepStrictEqual(data, { posts: [{ id: '1' }] });
     });
 
     it('should intercept POST request with body', async () => {
@@ -46,8 +44,8 @@ describe('jest-cjs integration (dynamic import)', () => {
         body: JSON.stringify({ content: 'Hello' }),
       });
 
-      expect(response.status).toBe(201);
-      expect(await response.json()).toEqual({ id: 'new-post' });
+      assert.equal(response.status, 201);
+      assert.deepStrictEqual(await response.json(), { id: 'new-post' });
     });
   });
 
@@ -59,9 +57,9 @@ describe('jest-cjs integration (dynamic import)', () => {
       await fetch(`${API_BASE}/a`);
       await fetch(`${API_BASE}/b`);
 
-      expect(fetchMock.calls.length).toBe(2);
-      expect(fetchMock.calls.firstCall().path).toBe('/a');
-      expect(fetchMock.calls.lastCall().path).toBe('/b');
+      assert.equal(fetchMock.calls.length, 2);
+      assert.equal(fetchMock.calls.firstCall().path, '/a');
+      assert.equal(fetchMock.calls.lastCall().path, '/b');
     });
 
     it('should record POST body and parse as JSON', async () => {
@@ -74,8 +72,8 @@ describe('jest-cjs integration (dynamic import)', () => {
       });
 
       const call = fetchMock.calls.lastCall();
-      expect(call.body).toBe('{"key":"value"}');
-      expect(call.json()).toEqual({ key: 'value' });
+      assert.equal(call.body, '{"key":"value"}');
+      assert.deepStrictEqual(call.json(), { key: 'value' });
     });
   });
 
@@ -86,7 +84,7 @@ describe('jest-cjs integration (dynamic import)', () => {
         .intercept({ path: '/unused', method: 'GET' })
         .reply(200, { data: 'never fetched' });
 
-      expect(() => fetchMock.assertNoPendingInterceptors()).toThrow(/pending interceptor/i);
+      assert.throws(() => fetchMock.assertNoPendingInterceptors(), /pending interceptor/i);
       fetchMock.reset();
     });
   });
@@ -96,12 +94,12 @@ describe('jest-cjs integration (dynamic import)', () => {
       fetchMock.get(API_BASE).intercept({ path: '/test', method: 'GET' }).reply(200, { ok: true });
 
       await fetch(`${API_BASE}/test`);
-      expect(fetchMock.calls.length).toBe(1);
+      assert.equal(fetchMock.calls.length, 1);
 
       fetchMock.reset();
 
-      expect(fetchMock.calls.length).toBe(0);
-      expect(fetchMock.pendingInterceptors()).toHaveLength(0);
+      assert.equal(fetchMock.calls.length, 0);
+      assert.equal(fetchMock.pendingInterceptors().length, 0);
     });
   });
 
@@ -119,7 +117,7 @@ describe('jest-cjs integration (dynamic import)', () => {
       });
 
       const data = await response.json();
-      expect(data).toEqual({ echoed: '{"message":"hello"}' });
+      assert.deepStrictEqual(data, { echoed: '{"message":"hello"}' });
     });
   });
 
@@ -134,9 +132,9 @@ describe('jest-cjs integration (dynamic import)', () => {
       const r1 = await fetch(`${API_BASE}/health`);
       const r2 = await fetch(`${API_BASE}/health`);
 
-      expect(r1.status).toBe(200);
-      expect(r2.status).toBe(200);
-      expect(fetchMock.calls.length).toBe(2);
+      assert.equal(r1.status, 200);
+      assert.equal(r2.status, 200);
+      assert.equal(fetchMock.calls.length, 2);
     });
   });
 
@@ -147,7 +145,10 @@ describe('jest-cjs integration (dynamic import)', () => {
         .intercept({ path: '/fail', method: 'GET' })
         .replyWithError(new Error('network failure'));
 
-      await expect(fetch(`${API_BASE}/fail`)).rejects.toThrow();
+      await assert.rejects(
+        () => fetch(`${API_BASE}/fail`),
+        (err) => err instanceof Error,
+      );
     });
   });
 });

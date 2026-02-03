@@ -2,7 +2,7 @@
   "name": "integration-jest-cjs",
   "private": true,
   "scripts": {
-    "test": "npx jest"
+    "test": "NODE_OPTIONS='--experimental-vm-modules' npx jest"
   },
   "dependencies": {
     "msw-fetch-mock": "file:../../",
