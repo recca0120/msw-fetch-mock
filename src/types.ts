@@ -80,3 +80,14 @@ export interface MswAdapter {
   activate(options: ResolvedActivateOptions): void | Promise<void>;
   deactivate(): void;
 }
+
+/** Pluggable factory for MSW-version-specific handler and response creation */
+export interface HandlerFactory {
+  createHandler(
+    method: HttpMethod,
+    urlPattern: string | RegExp,
+    handlerFn: (request: Request) => Promise<Response | undefined>
+  ): unknown;
+  buildResponse(status: number, body: unknown, headers?: Headers): Response;
+  buildErrorResponse(): Response;
+}

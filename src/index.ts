@@ -17,6 +17,7 @@ export type {
   PendingInterceptor,
   MswAdapter,
   SetupServerLike,
+  HandlerFactory,
   MockCallHistoryLogData,
   CallHistoryFilterCriteria,
 } from './node';
