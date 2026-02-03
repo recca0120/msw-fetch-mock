@@ -32,7 +32,7 @@ export class NativeFetchAdapter implements MswAdapter {
         },
         error() {
           throw new TypeError(
-            `[msw-fetch-mock] Cannot bypass a request when using the \"error\" strategy for the \"onUnhandledRequest\" option.\n\n` +
+            `[msw-fetch-mock] Cannot bypass a request when using the "error" strategy for the "onUnhandledRequest" option.\n\n` +
               `  \u2022 ${request.method} ${request.url}\n`
           );
         },

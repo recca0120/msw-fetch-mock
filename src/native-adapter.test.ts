@@ -105,7 +105,13 @@ describe('NativeFetchAdapter', () => {
 
       adapter.activate({ onUnhandledRequest: onUnhandled });
 
-      await globalThis.fetch('http://no-match.test/path');
+      // The noop callback doesn't throw, so the adapter falls through to
+      // originalFetch which may fail with a network error — ignore it.
+      try {
+        await globalThis.fetch('http://127.0.0.1:1/path');
+      } catch {
+        // expected: real fetch may fail in CI
+      }
 
       expect(onUnhandled).toHaveBeenCalledWith(
         expect.any(Request),
