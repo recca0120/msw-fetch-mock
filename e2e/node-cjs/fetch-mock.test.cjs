@@ -147,7 +147,7 @@ describe('node-cjs integration (require)', () => {
 
       await assert.rejects(
         () => fetch(`${API_BASE}/fail`),
-        (err) => err instanceof Error,
+        (err) => err instanceof Error
       );
     });
   });
