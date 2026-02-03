@@ -1,0 +1,23 @@
+{
+  "name": "integration-vitest-browser",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npx vitest run"
+  },
+  "dependencies": {
+    "msw-fetch-mock": "file:../../",
+    "msw": "^2.12.7"
+  },
+  "devDependencies": {
+    "@vitest/browser": "^3.2.4",
+    "playwright": "^1.52.0",
+    "vitest": "^3.2.4",
+    "typescript": "^5.9.3"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  }
+}
