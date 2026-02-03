@@ -10,6 +10,11 @@ If you're familiar with Cloudflare Workers' `fetchMock` (from `cloudflare:test`)
 
 Supports both **Node.js** (`msw/node`) and **Browser** (`msw/browser`) environments via subpath exports.
 
+## Requirements
+
+- **Node.js** >= 18
+- **MSW** ^1.0.0 (via `/legacy`) or ^2.12.7
+
 ## Install
 
 ```bash
@@ -89,6 +94,26 @@ afterEach(() => {
 
 > **Note:** Only one MSW server can be active at a time. If another server is already listening, standalone `activate()` will throw an error guiding you to use `new FetchMock(new NodeMswAdapter(server))` instead.
 
+### Legacy (MSW v1)
+
+```typescript
+import { rest } from 'msw';
+import { setupServer } from 'msw/node';
+import { createFetchMock } from 'msw-fetch-mock/legacy';
+
+const server = setupServer();
+const fetchMock = createFetchMock(rest, server);
+
+beforeAll(() => fetchMock.activate());
+afterAll(() => fetchMock.deactivate());
+afterEach(() => {
+  fetchMock.assertNoPendingInterceptors();
+  fetchMock.reset();
+});
+```
+
+See [MSW v1 Legacy Guide](docs/msw-v1-legacy.md) for details.
+
 ## Unhandled Requests
 
 By default `activate()` uses `'error'` mode — unmatched requests cause `fetch()` to reject. This includes requests to **consumed** interceptors (once a one-shot interceptor has been used, its handler is removed from MSW).
@@ -119,11 +144,12 @@ fetchMock.activate({
 
 ### Import Paths
 
-| Path                     | Environment                  | MSW dependency |
-| ------------------------ | ---------------------------- | -------------- |
-| `msw-fetch-mock`         | Node.js (re-exports `/node`) | `msw/node`     |
-| `msw-fetch-mock/node`    | Node.js                      | `msw/node`     |
-| `msw-fetch-mock/browser` | Browser                      | `msw/browser`  |
+| Path                     | Environment                  | MSW version |
+| ------------------------ | ---------------------------- | ----------- |
+| `msw-fetch-mock`         | Node.js (re-exports `/node`) | v2          |
+| `msw-fetch-mock/node`    | Node.js                      | v2          |
+| `msw-fetch-mock/browser` | Browser                      | v2          |
+| `msw-fetch-mock/legacy`  | Node.js (MSW v1)             | v1          |
 
 ### `fetchMock` (singleton)
 
@@ -136,6 +162,7 @@ Factory function that creates a `FetchMock` with the appropriate adapter.
 
 - Node: `createFetchMock(server?)` — optionally pass an existing MSW `SetupServer`
 - Browser: `createFetchMock(worker)` — pass an MSW `SetupWorker` (required)
+- Legacy: `createFetchMock(rest, server?)` — pass MSW v1 `rest` object
 
 ### `new FetchMock(adapter?)`
 
@@ -145,7 +172,7 @@ Creates a `FetchMock` instance with an explicit `MswAdapter`. Use `NodeMswAdapte
 
 ```typescript
 fetchMock
-  .get(origin)                              // select origin
+  .get(origin)                              // string, RegExp, or function
   .intercept({ path, method, headers, body, query })  // match criteria
   .reply(status, body, options)             // define response
   .times(n) / .persist();                   // repeat control
@@ -167,10 +194,23 @@ fetchMock.assertNoPendingInterceptors(); // throws if unconsumed interceptors re
 fetchMock.reset(); // clears interceptors + call history + handlers
 ```
 
+## Tested Environments
+
+E2E tests run on every CI push across these environments:
+
+| Environment    | Module System | Test Framework      |
+| -------------- | ------------- | ------------------- |
+| Jest ESM       | ESM (import)  | Jest                |
+| Jest CJS       | CJS (require) | Jest                |
+| Node.js Test   | ESM (import)  | Node test runner    |
+| Node.js CJS    | CJS (require) | Node test runner    |
+| Vitest Browser | ESM (import)  | Vitest + Playwright |
+
 ## Documentation
 
 - [API Reference](docs/api.md) — full API details, matching options, reply callbacks
 - [Cloudflare Workers Migration](docs/cloudflare-migration.md) — migrating from `cloudflare:test` fetchMock
+- [MSW v1 Legacy Guide](docs/msw-v1-legacy.md) — using msw-fetch-mock with MSW v1
 
 ## Development
 

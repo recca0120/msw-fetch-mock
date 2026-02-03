@@ -2,11 +2,12 @@
 
 ## Import Paths
 
-| Path                     | Environment                  | MSW dependency |
-| ------------------------ | ---------------------------- | -------------- |
-| `msw-fetch-mock`         | Node.js (re-exports `/node`) | `msw/node`     |
-| `msw-fetch-mock/node`    | Node.js                      | `msw/node`     |
-| `msw-fetch-mock/browser` | Browser                      | `msw/browser`  |
+| Path                     | Environment                  | MSW version |
+| ------------------------ | ---------------------------- | ----------- |
+| `msw-fetch-mock`         | Node.js (re-exports `/node`) | v2          |
+| `msw-fetch-mock/node`    | Node.js                      | v2          |
+| `msw-fetch-mock/browser` | Browser                      | v2          |
+| `msw-fetch-mock/legacy`  | Node.js (MSW v1)             | v1          |
 
 ## `fetchMock` (singleton)
 
@@ -55,6 +56,19 @@ const fetchMock = createFetchMock(worker);
 beforeAll(async () => {
   await fetchMock.activate({ onUnhandledRequest: 'error' });
 });
+```
+
+## `createFetchMock(rest, server?)` (Legacy)
+
+Creates a `FetchMock` for MSW v1 environments. See [MSW v1 Legacy Guide](msw-v1-legacy.md).
+
+```typescript
+import { rest } from 'msw';
+import { setupServer } from 'msw/node';
+import { createFetchMock } from 'msw-fetch-mock/legacy';
+
+const server = setupServer();
+const fetchMock = createFetchMock(rest, server);
 ```
 
 ## `new FetchMock(adapter?)`
@@ -142,11 +156,22 @@ fetchMock.calls.clear();
 
 ### `fetchMock.get(origin)`
 
-Returns a `MockPool` scoped to the given origin.
+Returns a `MockPool` scoped to the given origin. The `origin` parameter accepts three forms:
 
 ```typescript
+// String — exact origin match
 const pool = fetchMock.get('https://api.example.com');
+
+// RegExp — match against URL origin
+const pool = fetchMock.get(/\.example\.com$/);
+
+// Function — custom origin predicate
+const pool = fetchMock.get((origin) => origin.startsWith('https://'));
 ```
+
+| Parameter | Type                                              | Required | Description    |
+| --------- | ------------------------------------------------- | -------- | -------------- |
+| `origin`  | `string \| RegExp \| (origin: string) => boolean` | Yes      | Origin matcher |
 
 ### `fetchMock.disableNetConnect()`
 
@@ -174,6 +199,44 @@ fetchMock.enableNetConnect((host) => host.endsWith('.test'));
 | --------- | ----------------------------------------------- | -------- | ------------------------------------ |
 | `matcher` | `string \| RegExp \| (host: string) => boolean` | No       | Host matcher. Allows all if omitted. |
 
+### `fetchMock.defaultReplyHeaders(headers)`
+
+Sets default headers that are included in every response. Per-reply headers merge with and override defaults.
+
+```typescript
+fetchMock.defaultReplyHeaders({
+  'x-request-id': 'test-123',
+  'cache-control': 'no-store',
+});
+
+// This reply will have both x-request-id and content-type
+fetchMock
+  .get('https://api.example.com')
+  .intercept({ path: '/data' })
+  .reply(200, { ok: true }, { headers: { 'content-type': 'application/json' } });
+```
+
+> `reset()` clears default reply headers.
+
+| Parameter | Type                     | Required | Description                          |
+| --------- | ------------------------ | -------- | ------------------------------------ |
+| `headers` | `Record<string, string>` | Yes      | Headers to include in every response |
+
+### `fetchMock.enableCallHistory()`
+
+Enables call history recording. This is the default state.
+
+### `fetchMock.disableCallHistory()`
+
+Disables call history recording. Requests are still intercepted and replied to, but not recorded. Useful when you want to reduce overhead in performance-sensitive tests.
+
+```typescript
+fetchMock.disableCallHistory();
+// ... requests are intercepted but not recorded
+fetchMock.enableCallHistory();
+// ... requests are now recorded again
+```
+
 ### `fetchMock.getCallHistory()`
 
 Returns the `MockCallHistory` instance. Cloudflare-compatible alias for `fetchMock.calls`.
@@ -181,6 +244,10 @@ Returns the `MockCallHistory` instance. Cloudflare-compatible alias for `fetchMo
 ### `fetchMock.clearCallHistory()`
 
 Clears all recorded calls. Cloudflare-compatible alias for `fetchMock.calls.clear()`.
+
+### `fetchMock.clearAllCallHistory()`
+
+Alias for `clearCallHistory()`.
 
 ### `fetchMock.assertNoPendingInterceptors()`
 
@@ -195,7 +262,7 @@ afterEach(() => {
 
 ### `fetchMock.reset()`
 
-Clears all interceptors, call history, and MSW handlers. Resets the instance to a clean state without stopping the server. Use in `afterEach` after asserting no pending interceptors.
+Clears all interceptors, call history, default reply headers, and MSW handlers. Resets the instance to a clean state without stopping the server. Use in `afterEach` after asserting no pending interceptors.
 
 ```typescript
 afterEach(() => {
@@ -302,7 +369,7 @@ Returns: `MockInterceptor`
 
 ### `interceptor.reply(status, body?, options?)`
 
-Defines the mock response.
+Defines the mock response with a static body.
 
 ```typescript
 // Static body
@@ -310,7 +377,13 @@ Defines the mock response.
 
 // With response headers
 .reply(200, { users: [] }, { headers: { 'x-request-id': '123' } })
+```
 
+### `interceptor.reply(status, callback)`
+
+Defines the mock response with a dynamic body callback.
+
+```typescript
 // Callback (receives request info)
 .reply(200, (req) => {
   const input = JSON.parse(req.body!);
@@ -318,13 +391,39 @@ Defines the mock response.
 })
 ```
 
+### `interceptor.reply(callback)`
+
+Single callback form — full control over status code, body, and response options.
+
+```typescript
+.reply((req) => {
+  const data = JSON.parse(req.body!);
+  return {
+    statusCode: 201,
+    data: { id: '1', ...data },
+    responseOptions: { headers: { 'x-created': 'true' } },
+  };
+})
+```
+
+The callback receives `{ body: string | null }` and must return (or resolve to):
+
+```typescript
+interface SingleReplyResult {
+  statusCode: number;
+  data: unknown;
+  responseOptions?: { headers?: Record<string, string> };
+}
+```
+
 Returns: `MockReplyChain`
 
-| Parameter | Type                                   | Description               |
-| --------- | -------------------------------------- | ------------------------- |
-| `status`  | `number`                               | HTTP status code          |
-| `body`    | `unknown \| (req) => unknown`          | Response body or callback |
-| `options` | `{ headers?: Record<string, string> }` | Response headers          |
+| Parameter  | Type                                   | Description               |
+| ---------- | -------------------------------------- | ------------------------- |
+| `status`   | `number`                               | HTTP status code          |
+| `body`     | `unknown \| (req) => unknown`          | Response body or callback |
+| `callback` | `SingleReplyCallback`                  | Full-control callback     |
+| `options`  | `{ headers?: Record<string, string> }` | Response headers          |
 
 ### `interceptor.replyWithError(error)`
 
@@ -366,6 +465,15 @@ Adds a delay before the response is sent.
 
 ```typescript
 .reply(200, { ok: true }).delay(500)
+```
+
+### `chain.replyContentLength()`
+
+Automatically adds a `Content-Length` header to the response based on the JSON-serialized body size.
+
+```typescript
+.reply(200, { ok: true }).replyContentLength()
+// Response will include Content-Length: 13
 ```
 
 ---
