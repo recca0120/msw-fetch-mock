@@ -195,7 +195,7 @@ describe('FetchMock (native adapter)', () => {
       fetchMock
         .get(`${API_BASE}/${API_PREFIX}`)
         .intercept({ path: '/echo', method: 'POST' })
-        .reply(200, (req) => ({ echoed: req.body }));
+        .reply(200, (req: { body: string | null }) => ({ echoed: req.body }));
 
       const response = await fetch(`${API_BASE}/${API_PREFIX}/echo`, {
         method: 'POST',
