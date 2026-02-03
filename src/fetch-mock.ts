@@ -9,7 +9,7 @@ import {
   matchBody,
   recordCall,
 } from './matchers';
-import { isMswAdapter } from './type-guards';
+import { isSetupServerLike, isSetupWorkerLike, isMswAdapter } from './type-guards';
 import type {
   HttpMethod,
   InterceptOptions,
@@ -23,6 +23,9 @@ import type {
   NetConnectMatcher,
   ActivateOptions,
   MswAdapter,
+  ResolvedActivateOptions,
+  SetupServerLike,
+  SetupWorkerLike,
   HandlerFactory,
 } from './types';
 
@@ -37,26 +40,52 @@ export type {
   ActivateOptions,
 } from './types';
 
-function resolveAdapter(input?: unknown): MswAdapter {
-  if (input && isMswAdapter(input)) return input;
+function createServerAdapter(server: SetupServerLike): MswAdapter {
+  return {
+    use: (...handlers: Array<unknown>) => server.use(...handlers),
+    resetHandlers: (...handlers: Array<unknown>) => server.resetHandlers(...handlers),
+    activate(options: ResolvedActivateOptions) {
+      server.listen({ onUnhandledRequest: options.onUnhandledRequest });
+    },
+    deactivate() {
+      server.close();
+    },
+  };
+}
 
-  if (FetchMock._adapterResolver) {
-    const adapter = FetchMock._adapterResolver(input);
-    if (adapter) return adapter;
-  }
+function createWorkerAdapter(worker: SetupWorkerLike): MswAdapter {
+  return {
+    use: (...handlers: Array<unknown>) => worker.use(...handlers),
+    resetHandlers: (...handlers: Array<unknown>) => worker.resetHandlers(...handlers),
+    async activate(options: ResolvedActivateOptions) {
+      await worker.start({ onUnhandledRequest: options.onUnhandledRequest });
+    },
+    deactivate() {
+      worker.stop();
+    },
+  };
+}
 
-  throw new Error(
-    input
-      ? 'Invalid argument: expected a setupServer, setupWorker, or MswAdapter instance.'
-      : 'FetchMock requires a server, worker, or adapter argument. ' +
+function resolveAdapter(input?: SetupServerLike | SetupWorkerLike | MswAdapter): MswAdapter {
+  if (!input) {
+    if (!FetchMock._defaultAdapterFactory) {
+      throw new Error(
+        'FetchMock requires a server, worker, or adapter argument. ' +
           'Use createFetchMock() from msw-fetch-mock/node or msw-fetch-mock/browser, ' +
           'or pass a setupServer/setupWorker instance directly.'
-  );
+      );
+    }
+    return FetchMock._defaultAdapterFactory();
+  }
+  if (isMswAdapter(input)) return input;
+  if (isSetupServerLike(input)) return createServerAdapter(input);
+  if (isSetupWorkerLike(input)) return createWorkerAdapter(input);
+  throw new Error('Invalid argument: expected a setupServer, setupWorker, or MswAdapter instance.');
 }
 
 export class FetchMock {
   /** @internal */
-  static _adapterResolver?: (input?: unknown) => MswAdapter | undefined;
+  static _defaultAdapterFactory?: () => MswAdapter;
   /** @internal */
   static _handlerFactory?: HandlerFactory;
 
@@ -101,7 +130,7 @@ export class FetchMock {
     return this._calls;
   }
 
-  constructor(input?: unknown) {
+  constructor(input?: SetupServerLike | SetupWorkerLike | MswAdapter) {
     this.adapter = resolveAdapter(input);
   }
 

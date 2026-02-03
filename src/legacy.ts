@@ -1,19 +1,10 @@
 import { FetchMock } from './fetch-mock';
-import { NodeMswAdapter } from './node-adapter';
 import { createLegacyHandlerFactory, type LegacyRestApi } from './legacy-handler-factory';
-import { isSetupServerLike } from './type-guards';
 import type { SetupServerLike } from './types';
 
 export { FetchMock } from './fetch-mock';
 export { createLegacyHandlerFactory } from './legacy-handler-factory';
 export type { LegacyRestApi } from './legacy-handler-factory';
-
-/** Register Node.js adapter resolver for legacy mode. */
-FetchMock._adapterResolver = (input?: unknown) => {
-  if (!input) return new NodeMswAdapter();
-  if (isSetupServerLike(input)) return new NodeMswAdapter(input, { manageLifecycle: true });
-  return undefined;
-};
 
 /**
  * Create a FetchMock instance for MSW v1 (legacy) environments.
