@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --ignore-scripts && npm rebuild
+      - run: pnpm install
       - run: pnpm build
       - uses: actions/upload-artifact@v4
         with:
@@ -35,7 +35,8 @@ jobs:
         with:
           name: dist
           path: dist/
-      - run: cd integration/jest-esm && npm install --ignore-scripts && npm rebuild && npm test
+      - run: cd integration/jest-esm && npm install --ignore-scripts
+      - run: cd integration/jest-esm && npm test
 
   jest-cjs:
     needs: build
@@ -49,7 +50,8 @@ jobs:
         with:
           name: dist
           path: dist/
-      - run: cd integration/jest-cjs && npm install --ignore-scripts && npm rebuild && npm test
+      - run: cd integration/jest-cjs && npm install --ignore-scripts
+      - run: cd integration/jest-cjs && npm test
 
   node-test:
     needs: build
@@ -63,7 +65,8 @@ jobs:
         with:
           name: dist
           path: dist/
-      - run: cd integration/node-test && npm install --ignore-scripts && npm rebuild && npm test
+      - run: cd integration/node-test && npm install --ignore-scripts
+      - run: cd integration/node-test && npm test
 
   vitest-browser:
     needs: build
@@ -77,6 +80,6 @@ jobs:
         with:
           name: dist
           path: dist/
-      - run: cd integration/vitest-browser && npm install --ignore-scripts && npm rebuild
+      - run: cd integration/vitest-browser && npm install --ignore-scripts
       - run: cd integration/vitest-browser && npx playwright install --with-deps chromium
       - run: cd integration/vitest-browser && npm test
