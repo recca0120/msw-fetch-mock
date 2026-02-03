@@ -10,12 +10,12 @@ Undici-style fetch mock API built on [MSW](https://mswjs.io/) (Mock Service Work
 
 If you're familiar with Cloudflare Workers' `fetchMock` (from `cloudflare:test`) or Node.js undici's `MockAgent`, you already know this API.
 
-Supports both **Node.js** (`msw/node`) and **Browser** (`msw/browser`) environments via subpath exports.
+Supports **Node.js** (`msw/node`), **Browser** (`msw/browser`), and **Native** (no MSW dependency) environments via subpath exports.
 
 ## Requirements
 
 - **Node.js** >= 18
-- **MSW** ^1.0.0 (via `/legacy`) or ^2.12.7
+- **MSW** ^1.0.0 (via `/legacy`) or ^2.12.7 — **optional** when using `/native`
 
 ## Install
 
@@ -24,6 +24,12 @@ npm install -D msw-fetch-mock msw
 ```
 
 `msw` is a peer dependency — you provide your own version.
+
+For MSW-free usage (patches `globalThis.fetch` directly):
+
+```bash
+npm install -D msw-fetch-mock
+```
 
 ## Quick Start
 
@@ -95,6 +101,25 @@ afterEach(() => {
 
 > **Note:** Only one MSW server can be active at a time. If a server is already listening, standalone `activate()` will throw an error. Use `createFetchMock(server)` to share an existing server.
 
+### Native (no MSW dependency)
+
+For environments where you don't want to install MSW, the `/native` subpath patches `globalThis.fetch` directly:
+
+```typescript
+import { fetchMock } from 'msw-fetch-mock/native';
+
+beforeAll(async () => {
+  await fetchMock.activate({ onUnhandledRequest: 'error' });
+});
+afterAll(() => fetchMock.deactivate());
+afterEach(() => {
+  fetchMock.assertNoPendingInterceptors();
+  fetchMock.reset();
+});
+```
+
+The API is identical — only the underlying transport changes (no Service Worker, no MSW server).
+
 ### Legacy (MSW v1)
 
 ```typescript
@@ -145,12 +170,13 @@ fetchMock.activate({
 
 ### Import Paths
 
-| Path                     | Environment                  | MSW version |
-| ------------------------ | ---------------------------- | ----------- |
-| `msw-fetch-mock`         | Node.js (re-exports `/node`) | v2          |
-| `msw-fetch-mock/node`    | Node.js                      | v2          |
-| `msw-fetch-mock/browser` | Browser                      | v2          |
-| `msw-fetch-mock/legacy`  | Node.js (MSW v1)             | v1          |
+| Path                     | Environment                  | MSW version  |
+| ------------------------ | ---------------------------- | ------------ |
+| `msw-fetch-mock`         | Node.js (re-exports `/node`) | v2           |
+| `msw-fetch-mock/node`    | Node.js                      | v2           |
+| `msw-fetch-mock/browser` | Browser                      | v2           |
+| `msw-fetch-mock/native`  | Any (no MSW)                 | not required |
+| `msw-fetch-mock/legacy`  | Node.js (MSW v1)             | v1           |
 
 ### `fetchMock` (singleton)
 
@@ -163,11 +189,12 @@ Factory function that creates a `FetchMock` with the appropriate adapter.
 
 - Node: `createFetchMock(server?)` — optionally pass an existing MSW `SetupServer`
 - Browser: `createFetchMock(worker)` — pass an MSW `SetupWorker` (required)
+- Native: `createFetchMock()` — no arguments, no MSW dependency
 - Legacy: `createFetchMock(rest, server?)` — pass MSW v1 `rest` object
 
 ### `new FetchMock(adapter?)`
 
-Creates a `FetchMock` instance with an explicit `MswAdapter`. Use `NodeMswAdapter` or `BrowserMswAdapter`.
+Creates a `FetchMock` instance with an explicit `MswAdapter`. Use `NodeMswAdapter`, `BrowserMswAdapter`, or `NativeFetchAdapter`.
 
 ### Intercepting & Replying
 
@@ -205,6 +232,8 @@ E2E tests run on every CI push across these environments:
 | Jest CJS       | CJS (require) | Jest                |
 | Node.js Test   | ESM (import)  | Node test runner    |
 | Node.js CJS    | CJS (require) | Node test runner    |
+| Native ESM     | ESM (import)  | Node test runner    |
+| Native CJS     | CJS (require) | Node test runner    |
 | Legacy CJS     | CJS (require) | Jest (MSW v1)       |
 | Vitest Browser | ESM (import)  | Vitest + Playwright |
 
@@ -238,7 +267,7 @@ pnpm test:e2e -- node-cjs
 pnpm test:e2e -- --all
 ```
 
-Available suites: `jest-esm`, `jest-cjs`, `node-test`, `node-cjs`, `legacy-cjs`, `vitest-browser`
+Available suites: `jest-esm`, `jest-cjs`, `node-test`, `node-cjs`, `native-esm`, `native-cjs`, `legacy-cjs`, `vitest-browser`
 
 ## License
 

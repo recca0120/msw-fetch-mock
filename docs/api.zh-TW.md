@@ -7,6 +7,7 @@
 | `msw-fetch-mock`         | Node.js（re-exports `/node`） | v2       |
 | `msw-fetch-mock/node`    | Node.js                       | v2       |
 | `msw-fetch-mock/browser` | 瀏覽器                        | v2       |
+| `msw-fetch-mock/native`  | 任何環境（無 MSW）            | 不需要   |
 | `msw-fetch-mock/legacy`  | Node.js（MSW v1）             | v1       |
 
 ## `fetchMock`（單例）
@@ -58,6 +59,26 @@ beforeAll(async () => {
 });
 ```
 
+## `createFetchMock()`（原生模式）
+
+建立搭配 `NativeFetchAdapter` 的 `FetchMock`。不需要 MSW 依賴 — 直接 patch `globalThis.fetch`。
+
+```typescript
+import { createFetchMock } from 'msw-fetch-mock/native';
+
+const fetchMock = createFetchMock();
+
+beforeAll(async () => {
+  await fetchMock.activate({ onUnhandledRequest: 'error' });
+});
+```
+
+也提供預建的單例：
+
+```typescript
+import { fetchMock } from 'msw-fetch-mock/native';
+```
+
 ## `createFetchMock(rest, server?)`（Legacy）
 
 建立適用於 MSW v1 環境的 `FetchMock`。詳見 [MSW v1 Legacy 指南](msw-v1-legacy.zh-TW.md)。
@@ -79,12 +100,16 @@ const fetchMock = createFetchMock(rest, server);
 import { FetchMock } from 'msw-fetch-mock';
 import { NodeMswAdapter } from 'msw-fetch-mock/node';
 import { BrowserMswAdapter } from 'msw-fetch-mock/browser';
+import { NativeFetchAdapter } from 'msw-fetch-mock/native';
 
 // Node 搭配外部 server
 const fetchMock = new FetchMock(new NodeMswAdapter(server));
 
 // 瀏覽器搭配 worker
 const fetchMock = new FetchMock(new BrowserMswAdapter(worker));
+
+// 原生模式（無 MSW）
+const fetchMock = new FetchMock(new NativeFetchAdapter());
 ```
 
 | 參數      | 型別         | 必要 | 說明                                         |

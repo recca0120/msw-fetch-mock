@@ -10,12 +10,12 @@
 
 如果你熟悉 Cloudflare Workers 的 `fetchMock`（來自 `cloudflare:test`）或 Node.js undici 的 `MockAgent`，你已經會使用這個 API 了。
 
-透過 subpath exports 同時支援 **Node.js**（`msw/node`）和**瀏覽器**（`msw/browser`）環境。
+透過 subpath exports 支援 **Node.js**（`msw/node`）、**瀏覽器**（`msw/browser`）和**原生**（無 MSW 依賴）環境。
 
 ## 系統需求
 
 - **Node.js** >= 18
-- **MSW** ^1.0.0（透過 `/legacy`）或 ^2.12.7
+- **MSW** ^1.0.0（透過 `/legacy`）或 ^2.12.7 — 使用 `/native` 時**可選**
 
 ## 安裝
 
@@ -24,6 +24,12 @@ npm install -D msw-fetch-mock msw
 ```
 
 `msw` 是 peer dependency — 需要自行安裝你的版本。
+
+若不需要 MSW（直接 patch `globalThis.fetch`）：
+
+```bash
+npm install -D msw-fetch-mock
+```
 
 ## 快速開始
 
@@ -95,6 +101,25 @@ afterEach(() => {
 
 > **注意：** 同一時間只能有一個 MSW server 處於啟動狀態。如果已有 server 在監聽中，獨立模式的 `activate()` 會拋出錯誤。請使用 `createFetchMock(server)` 來共用現有的 server。
 
+### 原生模式（無 MSW 依賴）
+
+若不想安裝 MSW，`/native` 子路徑會直接 patch `globalThis.fetch`：
+
+```typescript
+import { fetchMock } from 'msw-fetch-mock/native';
+
+beforeAll(async () => {
+  await fetchMock.activate({ onUnhandledRequest: 'error' });
+});
+afterAll(() => fetchMock.deactivate());
+afterEach(() => {
+  fetchMock.assertNoPendingInterceptors();
+  fetchMock.reset();
+});
+```
+
+API 完全相同 — 只有底層傳輸方式不同（無 Service Worker、無 MSW server）。
+
 ### Legacy（MSW v1）
 
 ```typescript
@@ -150,6 +175,7 @@ fetchMock.activate({
 | `msw-fetch-mock`         | Node.js（re-exports `/node`） | v2       |
 | `msw-fetch-mock/node`    | Node.js                       | v2       |
 | `msw-fetch-mock/browser` | 瀏覽器                        | v2       |
+| `msw-fetch-mock/native`  | 任何環境（無 MSW）            | 不需要   |
 | `msw-fetch-mock/legacy`  | Node.js（MSW v1）             | v1       |
 
 ### `fetchMock`（單例）
@@ -163,11 +189,12 @@ fetchMock.activate({
 
 - Node：`createFetchMock(server?)` — 可選擇性傳入現有的 MSW `SetupServer`
 - 瀏覽器：`createFetchMock(worker)` — 傳入 MSW `SetupWorker`（必要）
+- 原生：`createFetchMock()` — 無需參數，無 MSW 依賴
 - Legacy：`createFetchMock(rest, server?)` — 傳入 MSW v1 的 `rest` 物件
 
 ### `new FetchMock(adapter?)`
 
-使用明確的 `MswAdapter` 建立 `FetchMock` 實例。可使用 `NodeMswAdapter` 或 `BrowserMswAdapter`。
+使用明確的 `MswAdapter` 建立 `FetchMock` 實例。可使用 `NodeMswAdapter`、`BrowserMswAdapter` 或 `NativeFetchAdapter`。
 
 ### 攔截與回應
 
@@ -205,6 +232,8 @@ fetchMock.reset(); // 清除攔截器 + 呼叫歷史 + handlers
 | Jest CJS       | CJS (require) | Jest                |
 | Node.js Test   | ESM (import)  | Node test runner    |
 | Node.js CJS    | CJS (require) | Node test runner    |
+| Native ESM     | ESM (import)  | Node test runner    |
+| Native CJS     | CJS (require) | Node test runner    |
 | Legacy CJS     | CJS (require) | Jest (MSW v1)       |
 | Vitest Browser | ESM (import)  | Vitest + Playwright |
 
@@ -238,7 +267,7 @@ pnpm test:e2e -- node-cjs
 pnpm test:e2e -- --all
 ```
 
-可用套組：`jest-esm`、`jest-cjs`、`node-test`、`node-cjs`、`legacy-cjs`、`vitest-browser`
+可用套組：`jest-esm`、`jest-cjs`、`node-test`、`node-cjs`、`native-esm`、`native-cjs`、`legacy-cjs`、`vitest-browser`
 
 ## 授權
 

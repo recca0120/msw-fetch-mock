@@ -2,12 +2,13 @@
 
 ## Import Paths
 
-| Path                     | Environment                  | MSW version |
-| ------------------------ | ---------------------------- | ----------- |
-| `msw-fetch-mock`         | Node.js (re-exports `/node`) | v2          |
-| `msw-fetch-mock/node`    | Node.js                      | v2          |
-| `msw-fetch-mock/browser` | Browser                      | v2          |
-| `msw-fetch-mock/legacy`  | Node.js (MSW v1)             | v1          |
+| Path                     | Environment                  | MSW version  |
+| ------------------------ | ---------------------------- | ------------ |
+| `msw-fetch-mock`         | Node.js (re-exports `/node`) | v2           |
+| `msw-fetch-mock/node`    | Node.js                      | v2           |
+| `msw-fetch-mock/browser` | Browser                      | v2           |
+| `msw-fetch-mock/native`  | Any (no MSW)                 | not required |
+| `msw-fetch-mock/legacy`  | Node.js (MSW v1)             | v1           |
 
 ## `fetchMock` (singleton)
 
@@ -58,6 +59,26 @@ beforeAll(async () => {
 });
 ```
 
+## `createFetchMock()` (Native)
+
+Creates a `FetchMock` with `NativeFetchAdapter`. No MSW dependency required — patches `globalThis.fetch` directly.
+
+```typescript
+import { createFetchMock } from 'msw-fetch-mock/native';
+
+const fetchMock = createFetchMock();
+
+beforeAll(async () => {
+  await fetchMock.activate({ onUnhandledRequest: 'error' });
+});
+```
+
+A pre-built singleton is also available:
+
+```typescript
+import { fetchMock } from 'msw-fetch-mock/native';
+```
+
 ## `createFetchMock(rest, server?)` (Legacy)
 
 Creates a `FetchMock` for MSW v1 environments. See [MSW v1 Legacy Guide](msw-v1-legacy.md).
@@ -79,12 +100,16 @@ Creates a `FetchMock` instance with an explicit `MswAdapter`.
 import { FetchMock } from 'msw-fetch-mock';
 import { NodeMswAdapter } from 'msw-fetch-mock/node';
 import { BrowserMswAdapter } from 'msw-fetch-mock/browser';
+import { NativeFetchAdapter } from 'msw-fetch-mock/native';
 
 // Node with external server
 const fetchMock = new FetchMock(new NodeMswAdapter(server));
 
 // Browser with worker
 const fetchMock = new FetchMock(new BrowserMswAdapter(worker));
+
+// Native (no MSW)
+const fetchMock = new FetchMock(new NativeFetchAdapter());
 ```
 
 | Parameter | Type         | Required | Description                                           |
