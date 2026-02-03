@@ -57,6 +57,15 @@
       },
       "import": "./dist/legacy.js",
       "require": "./dist/legacy.cjs"
+    },
+    "./native": {
+      "source": "./src/native.ts",
+      "types": {
+        "import": "./dist/native.d.ts",
+        "require": "./dist/native.d.cts"
+      },
+      "import": "./dist/native.js",
+      "require": "./dist/native.cjs"
     }
   },
   "files": [
@@ -80,6 +89,11 @@
   },
   "peerDependencies": {
     "msw": "^1.0.0 || ^2.12.7"
+  },
+  "peerDependenciesMeta": {
+    "msw": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

@@ -6,6 +6,7 @@ export default defineConfig({
     node: 'src/node.ts',
     browser: 'src/browser.ts',
     legacy: 'src/legacy.ts',
+    native: 'src/native.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,
