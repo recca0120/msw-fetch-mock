@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { setupServer } from 'msw/node';
 import { NodeMswAdapter } from './node-adapter';
 import type { SetupServerLike, ResolvedActivateOptions } from './types';
 
@@ -79,8 +80,6 @@ describe('NodeMswAdapter', () => {
     });
 
     it('should throw when another MSW server is already active', () => {
-      // We need a real MSW server to test isPatchedModule detection
-      const { setupServer } = require('msw/node');
       const externalServer = setupServer();
       externalServer.listen();
 
