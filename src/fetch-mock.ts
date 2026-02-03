@@ -13,7 +13,6 @@ import type {
   MockPool,
   PendingInterceptor,
   NetConnectMatcher,
-  OnUnhandledRequest,
   ActivateOptions,
   MswAdapter,
 } from './types';
