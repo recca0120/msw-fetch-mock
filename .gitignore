@@ -3,3 +3,4 @@ dist
 coverage
 *.tsbuildinfo
 e2e/*/package-lock.json
+*.tgz

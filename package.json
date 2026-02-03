@@ -75,7 +75,8 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepublishOnly": "tsup"
+    "prepublishOnly": "tsup",
+    "test:e2e": "bash scripts/test-e2e.sh"
   },
   "peerDependencies": {
     "msw": "^1.0.0 || ^2.12.7"
