@@ -152,4 +152,14 @@ describe('legacy-cjs integration (MSW v1)', () => {
       await expect(fetch(`${API_BASE}/fail`)).rejects.toThrow();
     });
   });
+
+  describe('activate returns promise', () => {
+    it('should return Promise<void> from activate()', async () => {
+      const fm2 = createFetchMock(rest, setupServer());
+      const result = fm2.activate();
+      expect(result).toBeInstanceOf(Promise);
+      await result;
+      fm2.deactivate();
+    });
+  });
 });

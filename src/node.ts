@@ -1,6 +1,6 @@
 import { FetchMock } from './fetch-mock';
 import { NodeMswAdapter } from './node-adapter';
-import { httpHandlerFactory } from './http-handler-factory';
+import { HandlerFactory } from './handler-factory';
 import type { SetupServerLike } from './types';
 
 export { FetchMock } from './fetch-mock';
@@ -10,7 +10,7 @@ export { NodeMswAdapter } from './node-adapter';
 FetchMock._defaultAdapterFactory = () => new NodeMswAdapter();
 
 /** Register MSW http handler factory. */
-FetchMock._handlerFactory = httpHandlerFactory;
+FetchMock._handlerFactory = HandlerFactory;
 
 export function createFetchMock(server?: SetupServerLike): FetchMock {
   return new FetchMock(new NodeMswAdapter(server));

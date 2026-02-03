@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import type { HttpMethod, HandlerFactory } from './types';
+import type { HttpMethod, HandlerFactory as HandlerFactoryType } from './types';
 
 const methods: Record<HttpMethod, typeof http.get> = {
   GET: http.get,
@@ -9,7 +9,7 @@ const methods: Record<HttpMethod, typeof http.get> = {
   PATCH: http.patch,
 };
 
-export const httpHandlerFactory: HandlerFactory = {
+export const HandlerFactory: HandlerFactoryType = {
   createHandler(method, urlPattern, handlerFn) {
     return methods[method](urlPattern, async ({ request }) => handlerFn(request));
   },

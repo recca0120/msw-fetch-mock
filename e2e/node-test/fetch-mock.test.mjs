@@ -151,4 +151,16 @@ describe('node-test integration', () => {
       );
     });
   });
+
+  describe('activate returns promise', () => {
+    it('should return Promise<void> from activate()', async () => {
+      fetchMock.deactivate();
+      const fm2 = createFetchMock();
+      const result = fm2.activate();
+      assert.ok(result instanceof Promise);
+      await result;
+      fm2.deactivate();
+      await fetchMock.activate();
+    });
+  });
 });

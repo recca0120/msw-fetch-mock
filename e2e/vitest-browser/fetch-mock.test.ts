@@ -62,6 +62,20 @@ describe('vitest-browser integration', () => {
       expect(fetchMock.calls.firstCall()!.path).toBe('/a');
       expect(fetchMock.calls.lastCall()!.path).toBe('/b');
     });
+
+    it('should record POST body and parse as JSON', async () => {
+      fetchMock.get(API_BASE).intercept({ path: '/data', method: 'POST' }).reply(200, { ok: true });
+
+      await fetch(`${API_BASE}/data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'value' }),
+      });
+
+      const call = fetchMock.calls.lastCall()!;
+      expect(call.body).toBe('{"key":"value"}');
+      expect(call.json()).toEqual({ key: 'value' });
+    });
   });
 
   describe('assertNoPendingInterceptors', () => {

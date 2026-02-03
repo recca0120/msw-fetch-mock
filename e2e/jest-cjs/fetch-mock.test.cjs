@@ -150,4 +150,16 @@ describe('jest-cjs integration (dynamic import)', () => {
       await expect(fetch(`${API_BASE}/fail`)).rejects.toThrow();
     });
   });
+
+  describe('activate returns promise', () => {
+    it('should return Promise<void> from activate()', async () => {
+      fetchMock.deactivate();
+      const fm2 = createFetchMock();
+      const result = fm2.activate();
+      expect(result).toBeInstanceOf(Promise);
+      await result;
+      fm2.deactivate();
+      await fetchMock.activate();
+    });
+  });
 });
