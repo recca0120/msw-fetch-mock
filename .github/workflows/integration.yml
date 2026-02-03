@@ -1,4 +1,4 @@
-name: Integration Tests
+name: E2E Tests
 
 on:
   push:
@@ -36,8 +36,8 @@ jobs:
         with:
           name: package-tarball
           path: .
-      - run: cd integration/jest-esm && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
-      - run: cd integration/jest-esm && npm test
+      - run: cd e2e/jest-esm && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
+      - run: cd e2e/jest-esm && npm test
 
   jest-cjs:
     needs: build
@@ -51,8 +51,8 @@ jobs:
         with:
           name: package-tarball
           path: .
-      - run: cd integration/jest-cjs && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
-      - run: cd integration/jest-cjs && npm test
+      - run: cd e2e/jest-cjs && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
+      - run: cd e2e/jest-cjs && npm test
 
   node-test:
     needs: build
@@ -66,8 +66,8 @@ jobs:
         with:
           name: package-tarball
           path: .
-      - run: cd integration/node-test && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
-      - run: cd integration/node-test && npm test
+      - run: cd e2e/node-test && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
+      - run: cd e2e/node-test && npm test
 
   vitest-browser:
     needs: build
@@ -81,6 +81,6 @@ jobs:
         with:
           name: package-tarball
           path: .
-      - run: cd integration/vitest-browser && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
-      - run: cd integration/vitest-browser && npx playwright install --with-deps chromium
-      - run: cd integration/vitest-browser && npm test
+      - run: cd e2e/vitest-browser && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
+      - run: cd e2e/vitest-browser && npx playwright install --with-deps chromium
+      - run: cd e2e/vitest-browser && npm test
