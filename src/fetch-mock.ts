@@ -155,6 +155,9 @@ export class FetchMock {
 
   async activate(options?: ActivateOptions): Promise<void> {
     const mode = options?.onUnhandledRequest ?? 'error';
+    const timeout = options?.timeout ?? 30000; // Default 30 seconds
+    const forceConnectionClose = options?.forceConnectionClose ?? false;
+
     await this.adapter.activate({
       onUnhandledRequest: (request: Request, print: { warning(): void; error(): void }) => {
         if (this.isNetConnectAllowed(request)) return;
@@ -167,6 +170,8 @@ export class FetchMock {
         }
         // 'bypass' → do nothing
       },
+      timeout,
+      forceConnectionClose,
     });
   }
 

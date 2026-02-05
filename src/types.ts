@@ -63,10 +63,24 @@ export type OnUnhandledRequest = 'bypass' | 'warn' | 'error' | OnUnhandledReques
 
 export interface ActivateOptions {
   onUnhandledRequest?: OnUnhandledRequest;
+  /**
+   * Timeout in milliseconds for each fetch request.
+   * Helps prevent hanging on platforms with known issues (e.g., macOS + Node 23).
+   * Set to 0 to disable. Default: 30000 (30 seconds).
+   */
+  timeout?: number;
+  /**
+   * Force 'Connection: close' header on all requests to disable keep-alive.
+   * Workaround for Undici connection pooling issues on macOS.
+   * Default: false.
+   */
+  forceConnectionClose?: boolean;
 }
 
 export interface ResolvedActivateOptions {
   onUnhandledRequest: OnUnhandledRequestCallback;
+  timeout: number;
+  forceConnectionClose: boolean;
 }
 
 /** Structural type to avoid cross-package nominal type mismatch on MSW's private fields */

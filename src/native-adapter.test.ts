@@ -5,6 +5,8 @@ import type { ResolvedActivateOptions } from './types';
 
 const noopOptions: ResolvedActivateOptions = {
   onUnhandledRequest: () => {},
+  timeout: 0, // disabled
+  forceConnectionClose: false,
 };
 
 describe('NativeFetchAdapter', () => {
@@ -87,7 +89,11 @@ describe('NativeFetchAdapter', () => {
         handlerFn: vi.fn().mockResolvedValue(new Response('ok')),
       };
 
-      adapter.activate({ onUnhandledRequest: onUnhandled });
+      adapter.activate({
+        onUnhandledRequest: onUnhandled,
+        timeout: 0,
+        forceConnectionClose: false,
+      });
       adapter.use(handler);
       adapter.resetHandlers();
 
@@ -103,7 +109,11 @@ describe('NativeFetchAdapter', () => {
       const adapter = new NativeFetchAdapter();
       const onUnhandled = vi.fn();
 
-      adapter.activate({ onUnhandledRequest: onUnhandled });
+      adapter.activate({
+        onUnhandledRequest: onUnhandled,
+        timeout: 0,
+        forceConnectionClose: false,
+      });
 
       // The noop callback doesn't throw, so the adapter falls through to
       // originalFetch which may fail with a network error — ignore it.
@@ -130,7 +140,11 @@ describe('NativeFetchAdapter', () => {
         handlerFn: vi.fn().mockResolvedValue(undefined),
       };
 
-      adapter.activate({ onUnhandledRequest: onUnhandled });
+      adapter.activate({
+        onUnhandledRequest: onUnhandled,
+        timeout: 0,
+        forceConnectionClose: false,
+      });
       adapter.use(handler);
 
       await globalThis.fetch('http://example.com/test');
@@ -154,6 +168,127 @@ describe('NativeFetchAdapter', () => {
 
       const response = await globalThis.fetch('http://example.com/test');
       expect(await response.text()).toBe('second');
+
+      adapter.deactivate();
+    });
+  });
+
+  describe('timeout', () => {
+    it('should abort request when timeout is reached', async () => {
+      const adapter = new NativeFetchAdapter();
+      // Handler that never resolves
+      const slowHandler: NativeHandler = {
+        method: 'GET',
+        urlPattern: '/slow',
+        handlerFn: () => new Promise(() => {}), // never resolves
+      };
+
+      adapter.activate({
+        onUnhandledRequest: () => {},
+        timeout: 100, // 100ms timeout
+        forceConnectionClose: false,
+      });
+      adapter.use(slowHandler);
+
+      await expect(globalThis.fetch('http://example.com/slow')).rejects.toThrow();
+
+      adapter.deactivate();
+    });
+
+    it('should not abort when timeout is 0 (disabled)', async () => {
+      const adapter = new NativeFetchAdapter();
+      const fastHandler: NativeHandler = {
+        method: 'GET',
+        urlPattern: '/fast',
+        handlerFn: vi.fn().mockResolvedValue(new Response('ok')),
+      };
+
+      adapter.activate({
+        onUnhandledRequest: () => {},
+        timeout: 0, // disabled
+        forceConnectionClose: false,
+      });
+      adapter.use(fastHandler);
+
+      const response = await globalThis.fetch('http://example.com/fast');
+      expect(response.status).toBe(200);
+
+      adapter.deactivate();
+    });
+
+    it('should respect user-provided signal over timeout', async () => {
+      const adapter = new NativeFetchAdapter();
+      const userController = new AbortController();
+      const handler: NativeHandler = {
+        method: 'GET',
+        urlPattern: '/test',
+        handlerFn: vi.fn().mockResolvedValue(new Response('ok')),
+      };
+
+      adapter.activate({
+        onUnhandledRequest: () => {},
+        timeout: 100,
+        forceConnectionClose: false,
+      });
+      adapter.use(handler);
+
+      // User provides their own signal - timeout should be ignored
+      const response = await globalThis.fetch('http://example.com/test', {
+        signal: userController.signal,
+      });
+      expect(response.status).toBe(200);
+
+      adapter.deactivate();
+    });
+  });
+
+  describe('forceConnectionClose', () => {
+    it('should add Connection: close header when enabled', async () => {
+      const adapter = new NativeFetchAdapter();
+      let capturedRequest: Request | null = null;
+      const handler: NativeHandler = {
+        method: 'GET',
+        urlPattern: '/test',
+        handlerFn: vi.fn((req) => {
+          capturedRequest = req;
+          return Promise.resolve(new Response('ok'));
+        }),
+      };
+
+      adapter.activate({
+        onUnhandledRequest: () => {},
+        timeout: 0,
+        forceConnectionClose: true,
+      });
+      adapter.use(handler);
+
+      await globalThis.fetch('http://example.com/test');
+      expect(capturedRequest?.headers.get('Connection')).toBe('close');
+
+      adapter.deactivate();
+    });
+
+    it('should not add Connection header when disabled', async () => {
+      const adapter = new NativeFetchAdapter();
+      let capturedRequest: Request | null = null;
+      const handler: NativeHandler = {
+        method: 'GET',
+        urlPattern: '/test',
+        handlerFn: vi.fn((req) => {
+          capturedRequest = req;
+          return Promise.resolve(new Response('ok'));
+        }),
+      };
+
+      adapter.activate({
+        onUnhandledRequest: () => {},
+        timeout: 0,
+        forceConnectionClose: false,
+      });
+      adapter.use(handler);
+
+      await globalThis.fetch('http://example.com/test');
+      expect(capturedRequest?.headers.get('Connection')).toBeNull();
 
       adapter.deactivate();
     });
