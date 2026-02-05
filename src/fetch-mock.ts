@@ -228,9 +228,9 @@ export class FetchMock {
         }
       );
       // Add handlers via use() so they can be cleared by resetHandlers()
-      // Reverse handler order: newest handlers should have highest priority (LIFO)
+      // FIFO order: first registered handler is matched first (Cloudflare fetchMock compatible)
       // Catch-all is added last (lowest priority) to handle unmatched requests
-      this.adapter.use(...activeHandlers.reverse(), catchAllHandler);
+      this.adapter.use(...activeHandlers, catchAllHandler);
     }
   }
 
