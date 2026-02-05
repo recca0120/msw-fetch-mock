@@ -195,12 +195,41 @@ export class FetchMock {
   /**
    * Remove consumed MSW handlers so future requests to those URLs
    * go through MSW's onUnhandledRequest instead of silently passing through.
+   * Also adds a catch-all handler at the end to handle requests that match
+   * a URL pattern but fail fine-grained matching (query/headers/body).
+   *
+   * IMPORTANT: Uses resetHandlers() + use() instead of resetHandlers(handlers...).
+   * MSW's resetHandlers(handlers...) sets handlers as "initial state", which means
+   * a subsequent resetHandlers() call restores them instead of clearing them.
+   * By using resetHandlers() to clear first, then use() to add handlers,
+   * we ensure reset() properly clears all handlers.
    */
   private syncMswHandlers(): void {
     const activeHandlers = [...this.mswHandlers.entries()]
       .filter(([p]) => !p.consumed || p.persist)
       .map(([, handler]) => handler);
-    this.adapter.resetHandlers(...activeHandlers);
+
+    // First, clear all existing handlers (including any "initial" handlers)
+    this.adapter.resetHandlers();
+
+    // Only add catch-all handler when there are active handlers.
+    // The catch-all handles requests that match URL pattern but fail fine-grained
+    // matching. Without this, MSW treats handler returning undefined as "passthrough",
+    // causing requests to hang when disableNetConnect() is used.
+    if (activeHandlers.length > 0) {
+      const catchAllHandler = this.handlerFactory.createCatchAllHandler(
+        async (request: Request) => {
+          if (!this.isNetConnectAllowed(request)) {
+            // Return error response to prevent hanging
+            return this.handlerFactory.buildErrorResponse();
+          }
+          // Allow passthrough for allowed hosts
+          return undefined;
+        }
+      );
+      // Add handlers via use() so they can be cleared by resetHandlers()
+      this.adapter.use(...activeHandlers, catchAllHandler);
+    }
   }
 
   /**
@@ -335,7 +364,8 @@ export class FetchMock {
   ): void {
     const handler = this.handlerFactory.createHandler(method, urlPattern, handlerFn);
     this.mswHandlers.set(pending, handler);
-    this.adapter.use(handler);
+    // Sync all handlers including catch-all to ensure correct order
+    this.syncMswHandlers();
   }
 
   private createMatchingHandler(
@@ -420,62 +450,38 @@ export class FetchMock {
             const delayRef = { ms: 0 };
             const contentLengthRef = { enabled: false };
 
-            if (typeof statusOrCallback === 'function') {
-              const callback = statusOrCallback;
-              this.registerHandler(
-                pending,
-                method,
-                urlPattern,
-                this.createMatchingHandler(
-                  pending,
-                  origin,
-                  originStr,
-                  options,
-                  delayRef,
-                  async (bodyText) => {
-                    const result = await callback({ body: bodyText });
-                    return this.buildResponse(
-                      result.statusCode,
-                      result.data,
-                      result.responseOptions,
-                      this._defaultReplyHeaders,
-                      contentLengthRef.enabled
-                    );
-                  }
-                )
+            const respond = async (bodyText: string | null): Promise<Response> => {
+              if (typeof statusOrCallback === 'function') {
+                const result = await statusOrCallback({ body: bodyText });
+                return this.buildResponse(
+                  result.statusCode,
+                  result.data,
+                  result.responseOptions,
+                  this._defaultReplyHeaders,
+                  contentLengthRef.enabled
+                );
+              }
+
+              const responseBody =
+                typeof bodyOrCallback === 'function'
+                  ? await (bodyOrCallback as ReplyCallback)({ body: bodyText })
+                  : bodyOrCallback;
+
+              return this.buildResponse(
+                statusOrCallback,
+                responseBody,
+                replyOptions,
+                this._defaultReplyHeaders,
+                contentLengthRef.enabled
               );
-            } else {
-              const status = statusOrCallback;
-              this.registerHandler(
-                pending,
-                method,
-                urlPattern,
-                this.createMatchingHandler(
-                  pending,
-                  origin,
-                  originStr,
-                  options,
-                  delayRef,
-                  async (bodyText) => {
-                    let responseBody: unknown;
-                    if (typeof bodyOrCallback === 'function') {
-                      responseBody = await (bodyOrCallback as ReplyCallback)({
-                        body: bodyText,
-                      });
-                    } else {
-                      responseBody = bodyOrCallback;
-                    }
-                    return this.buildResponse(
-                      status,
-                      responseBody,
-                      replyOptions,
-                      this._defaultReplyHeaders,
-                      contentLengthRef.enabled
-                    );
-                  }
-                )
-              );
-            }
+            };
+
+            this.registerHandler(
+              pending,
+              method,
+              urlPattern,
+              this.createMatchingHandler(pending, origin, originStr, options, delayRef, respond)
+            );
 
             return this.buildChain(pending, delayRef, contentLengthRef);
           },

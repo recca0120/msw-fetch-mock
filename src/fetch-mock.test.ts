@@ -1331,14 +1331,15 @@ describe('constructor auto-detection', () => {
       expect(server.close).toHaveBeenCalled();
     });
 
-    it('should delegate use() via interceptor registration', async () => {
+    it('should delegate resetHandlers() via interceptor registration', async () => {
       const server = createStubServer();
       const fm = new FetchMock(server);
       await fm.activate();
 
       fm.get('http://example.test').intercept({ path: '/data' }).reply(200, { ok: true });
 
-      expect(server.use).toHaveBeenCalled();
+      // syncMswHandlers uses resetHandlers to maintain correct handler order
+      expect(server.resetHandlers).toHaveBeenCalled();
     });
 
     it('should delegate resetHandlers() via reset()', async () => {
@@ -1373,14 +1374,15 @@ describe('constructor auto-detection', () => {
       expect(worker.stop).toHaveBeenCalled();
     });
 
-    it('should delegate use() via interceptor registration', async () => {
+    it('should delegate resetHandlers() via interceptor registration', async () => {
       const worker = createStubWorker();
       const fm = new FetchMock(worker);
       await fm.activate();
 
       fm.get('http://example.test').intercept({ path: '/data' }).reply(200, { ok: true });
 
-      expect(worker.use).toHaveBeenCalled();
+      // syncMswHandlers uses resetHandlers to maintain correct handler order
+      expect(worker.resetHandlers).toHaveBeenCalled();
     });
 
     it('should delegate resetHandlers() via reset()', async () => {

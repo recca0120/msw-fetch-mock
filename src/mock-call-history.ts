@@ -12,31 +12,21 @@ export interface MockCallHistoryLogData {
   hash: string;
 }
 
-export class MockCallHistoryLog {
-  readonly body: string | null;
-  readonly method: string;
-  readonly headers: Record<string, string>;
-  readonly fullUrl: string;
-  readonly origin: string;
-  readonly path: string;
-  readonly searchParams: Record<string, string>;
-  readonly protocol: string;
-  readonly host: string;
-  readonly port: string;
-  readonly hash: string;
+export class MockCallHistoryLog implements MockCallHistoryLogData {
+  readonly body!: string | null;
+  readonly method!: string;
+  readonly headers!: Record<string, string>;
+  readonly fullUrl!: string;
+  readonly origin!: string;
+  readonly path!: string;
+  readonly searchParams!: Record<string, string>;
+  readonly protocol!: string;
+  readonly host!: string;
+  readonly port!: string;
+  readonly hash!: string;
 
   constructor(data: MockCallHistoryLogData) {
-    this.body = data.body;
-    this.method = data.method;
-    this.headers = data.headers;
-    this.fullUrl = data.fullUrl;
-    this.origin = data.origin;
-    this.path = data.path;
-    this.searchParams = data.searchParams;
-    this.protocol = data.protocol;
-    this.host = data.host;
-    this.port = data.port;
-    this.hash = data.hash;
+    Object.assign(this, data);
   }
 
   json(): unknown {
