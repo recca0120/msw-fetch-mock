@@ -228,7 +228,9 @@ export class FetchMock {
         }
       );
       // Add handlers via use() so they can be cleared by resetHandlers()
-      this.adapter.use(...activeHandlers, catchAllHandler);
+      // Reverse handler order: newest handlers should have highest priority (LIFO)
+      // Catch-all is added last (lowest priority) to handle unmatched requests
+      this.adapter.use(...activeHandlers.reverse(), catchAllHandler);
     }
   }
 
