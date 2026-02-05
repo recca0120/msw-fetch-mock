@@ -11,6 +11,11 @@ export const NativeHandlerFactory: HandlerFactory = {
     return { method, urlPattern, handlerFn };
   },
 
+  createCatchAllHandler(handlerFn): NativeHandler {
+    // For native adapter, catch-all uses '*' pattern and matches all methods
+    return { method: 'GET', urlPattern: '*', handlerFn };
+  },
+
   buildResponse(status, body, headers) {
     if (body === null || body === undefined) {
       return new Response(null, { status, headers });

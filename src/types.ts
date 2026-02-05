@@ -114,6 +114,7 @@ export interface HandlerFactory {
     urlPattern: string | RegExp,
     handlerFn: (request: Request) => Promise<Response | undefined>
   ): unknown;
+  createCatchAllHandler(handlerFn: (request: Request) => Promise<Response | undefined>): unknown;
   buildResponse(status: number, body: unknown, headers?: Headers): Response;
   buildErrorResponse(): Response;
 }

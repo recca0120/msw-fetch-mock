@@ -14,21 +14,4 @@ export function createFetchMock(worker: SetupWorkerLike): FetchMock {
 }
 
 export type { SetupWorkerLike } from './types';
-export { MockCallHistory, MockCallHistoryLog } from './exports';
-export type {
-  ActivateOptions,
-  OnUnhandledRequest,
-  InterceptOptions,
-  MockPool,
-  MockInterceptor,
-  MockReplyChain,
-  ReplyOptions,
-  ReplyCallback,
-  SingleReplyCallback,
-  SingleReplyResult,
-  PendingInterceptor,
-  MswAdapter,
-  HandlerFactory,
-  MockCallHistoryLogData,
-  CallHistoryFilterCriteria,
-} from './exports';
+export * from './exports';

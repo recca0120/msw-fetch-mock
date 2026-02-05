@@ -14,6 +14,10 @@ export const HandlerFactory: HandlerFactoryType = {
     return methods[method](urlPattern, async ({ request }) => handlerFn(request));
   },
 
+  createCatchAllHandler(handlerFn) {
+    return http.all('*', async ({ request }) => handlerFn(request));
+  },
+
   buildResponse(status, body, headers) {
     if (body === null || body === undefined) {
       return new HttpResponse(null, { status, headers });
