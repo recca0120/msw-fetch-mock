@@ -32,6 +32,7 @@ export interface MockReplyChain {
   persist(): void;
   delay(ms: number): void;
   replyContentLength(): void;
+  intercept(options: InterceptOptions): MockInterceptor;
 }
 
 export interface MockInterceptor {

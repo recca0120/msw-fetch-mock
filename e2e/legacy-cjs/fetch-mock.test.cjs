@@ -162,4 +162,67 @@ describe('legacy-cjs integration (MSW v1)', () => {
       fm2.deactivate();
     });
   });
+
+  describe('chained intercept', () => {
+    it('should support chained intercept after reply (FIFO order)', async () => {
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/test' })
+        .reply(200, { call: 'first' })
+        .intercept({ path: '/test' })
+        .reply(200, { call: 'second' });
+
+      const res1 = await fetch(`${API_BASE}/test`);
+      const res2 = await fetch(`${API_BASE}/test`);
+
+      expect((await res1.json()).call).toBe('first');
+      expect((await res2.json()).call).toBe('second');
+    });
+  });
+
+  describe('FIFO ordering', () => {
+    it('should match interceptors in FIFO order (first registered = first matched)', async () => {
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/data', method: 'GET' })
+        .reply(200, { order: 1 });
+
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/data', method: 'GET' })
+        .reply(200, { order: 2 });
+
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/data', method: 'GET' })
+        .reply(200, { order: 3 });
+
+      const res1 = await fetch(`${API_BASE}/api/data`);
+      const res2 = await fetch(`${API_BASE}/api/data`);
+      const res3 = await fetch(`${API_BASE}/api/data`);
+
+      expect((await res1.json()).order).toBe(1);
+      expect((await res2.json()).order).toBe(2);
+      expect((await res3.json()).order).toBe(3);
+    });
+
+    it('should consume each interceptor once in FIFO order', async () => {
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/retry', method: 'POST' })
+        .reply(500, { error: 'Server error' });
+
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/retry', method: 'POST' })
+        .reply(200, { success: true });
+
+      const res1 = await fetch(`${API_BASE}/api/retry`, { method: 'POST' });
+      expect(res1.status).toBe(500);
+
+      const res2 = await fetch(`${API_BASE}/api/retry`, { method: 'POST' });
+      expect(res2.status).toBe(200);
+      expect((await res2.json()).success).toBe(true);
+    });
+  });
 });

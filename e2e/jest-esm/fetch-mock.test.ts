@@ -159,4 +159,73 @@ describe('jest-esm integration', () => {
       await fetchMock.activate();
     });
   });
+
+  describe('chained intercept', () => {
+    it('should support chained intercept after reply (FIFO order)', async () => {
+      // Chain two intercepts: first request returns 'first', second returns 'second'
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/test' })
+        .reply(200, { call: 'first' })
+        .intercept({ path: '/test' })
+        .reply(200, { call: 'second' });
+
+      const res1 = await fetch(`${API_BASE}/test`);
+      const res2 = await fetch(`${API_BASE}/test`);
+
+      expect((await res1.json()).call).toBe('first');
+      expect((await res2.json()).call).toBe('second');
+    });
+  });
+
+  describe('FIFO ordering', () => {
+    it('should match interceptors in FIFO order (first registered = first matched)', async () => {
+      // Register interceptors separately - FIFO means first registered is matched first
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/data', method: 'GET' })
+        .reply(200, { order: 1 });
+
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/data', method: 'GET' })
+        .reply(200, { order: 2 });
+
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/data', method: 'GET' })
+        .reply(200, { order: 3 });
+
+      // Each request consumes one interceptor in FIFO order
+      const res1 = await fetch(`${API_BASE}/api/data`);
+      const res2 = await fetch(`${API_BASE}/api/data`);
+      const res3 = await fetch(`${API_BASE}/api/data`);
+
+      expect((await res1.json()).order).toBe(1);
+      expect((await res2.json()).order).toBe(2);
+      expect((await res3.json()).order).toBe(3);
+    });
+
+    it('should consume each interceptor once in FIFO order', async () => {
+      // Simulate retry scenario: first call fails, second succeeds
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/retry', method: 'POST' })
+        .reply(500, { error: 'Server error' });
+
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/retry', method: 'POST' })
+        .reply(200, { success: true });
+
+      // First request gets 500
+      const res1 = await fetch(`${API_BASE}/api/retry`, { method: 'POST' });
+      expect(res1.status).toBe(500);
+
+      // Retry gets 200
+      const res2 = await fetch(`${API_BASE}/api/retry`, { method: 'POST' });
+      expect(res2.status).toBe(200);
+      expect((await res2.json()).success).toBe(true);
+    });
+  });
 });

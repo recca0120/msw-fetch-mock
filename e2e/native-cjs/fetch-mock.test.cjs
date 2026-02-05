@@ -163,4 +163,67 @@ describe('native-cjs integration (require)', () => {
       await fetchMock.activate();
     });
   });
+
+  describe('chained intercept', () => {
+    it('should support chained intercept after reply (FIFO order)', async () => {
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/test' })
+        .reply(200, { call: 'first' })
+        .intercept({ path: '/test' })
+        .reply(200, { call: 'second' });
+
+      const res1 = await fetch(`${API_BASE}/test`);
+      const res2 = await fetch(`${API_BASE}/test`);
+
+      assert.equal((await res1.json()).call, 'first');
+      assert.equal((await res2.json()).call, 'second');
+    });
+  });
+
+  describe('FIFO ordering', () => {
+    it('should match interceptors in FIFO order (first registered = first matched)', async () => {
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/data', method: 'GET' })
+        .reply(200, { order: 1 });
+
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/data', method: 'GET' })
+        .reply(200, { order: 2 });
+
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/data', method: 'GET' })
+        .reply(200, { order: 3 });
+
+      const res1 = await fetch(`${API_BASE}/api/data`);
+      const res2 = await fetch(`${API_BASE}/api/data`);
+      const res3 = await fetch(`${API_BASE}/api/data`);
+
+      assert.equal((await res1.json()).order, 1);
+      assert.equal((await res2.json()).order, 2);
+      assert.equal((await res3.json()).order, 3);
+    });
+
+    it('should consume each interceptor once in FIFO order', async () => {
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/retry', method: 'POST' })
+        .reply(500, { error: 'Server error' });
+
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/retry', method: 'POST' })
+        .reply(200, { success: true });
+
+      const res1 = await fetch(`${API_BASE}/api/retry`, { method: 'POST' });
+      assert.equal(res1.status, 500);
+
+      const res2 = await fetch(`${API_BASE}/api/retry`, { method: 'POST' });
+      assert.equal(res2.status, 200);
+      assert.equal((await res2.json()).success, true);
+    });
+  });
 });

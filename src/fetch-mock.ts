@@ -393,7 +393,8 @@ export class FetchMock {
   private buildChain(
     pending: PendingInterceptor,
     delayRef: { ms: number },
-    contentLengthRef: { enabled: boolean }
+    contentLengthRef: { enabled: boolean },
+    pool: MockPool
   ): MockReplyChain {
     return {
       times(n: number) {
@@ -410,6 +411,9 @@ export class FetchMock {
       replyContentLength() {
         contentLengthRef.enabled = true;
       },
+      intercept(options: InterceptOptions): MockInterceptor {
+        return pool.intercept(options);
+      },
     };
   }
 
@@ -421,7 +425,7 @@ export class FetchMock {
           ? origin.toString()
           : '<function>';
 
-    return {
+    const pool: MockPool = {
       intercept: (options: InterceptOptions): MockInterceptor => {
         const method = options.method ?? 'GET';
         const pathStr =
@@ -485,7 +489,7 @@ export class FetchMock {
               this.createMatchingHandler(pending, origin, originStr, options, delayRef, respond)
             );
 
-            return this.buildChain(pending, delayRef, contentLengthRef);
+            return this.buildChain(pending, delayRef, contentLengthRef, pool);
           },
 
           replyWithError: (): MockReplyChain => {
@@ -508,10 +512,12 @@ export class FetchMock {
               )
             );
 
-            return this.buildChain(pending, delayRef, contentLengthRef);
+            return this.buildChain(pending, delayRef, contentLengthRef, pool);
           },
         };
       },
     };
+
+    return pool;
   }
 }
