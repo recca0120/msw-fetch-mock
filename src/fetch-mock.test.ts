@@ -741,7 +741,7 @@ describe('enableNetConnect', () => {
   it('should block unmatched requests when disableNetConnect() is called', async () => {
     fetchMock.disableNetConnect();
 
-    await expect(fetch('http://no-such-host.test/path')).rejects.toThrow(/request/i);
+    await expect(fetch('http://no-such-host.test/path')).rejects.toThrow(/fetch/i);
   });
 
   it('should allow all requests when enableNetConnect() is called without args', async () => {
@@ -767,7 +767,7 @@ describe('enableNetConnect', () => {
     fetchMock.disableNetConnect();
     fetchMock.enableNetConnect('allowed.test');
 
-    await expect(fetch('http://blocked.test/path')).rejects.toThrow(/request/i);
+    await expect(fetch('http://blocked.test/path')).rejects.toThrow(/fetch/i);
   });
 
   it('should allow matching host when enableNetConnect(RegExp) is called', async () => {
@@ -875,7 +875,7 @@ describe('onUnhandledRequest', () => {
     await fm.activate({ onUnhandledRequest: 'error' });
 
     try {
-      await expect(fetch('http://no-such-host.test/path')).rejects.toThrow(/request/i);
+      await expect(fetch('http://no-such-host.test/path')).rejects.toThrow(/fetch/i);
     } finally {
       fm.deactivate();
     }
@@ -1331,25 +1331,25 @@ describe('constructor auto-detection', () => {
       expect(server.close).toHaveBeenCalled();
     });
 
-    it('should delegate resetHandlers() via interceptor registration', async () => {
+    it('should install catch-all handler on activate', async () => {
       const server = createStubServer();
       const fm = new FetchMock(server);
       await fm.activate();
 
-      fm.get('http://example.test').intercept({ path: '/data' }).reply(200, { ok: true });
-
-      // syncMswHandlers uses resetHandlers to maintain correct handler order
+      // activate() installs the catch-all via resetHandlers + use
       expect(server.resetHandlers).toHaveBeenCalled();
+      expect(server.use).toHaveBeenCalled();
     });
 
-    it('should delegate resetHandlers() via reset()', async () => {
+    it('should not call resetHandlers() on reset() (catch-all persists)', async () => {
       const server = createStubServer();
       const fm = new FetchMock(server);
       await fm.activate();
+      vi.mocked(server.resetHandlers).mockClear();
 
       fm.reset();
 
-      expect(server.resetHandlers).toHaveBeenCalled();
+      expect(server.resetHandlers).not.toHaveBeenCalled();
     });
   });
 
@@ -1374,25 +1374,25 @@ describe('constructor auto-detection', () => {
       expect(worker.stop).toHaveBeenCalled();
     });
 
-    it('should delegate resetHandlers() via interceptor registration', async () => {
+    it('should install catch-all handler on activate', async () => {
       const worker = createStubWorker();
       const fm = new FetchMock(worker);
       await fm.activate();
 
-      fm.get('http://example.test').intercept({ path: '/data' }).reply(200, { ok: true });
-
-      // syncMswHandlers uses resetHandlers to maintain correct handler order
+      // activate() installs the catch-all via resetHandlers + use
       expect(worker.resetHandlers).toHaveBeenCalled();
+      expect(worker.use).toHaveBeenCalled();
     });
 
-    it('should delegate resetHandlers() via reset()', async () => {
+    it('should not call resetHandlers() on reset() (catch-all persists)', async () => {
       const worker = createStubWorker();
       const fm = new FetchMock(worker);
       await fm.activate();
+      vi.mocked(worker.resetHandlers).mockClear();
 
       fm.reset();
 
-      expect(worker.resetHandlers).toHaveBeenCalled();
+      expect(worker.resetHandlers).not.toHaveBeenCalled();
     });
   });
 

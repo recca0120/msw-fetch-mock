@@ -157,6 +157,10 @@ describe('vitest-browser integration', () => {
       expect(result).toBeInstanceOf(Promise);
       await result;
       fm2.deactivate();
+      // fm2.deactivate() stopped the shared worker — restart it so
+      // subsequent tests can intercept requests again.
+      await fetchMock.activate({ onUnhandledRequest: 'error' });
+      fetchMock.disableNetConnect();
     });
   });
 

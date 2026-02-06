@@ -20,13 +20,26 @@ export function matchesValue(
 }
 
 export function matchPath(request: Request, origin: string, pathMatcher: PathMatcher): boolean {
-  if (typeof pathMatcher === 'string') return true; // string paths are matched by MSW URL pattern
   const url = new URL(request.url);
-  const originPrefix = new URL(origin).pathname.replace(/\/$/, '');
+  const originUrl = new URL(origin);
+
+  // Verify origin matches (scheme + host + port)
+  if (url.origin !== originUrl.origin) return false;
+
+  const originPrefix = originUrl.pathname.replace(/\/$/, '');
   const fullPath = url.pathname + url.search;
   const relativePath = fullPath.startsWith(originPrefix)
     ? fullPath.slice(originPrefix.length)
     : fullPath;
+
+  if (typeof pathMatcher === 'string') {
+    // String path: exact match against the relative path (without query string)
+    const relativePathname = url.pathname.startsWith(originPrefix)
+      ? url.pathname.slice(originPrefix.length)
+      : url.pathname;
+    return relativePathname === pathMatcher;
+  }
+
   return matchesValue(relativePath, pathMatcher);
 }
 

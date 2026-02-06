@@ -1,7 +1,6 @@
 import { MockCallHistory } from './mock-call-history';
 import {
   isPending,
-  escapeRegExp,
   matchesValue,
   matchPath,
   matchQuery,
@@ -11,7 +10,6 @@ import {
 } from './matchers';
 import { isSetupServerLike, isSetupWorkerLike, isMswAdapter } from './type-guards';
 import type {
-  HttpMethod,
   InterceptOptions,
   ReplyOptions,
   ReplyCallback,
@@ -140,10 +138,15 @@ export class FetchMock {
   private adapter: MswAdapter;
   private interceptors: PendingInterceptor[] = [];
   private netConnectAllowed: NetConnectMatcher = false;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private mswHandlers: Map<PendingInterceptor, any> = new Map();
+  private handlerFns: Map<PendingInterceptor, (request: Request) => Promise<Response | undefined>> =
+    new Map();
   private _defaultReplyHeaders: Record<string, string> = {};
   private _callHistoryEnabled = true;
+  private catchAllInstalled = false;
+  private _onUnhandledRequest?: (
+    request: Request,
+    print: { warning(): void; error(): void }
+  ) => void;
 
   get calls(): MockCallHistory {
     return this._calls;
@@ -158,21 +161,30 @@ export class FetchMock {
     const timeout = options?.timeout ?? 30000; // Default 30 seconds
     const forceConnectionClose = options?.forceConnectionClose ?? false;
 
+    this._onUnhandledRequest = (request: Request, print: { warning(): void; error(): void }) => {
+      if (this.isNetConnectAllowed(request)) return;
+      if (typeof mode === 'function') {
+        mode(request, print);
+      } else if (mode === 'error') {
+        print.error();
+      } else if (mode === 'warn') {
+        print.warning();
+      }
+      // 'bypass' → do nothing
+    };
+
     await this.adapter.activate({
-      onUnhandledRequest: (request: Request, print: { warning(): void; error(): void }) => {
-        if (this.isNetConnectAllowed(request)) return;
-        if (typeof mode === 'function') {
-          mode(request, print);
-        } else if (mode === 'error') {
-          print.error();
-        } else if (mode === 'warn') {
-          print.warning();
-        }
-        // 'bypass' → do nothing
-      },
+      onUnhandledRequest: this._onUnhandledRequest,
       timeout,
       forceConnectionClose,
     });
+
+    // Install the catch-all handler eagerly so that it is ready before
+    // the first fetch.  In browser environments `worker.use()` must finish
+    // before the Service Worker can match requests — doing it once here
+    // (behind the already-awaited `activate`) avoids per-test race conditions.
+    this.catchAllInstalled = false;
+    this.ensureCatchAllInstalled();
   }
 
   disableNetConnect(): void {
@@ -193,45 +205,57 @@ export class FetchMock {
   }
 
   /**
-   * Remove consumed MSW handlers so future requests to those URLs
-   * go through MSW's onUnhandledRequest instead of silently passing through.
-   * Also adds a catch-all handler at the end to handle requests that match
-   * a URL pattern but fail fine-grained matching (query/headers/body).
+   * Installs a single catch-all MSW handler that dispatches requests to
+   * registered interceptors in FIFO order. All matching logic runs in the
+   * main thread, eliminating race conditions with Service Worker messaging.
    *
-   * IMPORTANT: Uses resetHandlers() + use() instead of resetHandlers(handlers...).
-   * MSW's resetHandlers(handlers...) sets handlers as "initial state", which means
-   * a subsequent resetHandlers() call restores them instead of clearing them.
-   * By using resetHandlers() to clear first, then use() to add handlers,
-   * we ensure reset() properly clears all handlers.
+   * The catch-all is installed once and stays active until reset/deactivate.
+   * Adding or consuming interceptors only mutates in-memory data structures,
+   * so no additional adapter.use() calls are needed.
    */
-  private syncMswHandlers(): void {
-    const activeHandlers = [...this.mswHandlers.entries()]
-      .filter(([p]) => !p.consumed || p.persist)
-      .map(([, handler]) => handler);
+  private ensureCatchAllInstalled(): void {
+    if (this.catchAllInstalled) return;
 
-    // First, clear all existing handlers (including any "initial" handlers)
-    this.adapter.resetHandlers();
+    const catchAllHandler = this.handlerFactory.createCatchAllHandler(async (request: Request) => {
+      // Iterate handlers in FIFO order (insertion order of Map)
+      for (const [pending, handlerFn] of this.handlerFns) {
+        if (pending.consumed && !pending.persist) continue;
 
-    // Only add catch-all handler when there are active handlers.
-    // The catch-all handles requests that match URL pattern but fail fine-grained
-    // matching. Without this, MSW treats handler returning undefined as "passthrough",
-    // causing requests to hang when disableNetConnect() is used.
-    if (activeHandlers.length > 0) {
-      const catchAllHandler = this.handlerFactory.createCatchAllHandler(
-        async (request: Request) => {
-          if (!this.isNetConnectAllowed(request)) {
-            // Return error response to prevent hanging
-            return this.handlerFactory.buildErrorResponse();
-          }
-          // Allow passthrough for allowed hosts
-          return undefined;
+        // Clone request so each handler can read the body independently
+        const response = await handlerFn(request.clone());
+        if (response !== undefined) return response;
+      }
+
+      // No handler matched — invoke the onUnhandledRequest callback
+      // (handles net connect checks, error/warn modes, and custom callbacks).
+      // Since the catch-all intercepts all requests, MSW's own
+      // onUnhandledRequest won't fire, so we replicate it here.
+      if (this._onUnhandledRequest) {
+        let shouldError = false;
+        this._onUnhandledRequest(request, {
+          warning: () => {
+            console.warn(
+              `[msw-fetch-mock] Warning: intercepted a request without a matching request handler:\n\n` +
+                `  \u2022 ${request.method} ${request.url}\n\n` +
+                `If you still wish to intercept this unhandled request, please create a request handler for it.`
+            );
+          },
+          error: () => {
+            shouldError = true;
+          },
+        });
+        if (shouldError) {
+          return this.handlerFactory.buildErrorResponse();
         }
-      );
-      // Add handlers via use() so they can be cleared by resetHandlers()
-      // FIFO order: first registered handler is matched first (Cloudflare fetchMock compatible)
-      // Catch-all is added last (lowest priority) to handle unmatched requests
-      this.adapter.use(...activeHandlers, catchAllHandler);
-    }
+      }
+
+      // Allow passthrough for allowed hosts
+      return undefined;
+    });
+
+    this.adapter.resetHandlers();
+    this.adapter.use(catchAllHandler);
+    this.catchAllInstalled = true;
   }
 
   /**
@@ -267,17 +291,21 @@ export class FetchMock {
 
   deactivate(): void {
     this.interceptors = [];
-    this.mswHandlers.clear();
+    this.handlerFns.clear();
     this._calls.clear();
+    this.catchAllInstalled = false;
     this.adapter.deactivate();
   }
 
   reset(): void {
     this.interceptors = [];
-    this.mswHandlers.clear();
+    this.handlerFns.clear();
     this._calls.clear();
     this._defaultReplyHeaders = {};
-    this.adapter.resetHandlers();
+    // The catch-all handler is intentionally kept installed so that no
+    // additional adapter.use() / worker.use() calls are needed between
+    // tests.  Because the catch-all reads `this.handlerFns` (now cleared),
+    // it will correctly fall through to `_onUnhandledRequest`.
   }
 
   assertNoPendingInterceptors(): void {
@@ -290,17 +318,6 @@ export class FetchMock {
 
   pendingInterceptors(): PendingInterceptor[] {
     return this.interceptors.filter(isPending).map((p) => ({ ...p }));
-  }
-
-  private resolveUrlPattern(
-    origin: string | RegExp | ((origin: string) => boolean),
-    path: InterceptOptions['path']
-  ): string | RegExp {
-    if (typeof origin === 'string') {
-      return typeof path === 'string' ? `${origin}${path}` : new RegExp(`^${escapeRegExp(origin)}`);
-    }
-    // Non-string origin: catch all URLs, do manual matching
-    return /.*/;
   }
 
   private matchOriginAndPath(
@@ -349,7 +366,6 @@ export class FetchMock {
     pending.timesInvoked++;
     if (!pending.persist && pending.timesInvoked >= pending.times) {
       pending.consumed = true;
-      this.syncMswHandlers();
     }
 
     if (this._callHistoryEnabled) {
@@ -360,14 +376,10 @@ export class FetchMock {
 
   private registerHandler(
     pending: PendingInterceptor,
-    method: HttpMethod,
-    urlPattern: string | RegExp,
     handlerFn: (request: Request) => Promise<Response | undefined>
   ): void {
-    const handler = this.handlerFactory.createHandler(method, urlPattern, handlerFn);
-    this.mswHandlers.set(pending, handler);
-    // Sync all handlers including catch-all to ensure correct order
-    this.syncMswHandlers();
+    this.handlerFns.set(pending, handlerFn);
+    this.ensureCatchAllInstalled();
   }
 
   private createMatchingHandler(
@@ -445,8 +457,6 @@ export class FetchMock {
         };
         this.interceptors.push(pending);
 
-        const urlPattern = this.resolveUrlPattern(origin, options.path);
-
         return {
           reply: (
             statusOrCallback: number | SingleReplyCallback,
@@ -484,8 +494,6 @@ export class FetchMock {
 
             this.registerHandler(
               pending,
-              method,
-              urlPattern,
               this.createMatchingHandler(pending, origin, originStr, options, delayRef, respond)
             );
 
@@ -498,8 +506,6 @@ export class FetchMock {
 
             this.registerHandler(
               pending,
-              method,
-              urlPattern,
               this.createMatchingHandler(
                 pending,
                 origin,
