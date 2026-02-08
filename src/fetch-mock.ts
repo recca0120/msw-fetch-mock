@@ -357,6 +357,9 @@ export class FetchMock {
   ): Promise<string | null | undefined> {
     if (!pending.persist && pending.timesInvoked >= pending.times) return;
     if (!this.matchOriginAndPath(request, origin, originStr, options.path)) return;
+    // Check method match
+    const expectedMethod = options.method ?? 'GET';
+    if (request.method !== expectedMethod) return;
     if (!matchQuery(request, options.query)) return;
     if (!matchHeaders(request, options.headers)) return;
 

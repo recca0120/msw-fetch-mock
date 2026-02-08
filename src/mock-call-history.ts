@@ -29,6 +29,13 @@ export class MockCallHistoryLog implements MockCallHistoryLogData {
     Object.assign(this, data);
   }
 
+  /**
+   * Alias for fullUrl - returns the complete URL
+   */
+  get url(): string {
+    return this.fullUrl;
+  }
+
   json(): unknown {
     if (this.body === null) return null;
     return JSON.parse(this.body);
@@ -101,8 +108,19 @@ export class MockCallHistory {
     return this.filterCalls(criteria).length > 0;
   }
 
-  calls(): MockCallHistoryLog[] {
+  /**
+   * Returns all recorded calls
+   */
+  all(): MockCallHistoryLog[] {
     return [...this.logs];
+  }
+
+  /**
+   * Alias for all() - returns all recorded calls
+   * @deprecated Use all() instead for better clarity
+   */
+  calls(): MockCallHistoryLog[] {
+    return this.all();
   }
 
   firstCall(
