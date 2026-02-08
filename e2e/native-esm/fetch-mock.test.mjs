@@ -47,6 +47,33 @@ describe('native-esm integration', () => {
       assert.equal(response.status, 201);
       assert.deepStrictEqual(await response.json(), { id: 'new-post' });
     });
+
+    it('should correctly match method when multiple interceptors for same path', async () => {
+      // Setup GET interceptor
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/posts', method: 'GET' })
+        .reply(200, { type: 'get' });
+
+      // Setup POST interceptor for the same path
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/posts', method: 'POST' })
+        .reply(201, { type: 'post' });
+
+      // Make GET request - should match GET interceptor
+      const getResponse = await fetch(`${API_BASE}/posts`);
+      assert.equal(getResponse.status, 200);
+      assert.deepStrictEqual(await getResponse.json(), { type: 'get' });
+
+      // Make POST request - should match POST interceptor
+      const postResponse = await fetch(`${API_BASE}/posts`, {
+        method: 'POST',
+        body: JSON.stringify({ content: 'test' }),
+      });
+      assert.equal(postResponse.status, 201);
+      assert.deepStrictEqual(await postResponse.json(), { type: 'post' });
+    });
   });
 
   describe('call history', () => {

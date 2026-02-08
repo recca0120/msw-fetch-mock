@@ -51,6 +51,33 @@ describe('legacy-cjs integration (MSW v1)', () => {
       expect(response.status).toBe(201);
       expect(await response.json()).toEqual({ id: 'new-post' });
     });
+
+    it('should correctly match method when multiple interceptors for same path', async () => {
+      // Setup GET interceptor
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/posts', method: 'GET' })
+        .reply(200, { type: 'get' });
+
+      // Setup POST interceptor for the same path
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/posts', method: 'POST' })
+        .reply(201, { type: 'post' });
+
+      // Make GET request - should match GET interceptor
+      const getResponse = await fetch(`${API_BASE}/posts`);
+      expect(getResponse.status).toBe(200);
+      expect(await getResponse.json()).toEqual({ type: 'get' });
+
+      // Make POST request - should match POST interceptor
+      const postResponse = await fetch(`${API_BASE}/posts`, {
+        method: 'POST',
+        body: JSON.stringify({ content: 'test' }),
+      });
+      expect(postResponse.status).toBe(201);
+      expect(await postResponse.json()).toEqual({ type: 'post' });
+    });
   });
 
   describe('call history', () => {
