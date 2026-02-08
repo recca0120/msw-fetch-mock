@@ -442,6 +442,13 @@ export class FetchMock {
 
     const pool: MockPool = {
       intercept: (options: InterceptOptions): MockInterceptor => {
+        // Validate: cannot use both path query string and query parameter
+        if (typeof options.path === 'string' && options.path.includes('?') && options.query) {
+          throw new Error(
+            'Cannot use both query string in path and query parameter. Use either path: "/api?limit=10" or path: "/api", query: { limit: "10" }'
+          );
+        }
+
         const method = options.method ?? 'GET';
         const pathStr =
           typeof options.path === 'string'

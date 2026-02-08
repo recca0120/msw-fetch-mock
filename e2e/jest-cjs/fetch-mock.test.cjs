@@ -252,4 +252,45 @@ describe('jest-cjs integration (dynamic import)', () => {
       expect((await res2.json()).success).toBe(true);
     });
   });
+
+  describe('query matching with path query string', () => {
+    it('should match when path includes query string - exact match', async () => {
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/posts?limit=10', method: 'GET' })
+        .reply(200, { posts: [] });
+
+      const response = await fetch(`${API_BASE}/api/posts?limit=10`);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ posts: [] });
+    });
+
+    it('should not match when path includes query string but request query differs', async () => {
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/posts?limit=10', method: 'GET' })
+        .reply(200, { posts: [] });
+
+      await fetch(`${API_BASE}/api/posts?limit=20`).catch(() => null);
+
+      // Interceptor should still be pending (not consumed)
+      expect(() => fetchMock.assertNoPendingInterceptors()).toThrow(/pending interceptor/i);
+      fetchMock.reset();
+    });
+
+    it('should match when path includes query string regardless of param order', async () => {
+      fetchMock
+        .get(API_BASE)
+        .intercept({ path: '/api/posts?a=1&b=2', method: 'GET' })
+        .reply(200, { posts: [] });
+
+      const response = await fetch(`${API_BASE}/api/posts?b=2&a=1`);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ posts: [] });
+    });
+  });
 });

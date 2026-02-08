@@ -33,10 +33,35 @@ export function matchPath(request: Request, origin: string, pathMatcher: PathMat
     : fullPath;
 
   if (typeof pathMatcher === 'string') {
-    // String path: exact match against the relative path (without query string)
     const relativePathname = url.pathname.startsWith(originPrefix)
       ? url.pathname.slice(originPrefix.length)
       : url.pathname;
+
+    // Check if pathMatcher includes query string
+    if (pathMatcher.includes('?')) {
+      const [matcherPath, matcherQuery] = pathMatcher.split('?');
+
+      // pathname must match
+      if (relativePathname !== matcherPath) return false;
+
+      // Parse query params from pathMatcher and request
+      const matcherParams = new URLSearchParams(matcherQuery);
+      const requestParams = url.searchParams;
+
+      // Check if all matcher params exist in request with same values
+      for (const [key, value] of matcherParams.entries()) {
+        if (requestParams.get(key) !== value) return false;
+      }
+
+      // Check if request has same number of params (no extra params)
+      if (Array.from(requestParams.keys()).length !== Array.from(matcherParams.keys()).length) {
+        return false;
+      }
+
+      return true;
+    }
+
+    // String path without query string: exact match against pathname only
     return relativePathname === pathMatcher;
   }
 

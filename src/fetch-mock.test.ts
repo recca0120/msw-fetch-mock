@@ -329,6 +329,79 @@ describe('query matching', () => {
 
     expect(response.status).toBe(200);
   });
+
+  it('should match when path includes query string - exact match', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/posts?limit=10', method: 'GET' })
+      .reply(200, { posts: [] });
+
+    const response = await fetch(`${API_BASE}/${API_PREFIX}/posts?limit=10`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ posts: [] });
+  });
+
+  it('should not match when path includes query string but request query differs', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/posts?limit=10', method: 'GET' })
+      .reply(200, { posts: [] });
+
+    // fetch with different query - should NOT match
+    await fetch(`${API_BASE}/${API_PREFIX}/posts?limit=20`).catch(() => null);
+
+    // Clean up: the interceptor was not consumed
+    expect(() => fetchMock.assertNoPendingInterceptors()).toThrow(/pending interceptor/i);
+    fetchMock.reset();
+  });
+
+  it('should match when path includes query string regardless of param order', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: '/posts?a=1&b=2', method: 'GET' })
+      .reply(200, { posts: [] });
+
+    const response = await fetch(`${API_BASE}/${API_PREFIX}/posts?b=2&a=1`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ posts: [] });
+  });
+
+  it('should throw error when both path query and query param are provided', () => {
+    expect(() => {
+      fetchMock
+        .get(`${API_BASE}/${API_PREFIX}`)
+        .intercept({ path: '/posts?a=1', method: 'GET', query: { b: '2' } });
+    }).toThrow(/cannot use both/i);
+  });
+
+  it('should match when path is RegExp with query string', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({ path: /^\/posts\?limit=\d+$/, method: 'GET' })
+      .reply(200, { posts: [] });
+
+    const response = await fetch(`${API_BASE}/${API_PREFIX}/posts?limit=10`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ posts: [] });
+  });
+
+  it('should match when path is function that checks query string', async () => {
+    fetchMock
+      .get(`${API_BASE}/${API_PREFIX}`)
+      .intercept({
+        path: (path: string) => path.includes('?') && path.includes('limit'),
+        method: 'GET',
+      })
+      .reply(200, { posts: [] });
+
+    const response = await fetch(`${API_BASE}/${API_PREFIX}/posts?limit=10`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ posts: [] });
+  });
 });
 
 describe('times', () => {
