@@ -26,7 +26,7 @@ describe('MockCallHistory', () => {
   it('should return empty array when no calls recorded', () => {
     const history = new MockCallHistory();
 
-    expect(history.calls()).toEqual([]);
+    expect(history.all()).toEqual([]);
   });
 
   it('should return recorded calls', () => {
@@ -35,7 +35,7 @@ describe('MockCallHistory', () => {
 
     history.record(log);
 
-    expect(history.calls()).toEqual([log]);
+    expect(history.all()).toEqual([log]);
   });
 
   it('should return firstCall', () => {
@@ -90,7 +90,7 @@ describe('MockCallHistory', () => {
 
     history.clear();
 
-    expect(history.calls()).toEqual([]);
+    expect(history.all()).toEqual([]);
   });
 
   it('should support Symbol.iterator (spread and for...of)', () => {

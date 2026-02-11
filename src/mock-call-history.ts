@@ -115,14 +115,6 @@ export class MockCallHistory {
     return [...this.logs];
   }
 
-  /**
-   * Alias for all() - returns all recorded calls
-   * @deprecated Use all() instead for better clarity
-   */
-  calls(): MockCallHistoryLog[] {
-    return this.all();
-  }
-
   firstCall(
     criteria?: ((log: MockCallHistoryLog) => boolean) | CallHistoryFilterCriteria | RegExp
   ): MockCallHistoryLog | undefined {
