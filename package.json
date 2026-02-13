@@ -1,6 +1,6 @@
 {
 	"name": "msw-fetch-mock",
-	"version": "0.4.12",
+	"version": "0.4.13",
 	"description": "Undici-style fetch mock API built on MSW (Mock Service Worker)",
 	"type": "module",
 	"license": "MIT",
