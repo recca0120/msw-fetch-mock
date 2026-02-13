@@ -10,7 +10,7 @@ export { FetchMock } from './fetch-mock';
 FetchMock._handlerFactory = HandlerFactory;
 
 export function createFetchMock(worker: SetupWorkerLike): FetchMock {
-  return new FetchMock(new BrowserMswAdapter(worker));
+	return new FetchMock(new BrowserMswAdapter(worker));
 }
 
 export * from './exports';

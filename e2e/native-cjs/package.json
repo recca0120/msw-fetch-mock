@@ -1,10 +1,10 @@
 {
-  "name": "integration-native-cjs",
-  "private": true,
-  "scripts": {
-    "test": "node --test fetch-mock.test.cjs"
-  },
-  "dependencies": {
-    "msw-fetch-mock": "file:../../"
-  }
+	"name": "integration-native-cjs",
+	"private": true,
+	"scripts": {
+		"test": "node --test fetch-mock.test.cjs"
+	},
+	"dependencies": {
+		"msw-fetch-mock": "file:../../"
+	}
 }

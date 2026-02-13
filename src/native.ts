@@ -13,7 +13,7 @@ FetchMock._defaultAdapterFactory = () => new NativeFetchAdapter();
 FetchMock._handlerFactory = NativeHandlerFactory;
 
 export function createFetchMock(): FetchMock {
-  return new FetchMock(new NativeFetchAdapter());
+	return new FetchMock(new NativeFetchAdapter());
 }
 
 /** Pre-built singleton for quick standalone use. */

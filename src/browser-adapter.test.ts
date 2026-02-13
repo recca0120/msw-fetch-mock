@@ -3,78 +3,78 @@ import { BrowserMswAdapter } from './browser-adapter';
 import { type ResolvedActivateOptions, type SetupWorkerLike } from './types';
 
 function createStubWorker(): SetupWorkerLike {
-  return {
-    use: vi.fn(),
-    resetHandlers: vi.fn(),
-    start: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn(),
-  };
+	return {
+		use: vi.fn(),
+		resetHandlers: vi.fn(),
+		start: vi.fn().mockResolvedValue(undefined),
+		stop: vi.fn(),
+	};
 }
 
 const noopCallback: ResolvedActivateOptions = {
-  onUnhandledRequest: () => {},
+	onUnhandledRequest: () => {},
 };
 
 describe('BrowserMswAdapter', () => {
-  it('should delegate use() to worker', () => {
-    const worker = createStubWorker();
-    const adapter = new BrowserMswAdapter(worker);
-    const handler = { id: 'handler-1' };
+	it('should delegate use() to worker', () => {
+		const worker = createStubWorker();
+		const adapter = new BrowserMswAdapter(worker);
+		const handler = { id: 'handler-1' };
 
-    adapter.use(handler);
+		adapter.use(handler);
 
-    expect(worker.use).toHaveBeenCalledWith(handler);
-  });
+		expect(worker.use).toHaveBeenCalledWith(handler);
+	});
 
-  it('should delegate resetHandlers() to worker', () => {
-    const worker = createStubWorker();
-    const adapter = new BrowserMswAdapter(worker);
-    const handler = { id: 'handler-1' };
+	it('should delegate resetHandlers() to worker', () => {
+		const worker = createStubWorker();
+		const adapter = new BrowserMswAdapter(worker);
+		const handler = { id: 'handler-1' };
 
-    adapter.resetHandlers(handler);
+		adapter.resetHandlers(handler);
 
-    expect(worker.resetHandlers).toHaveBeenCalledWith(handler);
-  });
+		expect(worker.resetHandlers).toHaveBeenCalledWith(handler);
+	});
 
-  it('should call worker.start() on activate', async () => {
-    const worker = createStubWorker();
-    const adapter = new BrowserMswAdapter(worker);
+	it('should call worker.start() on activate', async () => {
+		const worker = createStubWorker();
+		const adapter = new BrowserMswAdapter(worker);
 
-    await adapter.activate(noopCallback);
+		await adapter.activate(noopCallback);
 
-    expect(worker.start).toHaveBeenCalledWith({
-      onUnhandledRequest: noopCallback.onUnhandledRequest,
-    });
-  });
+		expect(worker.start).toHaveBeenCalledWith({
+			onUnhandledRequest: noopCallback.onUnhandledRequest,
+		});
+	});
 
-  it('should return a Promise from activate', async () => {
-    const worker = createStubWorker();
-    const adapter = new BrowserMswAdapter(worker);
+	it('should return a Promise from activate', async () => {
+		const worker = createStubWorker();
+		const adapter = new BrowserMswAdapter(worker);
 
-    const result = adapter.activate(noopCallback);
+		const result = adapter.activate(noopCallback);
 
-    expect(result).toBeInstanceOf(Promise);
-    await result;
-  });
+		expect(result).toBeInstanceOf(Promise);
+		await result;
+	});
 
-  it('should call worker.stop() on deactivate', () => {
-    const worker = createStubWorker();
-    const adapter = new BrowserMswAdapter(worker);
+	it('should call worker.stop() on deactivate', () => {
+		const worker = createStubWorker();
+		const adapter = new BrowserMswAdapter(worker);
 
-    adapter.deactivate();
+		adapter.deactivate();
 
-    expect(worker.stop).toHaveBeenCalled();
-  });
+		expect(worker.stop).toHaveBeenCalled();
+	});
 
-  it('should pass onUnhandledRequest callback to worker.start()', async () => {
-    const worker = createStubWorker();
-    const adapter = new BrowserMswAdapter(worker);
-    const callback = vi.fn();
+	it('should pass onUnhandledRequest callback to worker.start()', async () => {
+		const worker = createStubWorker();
+		const adapter = new BrowserMswAdapter(worker);
+		const callback = vi.fn();
 
-    await adapter.activate({ onUnhandledRequest: callback });
+		await adapter.activate({ onUnhandledRequest: callback });
 
-    expect(worker.start).toHaveBeenCalledWith({
-      onUnhandledRequest: callback,
-    });
-  });
+		expect(worker.start).toHaveBeenCalledWith({
+			onUnhandledRequest: callback,
+		});
+	});
 });

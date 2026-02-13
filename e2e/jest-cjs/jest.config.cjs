@@ -1,4 +1,4 @@
 /** @type {import('jest').Config} */
 module.exports = {
-  testMatch: ['**/*.test.cjs'],
+	testMatch: ['**/*.test.cjs'],
 };

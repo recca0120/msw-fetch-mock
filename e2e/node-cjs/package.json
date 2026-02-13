@@ -1,11 +1,11 @@
 {
-  "name": "integration-node-cjs",
-  "private": true,
-  "scripts": {
-    "test": "node --test fetch-mock.test.cjs"
-  },
-  "dependencies": {
-    "msw-fetch-mock": "file:../../",
-    "msw": "^2.12.7"
-  }
+	"name": "integration-node-cjs",
+	"private": true,
+	"scripts": {
+		"test": "node --test fetch-mock.test.cjs"
+	},
+	"dependencies": {
+		"msw-fetch-mock": "file:../../",
+		"msw": "^2.12.7"
+	}
 }

@@ -1,105 +1,105 @@
 {
-  "name": "msw-fetch-mock",
-  "version": "0.4.10",
-  "description": "Undici-style fetch mock API built on MSW (Mock Service Worker)",
-  "type": "module",
-  "license": "MIT",
-  "keywords": [
-    "msw",
-    "fetch",
-    "mock",
-    "testing",
-    "undici",
-    "browser",
-    "service-worker"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/recca0120/msw-fetch-mock.git"
-  },
-  "packageManager": "pnpm@10.12.4",
-  "engines": {
-    "node": ">=18"
-  },
-  "exports": {
-    ".": {
-      "source": "./src/index.ts",
-      "types": {
-        "import": "./dist/index.d.ts",
-        "require": "./dist/index.d.cts"
-      },
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    },
-    "./node": {
-      "source": "./src/node.ts",
-      "types": {
-        "import": "./dist/node.d.ts",
-        "require": "./dist/node.d.cts"
-      },
-      "import": "./dist/node.js",
-      "require": "./dist/node.cjs"
-    },
-    "./browser": {
-      "source": "./src/browser.ts",
-      "types": {
-        "import": "./dist/browser.d.ts",
-        "require": "./dist/browser.d.cts"
-      },
-      "import": "./dist/browser.js",
-      "require": "./dist/browser.cjs"
-    },
-    "./legacy": {
-      "source": "./src/legacy.ts",
-      "types": {
-        "import": "./dist/legacy.d.ts",
-        "require": "./dist/legacy.d.cts"
-      },
-      "import": "./dist/legacy.js",
-      "require": "./dist/legacy.cjs"
-    },
-    "./native": {
-      "source": "./src/native.ts",
-      "types": {
-        "import": "./dist/native.d.ts",
-        "require": "./dist/native.d.cts"
-      },
-      "import": "./dist/native.js",
-      "require": "./dist/native.cjs"
-    }
-  },
-  "files": [
-    "dist",
-    "docs",
-    "LICENSE.md",
-    "README.md"
-  ],
-  "scripts": {
-    "prepare": "lefthook install",
-    "build": "tsup",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write .",
-    "format": "biome format --write .",
-    "prepublishOnly": "tsup",
-    "test:e2e": "bash scripts/test-e2e.sh"
-  },
-  "peerDependencies": {
-    "msw": "^1.0.0 || ^2.12.7"
-  },
-  "peerDependenciesMeta": {
-    "msw": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.3.15",
-    "lefthook": "^2.0.15",
-    "msw": "^2.12.7",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.17"
-  }
+	"name": "msw-fetch-mock",
+	"version": "0.4.11",
+	"description": "Undici-style fetch mock API built on MSW (Mock Service Worker)",
+	"type": "module",
+	"license": "MIT",
+	"keywords": [
+		"msw",
+		"fetch",
+		"mock",
+		"testing",
+		"undici",
+		"browser",
+		"service-worker"
+	],
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/recca0120/msw-fetch-mock.git"
+	},
+	"packageManager": "pnpm@10.12.4",
+	"engines": {
+		"node": ">=18"
+	},
+	"exports": {
+		".": {
+			"source": "./src/index.ts",
+			"types": {
+				"import": "./dist/index.d.ts",
+				"require": "./dist/index.d.cts"
+			},
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		},
+		"./node": {
+			"source": "./src/node.ts",
+			"types": {
+				"import": "./dist/node.d.ts",
+				"require": "./dist/node.d.cts"
+			},
+			"import": "./dist/node.js",
+			"require": "./dist/node.cjs"
+		},
+		"./browser": {
+			"source": "./src/browser.ts",
+			"types": {
+				"import": "./dist/browser.d.ts",
+				"require": "./dist/browser.d.cts"
+			},
+			"import": "./dist/browser.js",
+			"require": "./dist/browser.cjs"
+		},
+		"./legacy": {
+			"source": "./src/legacy.ts",
+			"types": {
+				"import": "./dist/legacy.d.ts",
+				"require": "./dist/legacy.d.cts"
+			},
+			"import": "./dist/legacy.js",
+			"require": "./dist/legacy.cjs"
+		},
+		"./native": {
+			"source": "./src/native.ts",
+			"types": {
+				"import": "./dist/native.d.ts",
+				"require": "./dist/native.d.cts"
+			},
+			"import": "./dist/native.js",
+			"require": "./dist/native.cjs"
+		}
+	},
+	"files": [
+		"dist",
+		"docs",
+		"LICENSE.md",
+		"README.md"
+	],
+	"scripts": {
+		"prepare": "lefthook install",
+		"build": "tsup",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest",
+		"test:run": "vitest run",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write .",
+		"prepublishOnly": "tsup",
+		"test:e2e": "bash scripts/test-e2e.sh"
+	},
+	"peerDependencies": {
+		"msw": "^1.0.0 || ^2.12.7"
+	},
+	"peerDependenciesMeta": {
+		"msw": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.15",
+		"lefthook": "^2.0.15",
+		"msw": "^2.12.7",
+		"tsup": "^8.5.1",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.17"
+	}
 }

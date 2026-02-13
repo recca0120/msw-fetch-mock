@@ -1,129 +1,129 @@
 import { type MockCallHistory } from './mock-call-history';
 import {
-  type BodyMatcher,
-  type HeaderValueMatcher,
-  type PathMatcher,
-  type PendingInterceptor,
+	type BodyMatcher,
+	type HeaderValueMatcher,
+	type PathMatcher,
+	type PendingInterceptor,
 } from './types';
 
 export function isPending(p: PendingInterceptor): boolean {
-  if (p.persist) return p.timesInvoked === 0;
-  return p.timesInvoked < p.times;
+	if (p.persist) return p.timesInvoked === 0;
+	return p.timesInvoked < p.times;
 }
 
 export function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export function matchesValue(
-  value: string,
-  matcher: string | RegExp | ((v: string) => boolean)
+	value: string,
+	matcher: string | RegExp | ((v: string) => boolean)
 ): boolean {
-  if (typeof matcher === 'string') return value === matcher;
-  if (matcher instanceof RegExp) return matcher.test(value);
-  return matcher(value);
+	if (typeof matcher === 'string') return value === matcher;
+	if (matcher instanceof RegExp) return matcher.test(value);
+	return matcher(value);
 }
 
 export function matchPath(request: Request, origin: string, pathMatcher: PathMatcher): boolean {
-  const url = new URL(request.url);
-  const originUrl = new URL(origin);
+	const url = new URL(request.url);
+	const originUrl = new URL(origin);
 
-  // Verify origin matches (scheme + host + port)
-  if (url.origin !== originUrl.origin) return false;
+	// Verify origin matches (scheme + host + port)
+	if (url.origin !== originUrl.origin) return false;
 
-  const originPrefix = originUrl.pathname.replace(/\/$/, '');
-  const fullPath = url.pathname + url.search;
-  const relativePath = fullPath.startsWith(originPrefix)
-    ? fullPath.slice(originPrefix.length)
-    : fullPath;
+	const originPrefix = originUrl.pathname.replace(/\/$/, '');
+	const fullPath = url.pathname + url.search;
+	const relativePath = fullPath.startsWith(originPrefix)
+		? fullPath.slice(originPrefix.length)
+		: fullPath;
 
-  if (typeof pathMatcher === 'string') {
-    const relativePathname = url.pathname.startsWith(originPrefix)
-      ? url.pathname.slice(originPrefix.length)
-      : url.pathname;
+	if (typeof pathMatcher === 'string') {
+		const relativePathname = url.pathname.startsWith(originPrefix)
+			? url.pathname.slice(originPrefix.length)
+			: url.pathname;
 
-    // Check if pathMatcher includes query string
-    if (pathMatcher.includes('?')) {
-      const [matcherPath, matcherQuery] = pathMatcher.split('?');
+		// Check if pathMatcher includes query string
+		if (pathMatcher.includes('?')) {
+			const [matcherPath, matcherQuery] = pathMatcher.split('?');
 
-      // pathname must match
-      if (relativePathname !== matcherPath) return false;
+			// pathname must match
+			if (relativePathname !== matcherPath) return false;
 
-      // Parse query params from pathMatcher and request
-      const matcherParams = new URLSearchParams(matcherQuery);
-      const requestParams = url.searchParams;
+			// Parse query params from pathMatcher and request
+			const matcherParams = new URLSearchParams(matcherQuery);
+			const requestParams = url.searchParams;
 
-      // Check if all matcher params exist in request with same values
-      for (const [key, value] of matcherParams.entries()) {
-        if (requestParams.get(key) !== value) return false;
-      }
+			// Check if all matcher params exist in request with same values
+			for (const [key, value] of matcherParams.entries()) {
+				if (requestParams.get(key) !== value) return false;
+			}
 
-      // Check if request has same number of params (no extra params)
-      if (Array.from(requestParams.keys()).length !== Array.from(matcherParams.keys()).length) {
-        return false;
-      }
+			// Check if request has same number of params (no extra params)
+			if (Array.from(requestParams.keys()).length !== Array.from(matcherParams.keys()).length) {
+				return false;
+			}
 
-      return true;
-    }
+			return true;
+		}
 
-    // String path without query string: exact match against pathname only
-    return relativePathname === pathMatcher;
-  }
+		// String path without query string: exact match against pathname only
+		return relativePathname === pathMatcher;
+	}
 
-  return matchesValue(relativePath, pathMatcher);
+	return matchesValue(relativePath, pathMatcher);
 }
 
 export function matchQuery(request: Request, query?: Record<string, string>): boolean {
-  if (!query) return true;
-  const url = new URL(request.url);
-  for (const [key, value] of Object.entries(query)) {
-    if (url.searchParams.get(key) !== value) return false;
-  }
-  return true;
+	if (!query) return true;
+	const url = new URL(request.url);
+	for (const [key, value] of Object.entries(query)) {
+		if (url.searchParams.get(key) !== value) return false;
+	}
+	return true;
 }
 
 export function matchHeaders(
-  request: Request,
-  headers?: Record<string, HeaderValueMatcher>
+	request: Request,
+	headers?: Record<string, HeaderValueMatcher>
 ): boolean {
-  if (!headers) return true;
-  for (const [key, matcher] of Object.entries(headers)) {
-    const value = request.headers.get(key);
-    if (value === null || !matchesValue(value, matcher)) return false;
-  }
-  return true;
+	if (!headers) return true;
+	for (const [key, matcher] of Object.entries(headers)) {
+		const value = request.headers.get(key);
+		if (value === null || !matchesValue(value, matcher)) return false;
+	}
+	return true;
 }
 
 export function matchBody(bodyText: string | null, bodyMatcher?: BodyMatcher): boolean {
-  if (!bodyMatcher) return true;
-  return matchesValue(bodyText ?? '', bodyMatcher);
+	if (!bodyMatcher) return true;
+	return matchesValue(bodyText ?? '', bodyMatcher);
 }
 
 export function recordCall(
-  callHistory: MockCallHistory,
-  request: Request,
-  bodyText: string | null
+	callHistory: MockCallHistory,
+	request: Request,
+	bodyText: string | null
 ) {
-  const url = new URL(request.url);
-  const requestHeaders: Record<string, string> = {};
-  request.headers.forEach((value, key) => {
-    requestHeaders[key] = value;
-  });
-  const searchParams: Record<string, string> = {};
-  url.searchParams.forEach((value, key) => {
-    searchParams[key] = value;
-  });
-  callHistory.record({
-    body: bodyText,
-    method: request.method,
-    headers: requestHeaders,
-    fullUrl: url.origin + url.pathname + url.search,
-    origin: url.origin,
-    path: url.pathname,
-    searchParams,
-    protocol: url.protocol,
-    host: url.host,
-    port: url.port,
-    hash: url.hash,
-  });
+	const url = new URL(request.url);
+	const requestHeaders: Record<string, string> = {};
+	request.headers.forEach((value, key) => {
+		requestHeaders[key] = value;
+	});
+	const searchParams: Record<string, string> = {};
+	url.searchParams.forEach((value, key) => {
+		searchParams[key] = value;
+	});
+	callHistory.record({
+		body: bodyText,
+		method: request.method,
+		headers: requestHeaders,
+		fullUrl: url.origin + url.pathname + url.search,
+		origin: url.origin,
+		path: url.pathname,
+		searchParams,
+		protocol: url.protocol,
+		host: url.host,
+		port: url.port,
+		hash: url.hash,
+	});
 }

@@ -14,45 +14,45 @@ import { type MswAdapter, type ResolvedActivateOptions, type SetupServerLike } f
  * delegates to it without managing lifecycle (similar to `createServerAdapter`).
  */
 export class NodeMswAdapter implements MswAdapter {
-  private server: SetupServerLike | null;
-  private readonly ownsServer: boolean;
+	private server: SetupServerLike | null;
+	private readonly ownsServer: boolean;
 
-  constructor(externalServer?: SetupServerLike) {
-    this.server = externalServer ?? null;
-    this.ownsServer = !externalServer;
-  }
+	constructor(externalServer?: SetupServerLike) {
+		this.server = externalServer ?? null;
+		this.ownsServer = !externalServer;
+	}
 
-  use(...handlers: Array<unknown>): void {
-    this.server?.use(...handlers);
-  }
+	use(...handlers: Array<unknown>): void {
+		this.server?.use(...handlers);
+	}
 
-  resetHandlers(...handlers: Array<unknown>): void {
-    this.server?.resetHandlers(...handlers);
-  }
+	resetHandlers(...handlers: Array<unknown>): void {
+		this.server?.resetHandlers(...handlers);
+	}
 
-  activate(options: ResolvedActivateOptions): void {
-    if (!this.ownsServer) return;
+	activate(options: ResolvedActivateOptions): void {
+		if (!this.ownsServer) return;
 
-    const isPatched = Object.getOwnPropertySymbols(globalThis.fetch).some(
-      (s) => s.description === 'isPatchedModule'
-    );
-    if (isPatched) {
-      throw new Error(
-        'Another MSW server is already active. ' +
-          'Pass your existing server to new FetchMock(server) instead.'
-      );
-    }
+		const isPatched = Object.getOwnPropertySymbols(globalThis.fetch).some(
+			(s) => s.description === 'isPatchedModule'
+		);
+		if (isPatched) {
+			throw new Error(
+				'Another MSW server is already active. ' +
+					'Pass your existing server to new FetchMock(server) instead.'
+			);
+		}
 
-    this.server = setupServer();
-    (this.server as ReturnType<typeof setupServer>).listen({
-      onUnhandledRequest: options.onUnhandledRequest,
-    });
-  }
+		this.server = setupServer();
+		(this.server as ReturnType<typeof setupServer>).listen({
+			onUnhandledRequest: options.onUnhandledRequest,
+		});
+	}
 
-  deactivate(): void {
-    if (this.ownsServer) {
-      this.server?.close();
-      this.server = null;
-    }
-  }
+	deactivate(): void {
+		if (this.ownsServer) {
+			this.server?.close();
+			this.server = null;
+		}
+	}
 }

@@ -13,7 +13,7 @@ FetchMock._defaultAdapterFactory = () => new NodeMswAdapter();
 FetchMock._handlerFactory = HandlerFactory;
 
 export function createFetchMock(server?: SetupServerLike): FetchMock {
-  return new FetchMock(new NodeMswAdapter(server));
+	return new FetchMock(new NodeMswAdapter(server));
 }
 
 /** Pre-built singleton for quick standalone use (Cloudflare migration compatible). */

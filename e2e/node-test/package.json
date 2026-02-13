@@ -1,15 +1,15 @@
 {
-  "name": "integration-node-test",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "node --import tsx --test fetch-mock.test.mjs"
-  },
-  "dependencies": {
-    "msw-fetch-mock": "file:../../",
-    "msw": "^2.12.7"
-  },
-  "devDependencies": {
-    "tsx": "^4.19.0"
-  }
+	"name": "integration-node-test",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"test": "node --import tsx --test fetch-mock.test.mjs"
+	},
+	"dependencies": {
+		"msw-fetch-mock": "file:../../",
+		"msw": "^2.12.7"
+	},
+	"devDependencies": {
+		"tsx": "^4.19.0"
+	}
 }
