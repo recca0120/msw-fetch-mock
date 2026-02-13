@@ -3,8 +3,7 @@ import { createLegacyHandlerFactory, type LegacyRestApi } from './legacy-handler
 
 /* ---------- MSW legacy (v1) API mocks ---------- */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type V1Resolver = (...args: any[]) => any;
+type V1Resolver = (...args: unknown[]) => unknown;
 
 function createMockRestApi(): LegacyRestApi & { _resolvers: Map<string, V1Resolver> } {
 	const resolvers = new Map<string, V1Resolver>();
@@ -44,12 +43,13 @@ function createMockV1Request(options: {
 function createMockV1Res() {
 	const collected: unknown[] = [];
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const res: any = (...transformers: unknown[]) => {
-		collected.push(...transformers);
-		return { _type: 'response', transformers: collected };
-	};
-	res.networkError = (msg: string) => ({ _type: 'networkError', message: msg });
+	const res = Object.assign(
+		(...transformers: unknown[]) => {
+			collected.push(...transformers);
+			return { _type: 'response', transformers: collected };
+		},
+		{ networkError: (msg: string) => ({ _type: 'networkError', message: msg }) },
+	);
 
 	return { res, collected };
 }

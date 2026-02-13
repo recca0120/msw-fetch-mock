@@ -79,8 +79,8 @@
 			"includes": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "e2e/**/*.test.*"],
 			"linter": {
 				"rules": {
-					"suspicious": { "noExplicitAny": "off", "noConsole": "off" },
-					"correctness": { "noUnusedVariables": "off", "noUnusedFunctionParameters": "off" },
+					"suspicious": { "noConsole": "off" },
+					"correctness": { "noUnusedFunctionParameters": "off" },
 					"style": { "noNonNullAssertion": "off" }
 				}
 			}
