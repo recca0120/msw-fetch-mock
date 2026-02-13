@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
 import { setupWorker } from 'msw/browser';
 import { createFetchMock } from 'msw-fetch-mock/browser';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 const API_BASE = 'http://localhost:5173';
 const worker = setupWorker();
@@ -86,8 +86,8 @@ describe('vitest-browser integration', () => {
       await fetch(`${API_BASE}/b`);
 
       expect(fetchMock.calls.length).toBe(2);
-      expect(fetchMock.calls.firstCall()!.path).toBe('/a');
-      expect(fetchMock.calls.lastCall()!.path).toBe('/b');
+      expect(fetchMock.calls.firstCall()?.path).toBe('/a');
+      expect(fetchMock.calls.lastCall()?.path).toBe('/b');
     });
 
     it('should record POST body and parse as JSON', async () => {

@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import { setupServer } from 'msw/node';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FetchMock } from './fetch-mock';
-import { NodeMswAdapter } from './node-adapter';
 import { createFetchMock, fetchMock as singletonFetchMock } from './node';
-import type { SetupServerLike, SetupWorkerLike, MswAdapter } from './types';
+import { NodeMswAdapter } from './node-adapter';
+import { type MswAdapter, type SetupServerLike, type SetupWorkerLike } from './types';
 
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
@@ -155,7 +155,7 @@ describe('FetchMock', () => {
         body: JSON.stringify({ content: 'Hello' }),
       });
 
-      expect(fetchMock.calls.lastCall()!.json()).toEqual({ content: 'Hello' });
+      expect(fetchMock.calls.lastCall()?.json()).toEqual({ content: 'Hello' });
     });
   });
 
@@ -716,7 +716,7 @@ describe('call history', () => {
     });
 
     const call = fetchMock.calls.lastCall()!;
-    expect(call.headers['authorization']).toBe('Bearer token-123');
+    expect(call.headers.authorization).toBe('Bearer token-123');
   });
 
   it('should record searchParams', async () => {

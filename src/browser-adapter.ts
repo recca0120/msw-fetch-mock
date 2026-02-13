@@ -1,4 +1,4 @@
-import type { MswAdapter, ResolvedActivateOptions, SetupWorkerLike } from './types';
+import { type MswAdapter, type ResolvedActivateOptions, type SetupWorkerLike } from './types';
 
 export class BrowserMswAdapter implements MswAdapter {
   private readonly worker: SetupWorkerLike;

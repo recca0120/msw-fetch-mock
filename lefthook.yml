@@ -1,18 +1,8 @@
-# Lefthook configuration for msw-fetch-mock
-# https://github.com/evilmartians/lefthook
-
 pre-commit:
-  parallel: true
   commands:
-    lint:
-      glob: 'src/**/*.ts'
-      run: npx eslint {staged_files} --fix
-      stage_fixed: true
-
-    prettier:
-      glob: '*.{ts,json,md,yml,yaml}'
-      exclude: 'node_modules/**|dist/**|coverage/**'
-      run: npx prettier --write {staged_files}
+    biome:
+      glob: '*.{ts,json}'
+      run: npx @biomejs/biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
       stage_fixed: true
 
 pre-push:
@@ -20,6 +10,5 @@ pre-push:
   commands:
     typecheck:
       run: npx tsc --noEmit
-
     test:
       run: npx vitest run

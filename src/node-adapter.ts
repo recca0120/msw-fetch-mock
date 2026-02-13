@@ -1,5 +1,5 @@
 import { setupServer } from 'msw/node';
-import type { MswAdapter, ResolvedActivateOptions, SetupServerLike } from './types';
+import { type MswAdapter, type ResolvedActivateOptions, type SetupServerLike } from './types';
 
 /**
  * MSW adapter that owns and manages its own `setupServer` lifecycle.
@@ -23,11 +23,11 @@ export class NodeMswAdapter implements MswAdapter {
   }
 
   use(...handlers: Array<unknown>): void {
-    this.server!.use(...handlers);
+    this.server?.use(...handlers);
   }
 
   resetHandlers(...handlers: Array<unknown>): void {
-    this.server!.resetHandlers(...handlers);
+    this.server?.resetHandlers(...handlers);
   }
 
   activate(options: ResolvedActivateOptions): void {

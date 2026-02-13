@@ -1,4 +1,4 @@
-import type { MswAdapter, SetupServerLike, SetupWorkerLike } from './types';
+import { type MswAdapter, type SetupServerLike, type SetupWorkerLike } from './types';
 
 export function isSetupServerLike(input: unknown): input is SetupServerLike {
   return (

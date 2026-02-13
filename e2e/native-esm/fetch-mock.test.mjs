@@ -1,5 +1,5 @@
-import { describe, it, before, afterEach, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { after, afterEach, before, describe, it } from 'node:test';
 import { createFetchMock } from 'msw-fetch-mock/native';
 
 const API_BASE = 'http://localhost:8787';

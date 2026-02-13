@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterEach, afterAll } from '@jest/globals';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from '@jest/globals';
 import { createFetchMock } from 'msw-fetch-mock';
 
 const API_BASE = 'http://localhost:8787';
@@ -84,8 +84,8 @@ describe('jest-esm integration', () => {
       await fetch(`${API_BASE}/b`);
 
       expect(fetchMock.calls.length).toBe(2);
-      expect(fetchMock.calls.firstCall()!.path).toBe('/a');
-      expect(fetchMock.calls.lastCall()!.path).toBe('/b');
+      expect(fetchMock.calls.firstCall()?.path).toBe('/a');
+      expect(fetchMock.calls.lastCall()?.path).toBe('/b');
     });
 
     it('should record POST body and parse as JSON', async () => {

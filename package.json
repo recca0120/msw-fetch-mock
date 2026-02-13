@@ -80,10 +80,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
     "prepublishOnly": "tsup",
     "test:e2e": "bash scripts/test-e2e.sh"
   },
@@ -96,14 +95,11 @@
     }
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "eslint": "^9.39.2",
+    "@biomejs/biome": "^2.3.15",
     "lefthook": "^2.0.15",
     "msw": "^2.12.7",
-    "prettier": "^3.8.1",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.53.1",
     "vitest": "^4.0.17"
   }
 }

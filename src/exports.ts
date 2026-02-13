@@ -6,21 +6,20 @@
  */
 
 export { FetchMock } from './fetch-mock';
+export type { CallHistoryFilterCriteria, MockCallHistoryLogData } from './mock-call-history';
 export { MockCallHistory, MockCallHistoryLog } from './mock-call-history';
-
 export type {
   ActivateOptions,
-  OnUnhandledRequest,
+  HandlerFactory,
   InterceptOptions,
-  MockPool,
   MockInterceptor,
+  MockPool,
   MockReplyChain,
-  ReplyOptions,
+  MswAdapter,
+  OnUnhandledRequest,
+  PendingInterceptor,
   ReplyCallback,
+  ReplyOptions,
   SingleReplyCallback,
   SingleReplyResult,
-  PendingInterceptor,
-  MswAdapter,
-  HandlerFactory,
 } from './types';
-export type { MockCallHistoryLogData, CallHistoryFilterCriteria } from './mock-call-history';

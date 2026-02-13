@@ -1,5 +1,5 @@
-import type { MswAdapter, ResolvedActivateOptions } from './types';
-import type { NativeHandler } from './native-handler-factory';
+import { type NativeHandler } from './native-handler-factory';
+import { type MswAdapter, type ResolvedActivateOptions } from './types';
 
 export class NativeFetchAdapter implements MswAdapter {
   private originalFetch!: typeof globalThis.fetch;

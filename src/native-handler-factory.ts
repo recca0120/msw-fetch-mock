@@ -1,4 +1,4 @@
-import type { HandlerFactory, HttpMethod } from './types';
+import { type HandlerFactory, type HttpMethod } from './types';
 
 export interface NativeHandler {
   method: HttpMethod;

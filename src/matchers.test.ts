@@ -1,16 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  isPending,
   escapeRegExp,
+  isPending,
+  matchBody,
   matchesValue,
+  matchHeaders,
   matchPath,
   matchQuery,
-  matchHeaders,
-  matchBody,
   recordCall,
 } from './matchers';
 import { MockCallHistory } from './mock-call-history';
-import type { PendingInterceptor } from './types';
+import { type PendingInterceptor } from './types';
 
 function createPending(overrides: Partial<PendingInterceptor> = {}): PendingInterceptor {
   return {
@@ -51,7 +51,9 @@ describe('escapeRegExp', () => {
   });
 
   it('should escape all special chars', () => {
-    expect(escapeRegExp('.*+?^${}()|[]\\')).toBe('\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\');
+    const specialChars = ['.*+?^', '$', '{}()|[]\\'];
+    const input = specialChars.join('');
+    expect(escapeRegExp(input)).toBe('\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\');
   });
 
   it('should return plain string unchanged', () => {
@@ -244,6 +246,6 @@ describe('recordCall', () => {
 
     recordCall(history, request, null);
 
-    expect(history.firstCall()!.body).toBeNull();
+    expect(history.firstCall()?.body).toBeNull();
   });
 });

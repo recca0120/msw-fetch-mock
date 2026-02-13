@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { isSetupServerLike, isSetupWorkerLike, isMswAdapter } from './type-guards';
+import { describe, expect, it } from 'vitest';
+import { isMswAdapter, isSetupServerLike, isSetupWorkerLike } from './type-guards';
 
 describe('isSetupServerLike', () => {
   it('should return true for object with listen and close methods', () => {

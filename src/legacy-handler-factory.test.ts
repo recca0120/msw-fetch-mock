@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createLegacyHandlerFactory, type LegacyRestApi } from './legacy-handler-factory';
 
 /* ---------- MSW legacy (v1) API mocks ---------- */

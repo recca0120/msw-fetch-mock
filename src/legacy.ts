@@ -1,10 +1,10 @@
 import { FetchMock } from './fetch-mock';
 import { createLegacyHandlerFactory, type LegacyRestApi } from './legacy-handler-factory';
-import type { SetupServerLike } from './types';
+import { type SetupServerLike } from './types';
 
 export { FetchMock } from './fetch-mock';
-export { createLegacyHandlerFactory } from './legacy-handler-factory';
 export type { LegacyRestApi } from './legacy-handler-factory';
+export { createLegacyHandlerFactory } from './legacy-handler-factory';
 
 /**
  * Create a FetchMock instance for MSW v1 (legacy) environments.
@@ -31,5 +31,5 @@ export function createFetchMock(rest: LegacyRestApi, server?: SetupServerLike): 
   return new FetchMock();
 }
 
-export type { SetupServerLike } from './types';
 export * from './exports';
+export type { SetupServerLike } from './types';

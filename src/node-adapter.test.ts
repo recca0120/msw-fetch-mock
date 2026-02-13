@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
 import { setupServer } from 'msw/node';
+import { describe, expect, it, vi } from 'vitest';
 import { NodeMswAdapter } from './node-adapter';
-import type { SetupServerLike, ResolvedActivateOptions } from './types';
+import { type ResolvedActivateOptions, type SetupServerLike } from './types';
 
 function createStubServer(): SetupServerLike {
   return {

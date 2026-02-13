@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   MockCallHistory,
-  MockCallHistoryLog,
+  type MockCallHistoryLog,
   type MockCallHistoryLogData,
 } from './mock-call-history';
 
@@ -163,7 +163,7 @@ describe('MockCallHistory', () => {
       history.record(createLog({ method: 'POST', path: '/submit' }));
       history.record(createLog({ method: 'GET', path: '/second' }));
 
-      expect(history.lastCall({ method: 'GET' })!.path).toBe('/second');
+      expect(history.lastCall({ method: 'GET' })?.path).toBe('/second');
     });
 
     it('should return first matching call with firstCall(filter)', () => {
@@ -172,7 +172,7 @@ describe('MockCallHistory', () => {
       history.record(createLog({ method: 'POST', path: '/submit' }));
       history.record(createLog({ method: 'POST', path: '/submit2' }));
 
-      expect(history.firstCall({ method: 'POST' })!.path).toBe('/submit');
+      expect(history.firstCall({ method: 'POST' })?.path).toBe('/submit');
     });
 
     it('should return nth matching call with nthCall(n, filter)', () => {
@@ -182,7 +182,7 @@ describe('MockCallHistory', () => {
       history.record(createLog({ method: 'GET', path: '/b' }));
       history.record(createLog({ method: 'GET', path: '/c' }));
 
-      expect(history.nthCall(2, { method: 'GET' })!.path).toBe('/b');
+      expect(history.nthCall(2, { method: 'GET' })?.path).toBe('/b');
     });
 
     it('should return undefined when filter has no match', () => {
@@ -198,21 +198,21 @@ describe('MockCallHistory', () => {
       const history = new MockCallHistory();
       history.record(createLog({ body: '{"text":"Hello"}' }));
 
-      expect(history.lastCall()!.json()).toEqual({ text: 'Hello' });
+      expect(history.lastCall()?.json()).toEqual({ text: 'Hello' });
     });
 
     it('should return null when body is null', () => {
       const history = new MockCallHistory();
       history.record(createLog({ body: null }));
 
-      expect(history.lastCall()!.json()).toBeNull();
+      expect(history.lastCall()?.json()).toBeNull();
     });
 
     it('should throw SyntaxError for invalid JSON', () => {
       const history = new MockCallHistory();
       history.record(createLog({ body: 'not json' }));
 
-      expect(() => history.lastCall()!.json()).toThrow(SyntaxError);
+      expect(() => history.lastCall()?.json()).toThrow(SyntaxError);
     });
   });
 
@@ -366,7 +366,7 @@ describe('MockCallHistory', () => {
       const history = new MockCallHistory();
       history.record(createLog({ method: 'POST', path: '/posts', body: '{"x":1}' }));
 
-      const map = history.lastCall()!.toMap();
+      const map = history.lastCall()?.toMap();
 
       expect(map).toBeInstanceOf(Map);
       expect(map.get('method')).toBe('POST');
@@ -382,7 +382,7 @@ describe('MockCallHistory', () => {
       const history = new MockCallHistory();
       history.record(createLog({ method: 'GET', path: '/posts', protocol: 'https:' }));
 
-      const str = history.lastCall()!.toString();
+      const str = history.lastCall()?.toString();
 
       expect(str).toContain('method->GET');
       expect(str).toContain('path->/posts');

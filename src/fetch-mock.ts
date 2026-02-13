@@ -1,41 +1,41 @@
-import { MockCallHistory } from './mock-call-history';
 import {
   isPending,
+  matchBody,
   matchesValue,
+  matchHeaders,
   matchPath,
   matchQuery,
-  matchHeaders,
-  matchBody,
   recordCall,
 } from './matchers';
-import { isSetupServerLike, isSetupWorkerLike, isMswAdapter } from './type-guards';
-import type {
-  InterceptOptions,
-  ReplyOptions,
-  ReplyCallback,
-  SingleReplyCallback,
-  MockReplyChain,
-  MockInterceptor,
-  MockPool,
-  PendingInterceptor,
-  NetConnectMatcher,
-  ActivateOptions,
-  MswAdapter,
-  ResolvedActivateOptions,
-  SetupServerLike,
-  SetupWorkerLike,
-  HandlerFactory,
+import { MockCallHistory } from './mock-call-history';
+import { isMswAdapter, isSetupServerLike, isSetupWorkerLike } from './type-guards';
+import {
+  type ActivateOptions,
+  type HandlerFactory,
+  type InterceptOptions,
+  type MockInterceptor,
+  type MockPool,
+  type MockReplyChain,
+  type MswAdapter,
+  type NetConnectMatcher,
+  type PendingInterceptor,
+  type ReplyCallback,
+  type ReplyOptions,
+  type ResolvedActivateOptions,
+  type SetupServerLike,
+  type SetupWorkerLike,
+  type SingleReplyCallback,
 } from './types';
 
 export type {
+  ActivateOptions,
   InterceptOptions,
-  ReplyOptions,
-  MockReplyChain,
   MockInterceptor,
   MockPool,
-  PendingInterceptor,
+  MockReplyChain,
   OnUnhandledRequest,
-  ActivateOptions,
+  PendingInterceptor,
+  ReplyOptions,
 } from './types';
 
 /**

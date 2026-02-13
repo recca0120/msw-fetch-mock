@@ -1,5 +1,5 @@
-import { http, HttpResponse } from 'msw';
-import type { HttpMethod, HandlerFactory as HandlerFactoryType } from './types';
+import { HttpResponse, http } from 'msw';
+import { type HandlerFactory as HandlerFactoryType, type HttpMethod } from './types';
 
 const methods: Record<HttpMethod, typeof http.get> = {
   GET: http.get,

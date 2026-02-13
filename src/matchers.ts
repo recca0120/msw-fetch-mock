@@ -1,5 +1,10 @@
-import { MockCallHistory } from './mock-call-history';
-import type { PathMatcher, HeaderValueMatcher, BodyMatcher, PendingInterceptor } from './types';
+import { type MockCallHistory } from './mock-call-history';
+import {
+  type BodyMatcher,
+  type HeaderValueMatcher,
+  type PathMatcher,
+  type PendingInterceptor,
+} from './types';
 
 export function isPending(p: PendingInterceptor): boolean {
   if (p.persist) return p.timesInvoked === 0;

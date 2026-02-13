@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BrowserMswAdapter } from './browser-adapter';
-import type { SetupWorkerLike, ResolvedActivateOptions } from './types';
+import { type ResolvedActivateOptions, type SetupWorkerLike } from './types';
 
 function createStubWorker(): SetupWorkerLike {
   return {

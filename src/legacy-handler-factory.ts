@@ -1,18 +1,37 @@
-import type { HttpMethod, HandlerFactory } from './types';
+import { type HandlerFactory, type HttpMethod } from './types';
+
+/** Duck-typed MSW v1 request object */
+interface LegacyReq {
+  url: { toString(): string };
+  method: string;
+  headers: { all(): Record<string, string> };
+  body?: unknown;
+}
+
+/** Duck-typed MSW v1 response composer */
+type LegacyRes = {
+  (...transformers: unknown[]): unknown;
+  networkError(msg: string): unknown;
+};
+
+/** Duck-typed MSW v1 context utilities */
+interface LegacyCtx {
+  status(code: number): unknown;
+  set(key: string, value: string): unknown;
+  body(text: string): unknown;
+}
 
 /** Duck-typed interface for MSW v1's `rest` API methods */
 export type LegacyRestMethod = (
   url: string | RegExp,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  resolver: (req: any, res: any, ctx: any) => any
+  resolver: (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => unknown
 ) => unknown;
 
 /** Duck-typed interface for MSW v1's `rest` namespace */
 export type LegacyRestApi = Record<Lowercase<HttpMethod> | 'all', LegacyRestMethod>;
 
 /** Convert MSW v1 request object to standard Request */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function convertV1Request(req: any): Request {
+function convertV1Request(req: LegacyReq): Request {
   const headers = new Headers(req.headers.all());
   const hasBody = !['GET', 'HEAD'].includes(req.method);
   const body =
@@ -30,14 +49,16 @@ function convertV1Request(req: any): Request {
 }
 
 /** Convert standard Response to MSW v1 res(ctx...) format */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function convertToV1Response(response: Response, res: any, ctx: any): Promise<any> {
+async function convertToV1Response(
+  response: Response,
+  res: LegacyRes,
+  ctx: LegacyCtx
+): Promise<unknown> {
   if (response.type === 'error') {
     return res.networkError('Failed to fetch');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const transformers: any[] = [ctx.status(response.status)];
+  const transformers: unknown[] = [ctx.status(response.status)];
 
   response.headers.forEach((value: string, key: string) => {
     transformers.push(ctx.set(key, value));
@@ -69,10 +90,8 @@ export function createLegacyHandlerFactory(rest: LegacyRestApi): HandlerFactory 
     PATCH: rest.patch,
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const createResolver = (handlerFn: (request: Request) => Promise<Response | undefined>) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return async (req: any, res: any, ctx: any) => {
+    return async (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => {
       const request = convertV1Request(req);
       const response = await handlerFn(request);
       if (!response) return undefined; // passthrough

@@ -1,7 +1,7 @@
 import { FetchMock } from './fetch-mock';
-import { NodeMswAdapter } from './node-adapter';
 import { HandlerFactory } from './handler-factory';
-import type { SetupServerLike } from './types';
+import { NodeMswAdapter } from './node-adapter';
+import { type SetupServerLike } from './types';
 
 export { FetchMock } from './fetch-mock';
 export { NodeMswAdapter } from './node-adapter';
@@ -19,5 +19,5 @@ export function createFetchMock(server?: SetupServerLike): FetchMock {
 /** Pre-built singleton for quick standalone use (Cloudflare migration compatible). */
 export const fetchMock = createFetchMock();
 
-export type { SetupServerLike } from './types';
 export * from './exports';
+export type { SetupServerLike } from './types';

@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NativeFetchAdapter } from './native-adapter';
-import type { NativeHandler } from './native-handler-factory';
-import type { ResolvedActivateOptions } from './types';
+import { type NativeHandler } from './native-handler-factory';
+import { type ResolvedActivateOptions } from './types';
 
 const noopOptions: ResolvedActivateOptions = {
   onUnhandledRequest: () => {},

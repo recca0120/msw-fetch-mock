@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
-import { createFetchMock, fetchMock as singletonFetchMock, FetchMock } from './native';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { createFetchMock, FetchMock, fetchMock as singletonFetchMock } from './native';
 
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
