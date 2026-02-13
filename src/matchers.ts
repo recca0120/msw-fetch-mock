@@ -17,7 +17,7 @@ export function escapeRegExp(str: string): string {
 
 export function matchesValue(
 	value: string,
-	matcher: string | RegExp | ((v: string) => boolean)
+	matcher: string | RegExp | ((v: string) => boolean),
 ): boolean {
 	if (typeof matcher === 'string') return value === matcher;
 	if (matcher instanceof RegExp) return matcher.test(value);
@@ -84,7 +84,7 @@ export function matchQuery(request: Request, query?: Record<string, string>): bo
 
 export function matchHeaders(
 	request: Request,
-	headers?: Record<string, HeaderValueMatcher>
+	headers?: Record<string, HeaderValueMatcher>,
 ): boolean {
 	if (!headers) return true;
 	for (const [key, matcher] of Object.entries(headers)) {
@@ -102,7 +102,7 @@ export function matchBody(bodyText: string | null, bodyMatcher?: BodyMatcher): b
 export function recordCall(
 	callHistory: MockCallHistory,
 	request: Request,
-	bodyText: string | null
+	bodyText: string | null,
 ) {
 	const url = new URL(request.url);
 	const requestHeaders: Record<string, string> = {};

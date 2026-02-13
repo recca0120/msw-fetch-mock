@@ -46,7 +46,7 @@ describe('isPending', () => {
 describe('escapeRegExp', () => {
 	it('should escape special regex characters', () => {
 		expect(escapeRegExp('http://example.com/api?q=1&b=2')).toBe(
-			'http://example\\.com/api\\?q=1&b=2'
+			'http://example\\.com/api\\?q=1&b=2',
 		);
 	});
 

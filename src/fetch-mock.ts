@@ -89,7 +89,7 @@ function resolveAdapter(input?: SetupServerLike | SetupWorkerLike | MswAdapter):
 			throw new Error(
 				'FetchMock requires a server, worker, or adapter argument. ' +
 					'Use createFetchMock() from msw-fetch-mock/node or msw-fetch-mock/browser, ' +
-					'or pass a setupServer/setupWorker instance directly.'
+					'or pass a setupServer/setupWorker instance directly.',
 			);
 		}
 		return FetchMock._defaultAdapterFactory();
@@ -110,7 +110,7 @@ export class FetchMock {
 		if (!FetchMock._handlerFactory) {
 			throw new Error(
 				'Handler factory not registered. ' +
-					'Import from msw-fetch-mock/node or msw-fetch-mock/browser.'
+					'Import from msw-fetch-mock/node or msw-fetch-mock/browser.',
 			);
 		}
 		return FetchMock._handlerFactory;
@@ -121,7 +121,7 @@ export class FetchMock {
 		responseBody: unknown,
 		replyOptions?: ReplyOptions,
 		defaultHeaders?: Record<string, string>,
-		addContentLength?: boolean
+		addContentLength?: boolean,
 	): Response {
 		const mergedHeaders: Record<string, string> = { ...defaultHeaders };
 		if (replyOptions?.headers) {
@@ -145,7 +145,7 @@ export class FetchMock {
 	private catchAllInstalled = false;
 	private _onUnhandledRequest?: (
 		request: Request,
-		print: { warning(): void; error(): void }
+		print: { warning(): void; error(): void },
 	) => void;
 
 	get calls(): MockCallHistory {
@@ -237,7 +237,7 @@ export class FetchMock {
 						console.warn(
 							`[msw-fetch-mock] Warning: intercepted a request without a matching request handler:\n\n` +
 								`  \u2022 ${request.method} ${request.url}\n\n` +
-								`If you still wish to intercept this unhandled request, please create a request handler for it.`
+								`If you still wish to intercept this unhandled request, please create a request handler for it.`,
 						);
 					},
 					error: () => {
@@ -324,7 +324,7 @@ export class FetchMock {
 		request: Request,
 		origin: string | RegExp | ((origin: string) => boolean),
 		originStr: string,
-		path: InterceptOptions['path']
+		path: InterceptOptions['path'],
 	): boolean {
 		if (typeof origin === 'string') {
 			// String origin: URL pattern already filtered by origin prefix,
@@ -353,7 +353,7 @@ export class FetchMock {
 		pending: PendingInterceptor,
 		origin: string | RegExp | ((origin: string) => boolean),
 		originStr: string,
-		options: InterceptOptions
+		options: InterceptOptions,
 	): Promise<string | null | undefined> {
 		if (!pending.persist && pending.timesInvoked >= pending.times) return;
 		if (!this.matchOriginAndPath(request, origin, originStr, options.path)) return;
@@ -379,7 +379,7 @@ export class FetchMock {
 
 	private registerHandler(
 		pending: PendingInterceptor,
-		handlerFn: (request: Request) => Promise<Response | undefined>
+		handlerFn: (request: Request) => Promise<Response | undefined>,
 	): void {
 		this.handlerFns.set(pending, handlerFn);
 		this.ensureCatchAllInstalled();
@@ -391,7 +391,7 @@ export class FetchMock {
 		originStr: string,
 		options: InterceptOptions,
 		delayRef: { ms: number },
-		respond: (bodyText: string | null) => Promise<Response>
+		respond: (bodyText: string | null) => Promise<Response>,
 	): (request: Request) => Promise<Response | undefined> {
 		return async (request: Request) => {
 			const bodyText = await this.matchAndConsume(request, pending, origin, originStr, options);
@@ -409,7 +409,7 @@ export class FetchMock {
 		pending: PendingInterceptor,
 		delayRef: { ms: number },
 		contentLengthRef: { enabled: boolean },
-		pool: MockPool
+		pool: MockPool,
 	): MockReplyChain {
 		return {
 			times(n: number) {
@@ -445,7 +445,7 @@ export class FetchMock {
 				// Validate: cannot use both path query string and query parameter
 				if (typeof options.path === 'string' && options.path.includes('?') && options.query) {
 					throw new Error(
-						'Cannot use both query string in path and query parameter. Use either path: "/api?limit=10" or path: "/api", query: { limit: "10" }'
+						'Cannot use both query string in path and query parameter. Use either path: "/api?limit=10" or path: "/api", query: { limit: "10" }',
 					);
 				}
 
@@ -471,7 +471,7 @@ export class FetchMock {
 					reply: (
 						statusOrCallback: number | SingleReplyCallback,
 						bodyOrCallback?: unknown | ReplyCallback,
-						replyOptions?: ReplyOptions
+						replyOptions?: ReplyOptions,
 					): MockReplyChain => {
 						const delayRef = { ms: 0 };
 						const contentLengthRef = { enabled: false };
@@ -484,7 +484,7 @@ export class FetchMock {
 									result.data,
 									result.responseOptions,
 									this._defaultReplyHeaders,
-									contentLengthRef.enabled
+									contentLengthRef.enabled,
 								);
 							}
 
@@ -498,13 +498,13 @@ export class FetchMock {
 								responseBody,
 								replyOptions,
 								this._defaultReplyHeaders,
-								contentLengthRef.enabled
+								contentLengthRef.enabled,
 							);
 						};
 
 						this.registerHandler(
 							pending,
-							this.createMatchingHandler(pending, origin, originStr, options, delayRef, respond)
+							this.createMatchingHandler(pending, origin, originStr, options, delayRef, respond),
 						);
 
 						return this.buildChain(pending, delayRef, contentLengthRef, pool);
@@ -524,8 +524,8 @@ export class FetchMock {
 								delayRef,
 								async () => {
 									return this.handlerFactory.buildErrorResponse();
-								}
-							)
+								},
+							),
 						);
 
 						return this.buildChain(pending, delayRef, contentLengthRef, pool);

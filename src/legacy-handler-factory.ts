@@ -24,7 +24,7 @@ interface LegacyCtx {
 /** Duck-typed interface for MSW v1's `rest` API methods */
 export type LegacyRestMethod = (
 	url: string | RegExp,
-	resolver: (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => unknown
+	resolver: (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => unknown,
 ) => unknown;
 
 /** Duck-typed interface for MSW v1's `rest` namespace */
@@ -52,7 +52,7 @@ function convertV1Request(req: LegacyReq): Request {
 async function convertToV1Response(
 	response: Response,
 	res: LegacyRes,
-	ctx: LegacyCtx
+	ctx: LegacyCtx,
 ): Promise<unknown> {
 	if (response.type === 'error') {
 		return res.networkError('Failed to fetch');

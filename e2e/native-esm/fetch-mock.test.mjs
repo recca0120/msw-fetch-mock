@@ -174,7 +174,7 @@ describe('native-esm integration', () => {
 
 			await assert.rejects(
 				() => fetch(`${API_BASE}/fail`),
-				(err) => err instanceof Error
+				(err) => err instanceof Error,
 			);
 		});
 	});

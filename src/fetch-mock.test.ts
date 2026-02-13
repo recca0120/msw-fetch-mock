@@ -1418,7 +1418,7 @@ describe('constructor auto-detection', () => {
 			await fm.activate();
 
 			expect(server.listen).toHaveBeenCalledWith(
-				expect.objectContaining({ onUnhandledRequest: expect.any(Function) })
+				expect.objectContaining({ onUnhandledRequest: expect.any(Function) }),
 			);
 		});
 
@@ -1461,7 +1461,7 @@ describe('constructor auto-detection', () => {
 			await fm.activate();
 
 			expect(worker.start).toHaveBeenCalledWith(
-				expect.objectContaining({ onUnhandledRequest: expect.any(Function) })
+				expect.objectContaining({ onUnhandledRequest: expect.any(Function) }),
 			);
 		});
 

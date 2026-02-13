@@ -125,7 +125,7 @@ describe('NativeFetchAdapter', () => {
 
 			expect(onUnhandled).toHaveBeenCalledWith(
 				expect.any(Request),
-				expect.objectContaining({ warning: expect.any(Function), error: expect.any(Function) })
+				expect.objectContaining({ warning: expect.any(Function), error: expect.any(Function) }),
 			);
 
 			adapter.deactivate();

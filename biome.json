@@ -1,11 +1,15 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.3.15/schema.json",
 	"vcs": {
-		"enabled": true,
 		"clientKind": "git",
-		"useIgnoreFile": true
+		"enabled": true,
+		"useIgnoreFile": true,
+		"defaultBranch": "main"
 	},
-	"assist": { "actions": { "source": { "organizeImports": "on" } } },
+	"files": {
+		"includes": ["**", "!**/node_modules", "!**/dist", "!**/coverage", "!**/pnpm-lock.yaml"],
+		"ignoreUnknown": true
+	},
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab",
@@ -16,39 +20,84 @@
 		"formatter": {
 			"quoteStyle": "single",
 			"semicolons": "always",
-			"trailingCommas": "es5",
+			"trailingCommas": "all",
 			"bracketSpacing": true,
 			"arrowParentheses": "always"
+		}
+	},
+	"json": {
+		"formatter": {
+			"indentStyle": "tab",
+			"trailingCommas": "none"
 		}
 	},
 	"linter": {
 		"enabled": true,
 		"rules": {
 			"recommended": true,
+			"correctness": {
+				"noUnusedImports": "error",
+				"noUnusedVariables": "error",
+				"noUnusedFunctionParameters": "warn",
+				"noUndeclaredDependencies": "error"
+			},
 			"style": {
 				"useImportType": {
 					"level": "error",
 					"options": { "style": "inlineType" }
 				},
-				"noNonNullAssertion": "warn"
+				"noNonNullAssertion": "warn",
+				"useConst": "error",
+				"noUselessElse": "error",
+				"noInferrableTypes": "error",
+				"noParameterAssign": "error",
+				"useDefaultParameterLast": "error"
 			},
-			"correctness": {
-				"noUnusedVariables": "error",
-				"noUnusedImports": "error"
+			"suspicious": {
+				"noVar": "error",
+				"noDoubleEquals": "error",
+				"noConsole": "warn"
+			},
+			"performance": {
+				"noAccumulatingSpread": "warn"
+			},
+			"nursery": {
+				"noImportCycles": "error"
 			}
 		}
 	},
-	"files": {
-		"includes": ["**", "!**/node_modules", "!**/dist", "!**/coverage", "!**/pnpm-lock.yaml"]
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
 	},
 	"overrides": [
 		{
 			"includes": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "e2e/**/*.test.*"],
 			"linter": {
 				"rules": {
-					"suspicious": { "noExplicitAny": "off" },
-					"correctness": { "noUnusedVariables": "off" },
+					"suspicious": { "noExplicitAny": "off", "noConsole": "off" },
+					"correctness": { "noUnusedVariables": "off", "noUnusedFunctionParameters": "off" },
 					"style": { "noNonNullAssertion": "off" }
+				}
+			}
+		},
+		{
+			"includes": ["src/fetch-mock.ts", "src/native-adapter.ts"],
+			"linter": {
+				"rules": {
+					"suspicious": { "noConsole": "off" }
+				}
+			}
+		},
+		{
+			"includes": ["*.config.ts", "*.config.js", "*.config.mjs"],
+			"linter": {
+				"rules": {
+					"suspicious": { "noConsole": "off" }
 				}
 			}
 		}

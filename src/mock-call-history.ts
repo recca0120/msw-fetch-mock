@@ -102,7 +102,7 @@ export class MockCallHistory {
 	}
 
 	called(
-		criteria?: ((log: MockCallHistoryLog) => boolean) | CallHistoryFilterCriteria | RegExp
+		criteria?: ((log: MockCallHistoryLog) => boolean) | CallHistoryFilterCriteria | RegExp,
 	): boolean {
 		if (criteria === undefined) return this.logs.length > 0;
 		return this.filterCalls(criteria).length > 0;
@@ -116,14 +116,14 @@ export class MockCallHistory {
 	}
 
 	firstCall(
-		criteria?: ((log: MockCallHistoryLog) => boolean) | CallHistoryFilterCriteria | RegExp
+		criteria?: ((log: MockCallHistoryLog) => boolean) | CallHistoryFilterCriteria | RegExp,
 	): MockCallHistoryLog | undefined {
 		if (criteria === undefined) return this.logs[0];
 		return this.filterCalls(criteria)[0];
 	}
 
 	lastCall(
-		criteria?: ((log: MockCallHistoryLog) => boolean) | CallHistoryFilterCriteria | RegExp
+		criteria?: ((log: MockCallHistoryLog) => boolean) | CallHistoryFilterCriteria | RegExp,
 	): MockCallHistoryLog | undefined {
 		if (criteria === undefined) return this.logs[this.logs.length - 1];
 		const filtered = this.filterCalls(criteria);
@@ -132,7 +132,7 @@ export class MockCallHistory {
 
 	nthCall(
 		n: number,
-		criteria?: ((log: MockCallHistoryLog) => boolean) | CallHistoryFilterCriteria | RegExp
+		criteria?: ((log: MockCallHistoryLog) => boolean) | CallHistoryFilterCriteria | RegExp,
 	): MockCallHistoryLog | undefined {
 		if (criteria === undefined) return this.logs[n - 1];
 		return this.filterCalls(criteria)[n - 1];
@@ -148,7 +148,7 @@ export class MockCallHistory {
 
 	filterCalls(
 		criteria: ((log: MockCallHistoryLog) => boolean) | CallHistoryFilterCriteria | RegExp,
-		options?: { operator?: 'AND' | 'OR' }
+		options?: { operator?: 'AND' | 'OR' },
 	): MockCallHistoryLog[] {
 		if (typeof criteria === 'function') {
 			return this.logs.filter(criteria);
@@ -167,7 +167,7 @@ export class MockCallHistory {
 		if (predicates.length === 0) return [...this.logs];
 
 		return this.logs.filter((log) =>
-			operator === 'AND' ? predicates.every((p) => p(log)) : predicates.some((p) => p(log))
+			operator === 'AND' ? predicates.every((p) => p(log)) : predicates.some((p) => p(log)),
 		);
 	}
 
@@ -180,10 +180,10 @@ export class MockCallHistory {
 	 */
 	private filterBy(
 		field: keyof MockCallHistoryLogData,
-		filter: string | RegExp
+		filter: string | RegExp,
 	): MockCallHistoryLog[] {
 		return this.logs.filter((log) =>
-			typeof filter === 'string' ? log[field] === filter : filter.test(String(log[field]))
+			typeof filter === 'string' ? log[field] === filter : filter.test(String(log[field])),
 		);
 	}
 

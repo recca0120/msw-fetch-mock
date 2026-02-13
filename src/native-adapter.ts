@@ -24,7 +24,7 @@ export class NativeFetchAdapter implements MswAdapter {
 	private async handleRequest(
 		request: Request,
 		input: RequestInfo | URL,
-		init?: RequestInit
+		init?: RequestInit,
 	): Promise<Response> {
 		for (const handler of this.handlers) {
 			const response = await handler.handlerFn(request);
@@ -41,13 +41,13 @@ export class NativeFetchAdapter implements MswAdapter {
 				console.warn(
 					`[msw-fetch-mock] Warning: intercepted a request without a matching request handler:\n\n` +
 						`  \u2022 ${request.method} ${request.url}\n\n` +
-						`If you still wish to intercept this unhandled request, please create a request handler for it.`
+						`If you still wish to intercept this unhandled request, please create a request handler for it.`,
 				);
 			},
 			error: () => {
 				throw new TypeError(
 					`[msw-fetch-mock] Cannot bypass a request when using the "error" strategy for the "onUnhandledRequest" option.\n\n` +
-						`  \u2022 ${request.method} ${request.url}\n`
+						`  \u2022 ${request.method} ${request.url}\n`,
 				);
 			},
 		});
