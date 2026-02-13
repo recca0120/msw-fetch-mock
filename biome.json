@@ -80,7 +80,6 @@
 			"linter": {
 				"rules": {
 					"suspicious": { "noConsole": "off" },
-					"correctness": { "noUnusedFunctionParameters": "off" },
 					"style": { "noNonNullAssertion": "off" }
 				}
 			}
