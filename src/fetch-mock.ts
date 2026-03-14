@@ -1,3 +1,4 @@
+import { BrowserMswAdapter } from './browser-adapter';
 import {
 	isPending,
 	matchBody,
@@ -7,6 +8,7 @@ import {
 	matchQuery,
 	recordCall,
 } from './matchers';
+import { formatUnhandledRequestWarning } from './messages';
 import { MockCallHistory } from './mock-call-history';
 import { isMswAdapter, isSetupServerLike, isSetupWorkerLike } from './type-guards';
 import {
@@ -42,8 +44,8 @@ export type {
  * Thin wrapper: adapts a user-provided `setupServer` instance to {@link MswAdapter}.
  *
  * **Difference from {@link NodeMswAdapter}:**
- * - `createServerAdapter` does NOT own the server lifecycle — the caller is
- *   responsible for `listen()` / `close()`.
+ * - `createServerAdapter` manages the server lifecycle — calls `listen()` on
+ *   activate and `close()` on deactivate.
  * - `NodeMswAdapter` creates and manages its own `setupServer` internally
  *   (calls `listen()` on activate and `close()` on deactivate).
  *
@@ -65,24 +67,6 @@ function createServerAdapter(server: SetupServerLike): MswAdapter {
 	};
 }
 
-/**
- * Thin wrapper: adapts a user-provided setupWorker instance to MswAdapter.
- * Unlike BrowserMswAdapter, this does NOT manage the worker lifecycle —
- * the caller owns start/stop.
- */
-function createWorkerAdapter(worker: SetupWorkerLike): MswAdapter {
-	return {
-		use: (...handlers: Array<unknown>) => worker.use(...handlers),
-		resetHandlers: (...handlers: Array<unknown>) => worker.resetHandlers(...handlers),
-		async activate(options: ResolvedActivateOptions) {
-			await worker.start({ onUnhandledRequest: options.onUnhandledRequest });
-		},
-		deactivate() {
-			worker.stop();
-		},
-	};
-}
-
 function resolveAdapter(input?: SetupServerLike | SetupWorkerLike | MswAdapter): MswAdapter {
 	if (!input) {
 		if (!FetchMock._defaultAdapterFactory) {
@@ -96,7 +80,7 @@ function resolveAdapter(input?: SetupServerLike | SetupWorkerLike | MswAdapter):
 	}
 	if (isMswAdapter(input)) return input;
 	if (isSetupServerLike(input)) return createServerAdapter(input);
-	if (isSetupWorkerLike(input)) return createWorkerAdapter(input);
+	if (isSetupWorkerLike(input)) return new BrowserMswAdapter(input as SetupWorkerLike);
 	throw new Error('Invalid argument: expected a setupServer, setupWorker, or MswAdapter instance.');
 }
 
@@ -106,14 +90,17 @@ export class FetchMock {
 	/** @internal */
 	static _handlerFactory?: HandlerFactory;
 
+	private readonly _instanceHandlerFactory?: HandlerFactory;
+
 	private get handlerFactory(): HandlerFactory {
-		if (!FetchMock._handlerFactory) {
+		const factory = this._instanceHandlerFactory ?? FetchMock._handlerFactory;
+		if (!factory) {
 			throw new Error(
 				'Handler factory not registered. ' +
 					'Import from msw-fetch-mock/node or msw-fetch-mock/browser.',
 			);
 		}
-		return FetchMock._handlerFactory;
+		return factory;
 	}
 
 	private buildResponse(
@@ -136,7 +123,6 @@ export class FetchMock {
 
 	private readonly _calls = new MockCallHistory();
 	private adapter: MswAdapter;
-	private interceptors: PendingInterceptor[] = [];
 	private netConnectAllowed: NetConnectMatcher = false;
 	private handlerFns: Map<PendingInterceptor, (request: Request) => Promise<Response | undefined>> =
 		new Map();
@@ -152,8 +138,12 @@ export class FetchMock {
 		return this._calls;
 	}
 
-	constructor(input?: SetupServerLike | SetupWorkerLike | MswAdapter) {
+	constructor(
+		input?: SetupServerLike | SetupWorkerLike | MswAdapter,
+		handlerFactory?: HandlerFactory,
+	) {
 		this.adapter = resolveAdapter(input);
+		this._instanceHandlerFactory = handlerFactory;
 	}
 
 	async activate(options?: ActivateOptions): Promise<void> {
@@ -234,11 +224,7 @@ export class FetchMock {
 				let shouldError = false;
 				this._onUnhandledRequest(request, {
 					warning: () => {
-						console.warn(
-							`[msw-fetch-mock] Warning: intercepted a request without a matching request handler:\n\n` +
-								`  \u2022 ${request.method} ${request.url}\n\n` +
-								`If you still wish to intercept this unhandled request, please create a request handler for it.`,
-						);
+						console.warn(formatUnhandledRequestWarning(request.method, request.url));
 					},
 					error: () => {
 						shouldError = true;
@@ -290,7 +276,6 @@ export class FetchMock {
 	}
 
 	deactivate(): void {
-		this.interceptors = [];
 		this.handlerFns.clear();
 		this._calls.clear();
 		this.catchAllInstalled = false;
@@ -298,7 +283,6 @@ export class FetchMock {
 	}
 
 	reset(): void {
-		this.interceptors = [];
 		this.handlerFns.clear();
 		this._calls.clear();
 		this._defaultReplyHeaders = {};
@@ -309,7 +293,7 @@ export class FetchMock {
 	}
 
 	assertNoPendingInterceptors(): void {
-		const unconsumed = this.interceptors.filter(isPending);
+		const unconsumed = [...this.handlerFns.keys()].filter(isPending);
 		if (unconsumed.length > 0) {
 			const descriptions = unconsumed.map((p) => `  ${p.method} ${p.origin}${p.path}`);
 			throw new Error(`Pending interceptor(s) not consumed:\n${descriptions.join('\n')}`);
@@ -317,7 +301,7 @@ export class FetchMock {
 	}
 
 	pendingInterceptors(): PendingInterceptor[] {
-		return this.interceptors.filter(isPending).map((p) => ({ ...p }));
+		return [...this.handlerFns.keys()].filter(isPending).map((p) => ({ ...p }));
 	}
 
 	private matchOriginAndPath(
@@ -398,7 +382,18 @@ export class FetchMock {
 			if (bodyText === undefined) return;
 
 			if (delayRef.ms > 0) {
-				await new Promise((resolve) => setTimeout(resolve, delayRef.ms));
+				await new Promise<void>((resolve) => {
+					const timer = setTimeout(resolve, delayRef.ms);
+					const onAbort = () => {
+						clearTimeout(timer);
+						resolve();
+					};
+					if (request.signal?.aborted) {
+						onAbort();
+					} else {
+						request.signal?.addEventListener('abort', onAbort, { once: true });
+					}
+				});
 			}
 
 			return respond(bodyText);
@@ -408,28 +403,33 @@ export class FetchMock {
 	private buildChain(
 		pending: PendingInterceptor,
 		delayRef: { ms: number },
-		contentLengthRef: { enabled: boolean },
+		contentLengthRef: { enabled: boolean } | undefined,
 		pool: MockPool,
 	): MockReplyChain {
-		return {
+		const chain: MockReplyChain = {
 			times(n: number) {
 				pending.times = n;
 				pending.consumed = false;
+				return chain;
 			},
 			persist() {
 				pending.persist = true;
 				pending.consumed = false;
+				return chain;
 			},
 			delay(ms: number) {
 				delayRef.ms = ms;
+				return chain;
 			},
 			replyContentLength() {
-				contentLengthRef.enabled = true;
+				if (contentLengthRef) contentLengthRef.enabled = true;
+				return chain;
 			},
 			intercept(options: InterceptOptions): MockInterceptor {
 				return pool.intercept(options);
 			},
 		};
+		return chain;
 	}
 
 	get(origin: string | RegExp | ((origin: string) => boolean)): MockPool {
@@ -465,8 +465,6 @@ export class FetchMock {
 					timesInvoked: 0,
 					persist: false,
 				};
-				this.interceptors.push(pending);
-
 				return {
 					reply: (
 						statusOrCallback: number | SingleReplyCallback,
@@ -512,7 +510,6 @@ export class FetchMock {
 
 					replyWithError: (): MockReplyChain => {
 						const delayRef = { ms: 0 };
-						const contentLengthRef = { enabled: false };
 
 						this.registerHandler(
 							pending,
@@ -528,7 +525,7 @@ export class FetchMock {
 							),
 						);
 
-						return this.buildChain(pending, delayRef, contentLengthRef, pool);
+						return this.buildChain(pending, delayRef, undefined, pool);
 					},
 				};
 			},

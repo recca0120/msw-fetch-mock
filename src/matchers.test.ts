@@ -93,6 +93,16 @@ describe('matchPath', () => {
 		expect(matchPath(request, 'http://localhost', '/api/users')).toBe(true);
 	});
 
+	it('should return false when string path does not match', () => {
+		const request = new Request('http://localhost/api/users');
+		expect(matchPath(request, 'http://localhost', '/api/posts')).toBe(false);
+	});
+
+	it('should return false when origin does not match', () => {
+		const request = new Request('http://other.com/api/users');
+		expect(matchPath(request, 'http://localhost', '/api/users')).toBe(false);
+	});
+
 	it('should match RegExp path against relative path', () => {
 		const request = new Request('http://localhost/api/users');
 		expect(matchPath(request, 'http://localhost', /^\/api/)).toBe(true);
@@ -108,6 +118,11 @@ describe('matchPath', () => {
 		expect(matchPath(request, 'http://localhost', (p) => p.startsWith('/api'))).toBe(true);
 	});
 
+	it('should not match when function path matcher returns false', () => {
+		const request = new Request('http://localhost/other');
+		expect(matchPath(request, 'http://localhost', (p) => p.startsWith('/api'))).toBe(false);
+	});
+
 	it('should strip origin prefix from path', () => {
 		const request = new Request('http://localhost/prefix/api/users');
 		expect(matchPath(request, 'http://localhost/prefix', /^\/api/)).toBe(true);
@@ -116,6 +131,31 @@ describe('matchPath', () => {
 	it('should include query string in path matching', () => {
 		const request = new Request('http://localhost/api?q=1');
 		expect(matchPath(request, 'http://localhost', /\/api\?q=1/)).toBe(true);
+	});
+
+	it('should match string path with query string when all params match exactly', () => {
+		const request = new Request('http://localhost/api?page=1&limit=10');
+		expect(matchPath(request, 'http://localhost', '/api?page=1&limit=10')).toBe(true);
+	});
+
+	it('should not match string path with query string when pathname differs', () => {
+		const request = new Request('http://localhost/other?page=1');
+		expect(matchPath(request, 'http://localhost', '/api?page=1')).toBe(false);
+	});
+
+	it('should not match string path with query string when param value differs', () => {
+		const request = new Request('http://localhost/api?page=2');
+		expect(matchPath(request, 'http://localhost', '/api?page=1')).toBe(false);
+	});
+
+	it('should not match string path with query string when request has extra params', () => {
+		const request = new Request('http://localhost/api?page=1&extra=val');
+		expect(matchPath(request, 'http://localhost', '/api?page=1')).toBe(false);
+	});
+
+	it('should strip origin prefix when matching string path with query string', () => {
+		const request = new Request('http://localhost/prefix/api?page=1');
+		expect(matchPath(request, 'http://localhost/prefix', '/api?page=1')).toBe(true);
 	});
 });
 

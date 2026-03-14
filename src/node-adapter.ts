@@ -33,10 +33,41 @@ export class NodeMswAdapter implements MswAdapter {
 	activate(options: ResolvedActivateOptions): void {
 		if (!this.ownsServer) return;
 
-		const isPatched = Object.getOwnPropertySymbols(globalThis.fetch).some(
-			(s) => s.description === 'isPatchedModule',
+		// Detect whether another MSW server has already called listen() and
+		// patched globalThis.fetch.
+		//
+		// Why this approach:
+		//   MSW v2 does NOT throw when a second server calls listen() — it
+		//   silently reuses the running @mswjs/interceptors instance.  There is
+		//   also no public API on SetupServer to query whether it is active.
+		//
+		//   @mswjs/interceptors marks globalThis.fetch with a well-known Symbol
+		//   ("isPatchedModule") immediately after it wraps the native fetch.
+		//   Checking for that symbol is the only reliable in-process signal that
+		//   a fetch interceptor is already running.
+		//
+		//   We additionally check globalThis itself for the interceptor's own
+		//   instance-tracking symbol (description "fetch"), which BatchInterceptor
+		//   stores via setInstance() to share state across multiple callers.
+		//   Either signal being truthy means an MSW server is already active.
+		//
+		// Risk / future-proofing:
+		//   Both checks depend on @mswjs/interceptors internals.  If a future
+		//   MSW release removes or renames these symbols, the guard will silently
+		//   stop firing (fail-open) rather than crashing — the second server will
+		//   just silently share the interceptor, which is the MSW default.  To
+		//   catch a regression, the integration test in node-adapter.test.ts
+		//   ("should throw when another MSW server is already active") must keep
+		//   passing on every MSW upgrade.
+		const isFetchPatched =
+			typeof globalThis.fetch === 'function' &&
+			Object.getOwnPropertySymbols(globalThis.fetch).some(
+				(s) => s.description === 'isPatchedModule',
+			);
+		const isInterceptorActive = Object.getOwnPropertySymbols(globalThis).some(
+			(s) => s.description === 'fetch',
 		);
-		if (isPatched) {
+		if (isFetchPatched || isInterceptorActive) {
 			throw new Error(
 				'Another MSW server is already active. ' +
 					'Pass your existing server to new FetchMock(server) instead.',

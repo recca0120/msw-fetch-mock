@@ -24,53 +24,46 @@ export function matchesValue(
 	return matcher(value);
 }
 
+function matchStringPathWithQuery(
+	relativePathname: string,
+	requestParams: URLSearchParams,
+	matcherPath: string,
+	matcherQuery: string,
+): boolean {
+	if (relativePathname !== matcherPath) return false;
+
+	const matcherParams = new URLSearchParams(matcherQuery);
+
+	for (const [key, value] of matcherParams.entries()) {
+		if (requestParams.get(key) !== value) return false;
+	}
+
+	return Array.from(requestParams.keys()).length === Array.from(matcherParams.keys()).length;
+}
+
 export function matchPath(request: Request, origin: string, pathMatcher: PathMatcher): boolean {
 	const url = new URL(request.url);
 	const originUrl = new URL(origin);
 
-	// Verify origin matches (scheme + host + port)
 	if (url.origin !== originUrl.origin) return false;
 
 	const originPrefix = originUrl.pathname.replace(/\/$/, '');
-	const fullPath = url.pathname + url.search;
-	const relativePath = fullPath.startsWith(originPrefix)
-		? fullPath.slice(originPrefix.length)
-		: fullPath;
+	const strip = <T extends string>(s: T) =>
+		s.startsWith(originPrefix) ? (s.slice(originPrefix.length) as T) : s;
 
-	if (typeof pathMatcher === 'string') {
-		const relativePathname = url.pathname.startsWith(originPrefix)
-			? url.pathname.slice(originPrefix.length)
-			: url.pathname;
+	if (typeof pathMatcher !== 'string') {
+		const relativePath = strip(url.pathname + url.search);
+		return matchesValue(relativePath, pathMatcher);
+	}
 
-		// Check if pathMatcher includes query string
-		if (pathMatcher.includes('?')) {
-			const [matcherPath, matcherQuery] = pathMatcher.split('?');
+	const relativePathname = strip(url.pathname);
 
-			// pathname must match
-			if (relativePathname !== matcherPath) return false;
-
-			// Parse query params from pathMatcher and request
-			const matcherParams = new URLSearchParams(matcherQuery);
-			const requestParams = url.searchParams;
-
-			// Check if all matcher params exist in request with same values
-			for (const [key, value] of matcherParams.entries()) {
-				if (requestParams.get(key) !== value) return false;
-			}
-
-			// Check if request has same number of params (no extra params)
-			if (Array.from(requestParams.keys()).length !== Array.from(matcherParams.keys()).length) {
-				return false;
-			}
-
-			return true;
-		}
-
-		// String path without query string: exact match against pathname only
+	if (!pathMatcher.includes('?')) {
 		return relativePathname === pathMatcher;
 	}
 
-	return matchesValue(relativePath, pathMatcher);
+	const [matcherPath, matcherQuery] = pathMatcher.split('?') as [string, string];
+	return matchStringPathWithQuery(relativePathname, url.searchParams, matcherPath, matcherQuery);
 }
 
 export function matchQuery(request: Request, query?: Record<string, string>): boolean {

@@ -24,11 +24,8 @@ export { createLegacyHandlerFactory } from './legacy-handler-factory';
  *   server or adapter to `new FetchMock(server)` yourself.
  */
 export function createFetchMock(rest: LegacyRestApi, server?: SetupServerLike): FetchMock {
-	FetchMock._handlerFactory = createLegacyHandlerFactory(rest);
-	if (server) {
-		return new FetchMock(server);
-	}
-	return new FetchMock();
+	const factory = createLegacyHandlerFactory(rest);
+	return new FetchMock(server, factory);
 }
 
 export * from './exports';

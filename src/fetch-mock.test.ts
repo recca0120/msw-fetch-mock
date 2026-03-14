@@ -913,6 +913,61 @@ describe('replyWithError', () => {
 	});
 });
 
+describe('streaming body', () => {
+	const fetchMock = createFetchMock();
+
+	beforeAll(async () => {
+		await fetchMock.activate();
+		fetchMock.disableNetConnect();
+	});
+
+	afterEach(() => {
+		fetchMock.assertNoPendingInterceptors();
+		fetchMock.reset();
+	});
+	afterAll(() => fetchMock.deactivate());
+
+	it('should stream response body correctly when reply body is a ReadableStream', async () => {
+		const chunks = ['hello', ' ', 'world'];
+		const stream = new ReadableStream({
+			start(controller) {
+				for (const chunk of chunks) {
+					controller.enqueue(new TextEncoder().encode(chunk));
+				}
+				controller.close();
+			},
+		});
+
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/stream', method: 'GET' })
+			.reply(200, stream);
+
+		const response = await fetch(`${API_BASE}/${API_PREFIX}/stream`);
+		expect(response.status).toBe(200);
+		const text = await response.text();
+		expect(text).toBe('hello world');
+	});
+
+	it('should not force application/json Content-Type for ReadableStream body', async () => {
+		const stream = new ReadableStream({
+			start(controller) {
+				controller.enqueue(new TextEncoder().encode('plain text'));
+				controller.close();
+			},
+		});
+
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/stream-content-type', method: 'GET' })
+			.reply(200, stream, { headers: { 'Content-Type': 'text/plain' } });
+
+		const response = await fetch(`${API_BASE}/${API_PREFIX}/stream-content-type`);
+		expect(response.headers.get('content-type')).toBe('text/plain');
+		expect(await response.text()).toBe('plain text');
+	});
+});
+
 describe('delay', () => {
 	const fetchMock = createFetchMock();
 
@@ -940,6 +995,158 @@ describe('delay', () => {
 
 		expect(response.status).toBe(200);
 		expect(elapsed).toBeGreaterThanOrEqual(90); // allow 10ms tolerance
+	});
+
+	it('should clear the delay timer when request is aborted (no lingering timers)', async () => {
+		vi.useFakeTimers();
+
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/abort-timer-cleanup', method: 'GET' })
+			.reply(200, { ok: true })
+			.delay(1000);
+
+		const controller = new AbortController();
+		const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/abort-timer-cleanup`, {
+			signal: controller.signal,
+		}).catch(() => {});
+
+		controller.abort();
+		await vi.advanceTimersByTimeAsync(0);
+		await fetchPromise;
+
+		// timer should be cleared — no lingering fake timers
+		expect(vi.getTimerCount()).toBe(0);
+
+		vi.useRealTimers();
+	});
+
+	it('should reject with AbortError when request is aborted during delay', async () => {
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/slow-abort', method: 'GET' })
+			.reply(200, { ok: true })
+			.delay(500);
+
+		const controller = new AbortController();
+		const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow-abort`, {
+			signal: controller.signal,
+		});
+
+		setTimeout(() => controller.abort(), 50);
+
+		await expect(fetchPromise).rejects.toThrow();
+	});
+
+	it('should reject with an error named AbortError when aborted', async () => {
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/slow-abort-name', method: 'GET' })
+			.reply(200, { ok: true })
+			.delay(500);
+
+		const controller = new AbortController();
+		const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow-abort-name`, {
+			signal: controller.signal,
+		});
+
+		setTimeout(() => controller.abort(), 50);
+
+		const error = await fetchPromise.catch((e) => e);
+		expect(error.name).toBe('AbortError');
+	});
+
+	it('should resolve normally when not aborted', async () => {
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/slow-no-abort', method: 'GET' })
+			.reply(200, { ok: true })
+			.delay(50);
+
+		const response = await fetch(`${API_BASE}/${API_PREFIX}/slow-no-abort`);
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ ok: true });
+	});
+
+	it('should complete within delay time when using fake timers', async () => {
+		vi.useFakeTimers();
+
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/fake-timer', method: 'GET' })
+			.reply(200, { ok: true })
+			.delay(1000);
+
+		const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/fake-timer`);
+		await vi.advanceTimersByTimeAsync(1000);
+		const response = await fetchPromise;
+
+		expect(response.status).toBe(200);
+
+		vi.useRealTimers();
+	});
+});
+
+describe('retry scenarios', () => {
+	const fetchMock = createFetchMock();
+
+	beforeAll(async () => {
+		await fetchMock.activate();
+		fetchMock.disableNetConnect();
+	});
+
+	afterEach(() => {
+		fetchMock.assertNoPendingInterceptors();
+		fetchMock.reset();
+	});
+	afterAll(() => fetchMock.deactivate());
+
+	it('should return 503 on first call and 200 on second call (retry scenario)', async () => {
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/retry', method: 'GET' })
+			.reply(503)
+			.times(1);
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/retry', method: 'GET' })
+			.reply(200, { ok: true })
+			.persist();
+
+		const first = await fetch(`${API_BASE}/${API_PREFIX}/retry`);
+		expect(first.status).toBe(503);
+
+		const second = await fetch(`${API_BASE}/${API_PREFIX}/retry`);
+		expect(second.status).toBe(200);
+	});
+
+	it('should handle retry with delay using fake timers', async () => {
+		vi.useFakeTimers();
+
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/retry-delay', method: 'GET' })
+			.reply(503)
+			.times(1)
+			.delay(500);
+
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/retry-delay', method: 'GET' })
+			.reply(200, { ok: true })
+			.persist();
+
+		const firstPromise = fetch(`${API_BASE}/${API_PREFIX}/retry-delay`);
+		await vi.advanceTimersByTimeAsync(500);
+		const first = await firstPromise;
+		expect(first.status).toBe(503);
+
+		const secondPromise = fetch(`${API_BASE}/${API_PREFIX}/retry-delay`);
+		await vi.advanceTimersByTimeAsync(500);
+		const second = await secondPromise;
+		expect(second.status).toBe(200);
+
+		vi.useRealTimers();
 	});
 });
 

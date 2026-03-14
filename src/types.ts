@@ -28,10 +28,10 @@ export type SingleReplyCallback = (req: {
 }) => SingleReplyResult | Promise<SingleReplyResult>;
 
 export interface MockReplyChain {
-	times(n: number): void;
-	persist(): void;
-	delay(ms: number): void;
-	replyContentLength(): void;
+	times(n: number): MockReplyChain;
+	persist(): MockReplyChain;
+	delay(ms: number): MockReplyChain;
+	replyContentLength(): MockReplyChain;
 	intercept(options: InterceptOptions): MockInterceptor;
 }
 

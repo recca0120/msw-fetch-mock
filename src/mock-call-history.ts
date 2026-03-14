@@ -13,20 +13,30 @@ export interface MockCallHistoryLogData {
 }
 
 export class MockCallHistoryLog implements MockCallHistoryLogData {
-	readonly body!: string | null;
-	readonly method!: string;
-	readonly headers!: Record<string, string>;
-	readonly fullUrl!: string;
-	readonly origin!: string;
-	readonly path!: string;
-	readonly searchParams!: Record<string, string>;
-	readonly protocol!: string;
-	readonly host!: string;
-	readonly port!: string;
-	readonly hash!: string;
+	readonly body: string | null;
+	readonly method: string;
+	readonly headers: Record<string, string>;
+	readonly fullUrl: string;
+	readonly origin: string;
+	readonly path: string;
+	readonly searchParams: Record<string, string>;
+	readonly protocol: string;
+	readonly host: string;
+	readonly port: string;
+	readonly hash: string;
 
 	constructor(data: MockCallHistoryLogData) {
-		Object.assign(this, data);
+		this.body = data.body;
+		this.method = data.method;
+		this.headers = data.headers;
+		this.fullUrl = data.fullUrl;
+		this.origin = data.origin;
+		this.path = data.path;
+		this.searchParams = data.searchParams;
+		this.protocol = data.protocol;
+		this.host = data.host;
+		this.port = data.port;
+		this.hash = data.hash;
 	}
 
 	/**
@@ -88,6 +98,8 @@ export interface CallHistoryFilterCriteria {
 	port?: string;
 	hash?: string;
 	fullUrl?: string;
+	headers?: Record<string, string>;
+	searchParams?: Record<string, string>;
 }
 
 export class MockCallHistory {
@@ -98,7 +110,7 @@ export class MockCallHistory {
 	}
 
 	record(data: MockCallHistoryLogData): void {
-		this.logs.push(data instanceof MockCallHistoryLog ? data : new MockCallHistoryLog(data));
+		this.logs.push(new MockCallHistoryLog(data));
 	}
 
 	called(
@@ -151,18 +163,43 @@ export class MockCallHistory {
 		options?: { operator?: 'AND' | 'OR' },
 	): MockCallHistoryLog[] {
 		if (typeof criteria === 'function') {
-			return this.logs.filter(criteria);
+			return this.filterCallsByPredicate(criteria);
 		}
 
 		if (criteria instanceof RegExp) {
-			return this.logs.filter((log) => criteria.test(log.toString()));
+			return this.filterCallsByRegExp(criteria);
 		}
 
-		const operator = options?.operator ?? 'OR';
+		return this.filterCallsByObject(criteria, options?.operator ?? 'OR');
+	}
+
+	private filterCallsByPredicate(
+		predicate: (log: MockCallHistoryLog) => boolean,
+	): MockCallHistoryLog[] {
+		return this.logs.filter(predicate);
+	}
+
+	private filterCallsByRegExp(pattern: RegExp): MockCallHistoryLog[] {
+		return this.logs.filter((log) => pattern.test(log.toString()));
+	}
+
+	private filterCallsByObject(
+		criteria: CallHistoryFilterCriteria,
+		operator: 'AND' | 'OR',
+	): MockCallHistoryLog[] {
+		const recordFields = new Set<keyof CallHistoryFilterCriteria>(['headers', 'searchParams']);
+
 		const keys = Object.keys(criteria) as (keyof CallHistoryFilterCriteria)[];
 		const predicates = keys
 			.filter((key) => criteria[key] !== undefined)
-			.map((key) => (log: MockCallHistoryLog) => log[key] === criteria[key]);
+			.map((key) => {
+				const value = criteria[key];
+				if (recordFields.has(key)) {
+					const expected = JSON.stringify(value);
+					return (log: MockCallHistoryLog) => JSON.stringify(log[key]) === expected;
+				}
+				return (log: MockCallHistoryLog) => log[key] === value;
+			});
 
 		if (predicates.length === 0) return [...this.logs];
 

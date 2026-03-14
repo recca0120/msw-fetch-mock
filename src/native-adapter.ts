@@ -1,3 +1,4 @@
+import { formatUnhandledRequestWarning } from './messages';
 import { type NativeHandler } from './native-handler-factory';
 import { type MswAdapter, type ResolvedActivateOptions } from './types';
 
@@ -38,11 +39,7 @@ export class NativeFetchAdapter implements MswAdapter {
 
 		this.options.onUnhandledRequest(request, {
 			warning: () => {
-				console.warn(
-					`[msw-fetch-mock] Warning: intercepted a request without a matching request handler:\n\n` +
-						`  \u2022 ${request.method} ${request.url}\n\n` +
-						`If you still wish to intercept this unhandled request, please create a request handler for it.`,
-				);
+				console.warn(formatUnhandledRequestWarning(request.method, request.url));
 			},
 			error: () => {
 				throw new TypeError(
@@ -64,29 +61,19 @@ export class NativeFetchAdapter implements MswAdapter {
 		return { ...init, headers };
 	}
 
-	private async withTimeout<T>(fn: () => Promise<T>, userSignal?: AbortSignal | null): Promise<T> {
+	private withTimeout<T>(fn: () => Promise<T>, userSignal?: AbortSignal | null): Promise<T> {
 		const timeout = this.options.timeout;
+		if (timeout <= 0 || userSignal) return fn();
 
-		// If no timeout or user provided their own signal, run without timeout wrapper
-		if (timeout <= 0 || userSignal) {
-			return fn();
-		}
+		let timeoutId: ReturnType<typeof setTimeout>;
+		const timeoutPromise = new Promise<never>((_, reject) => {
+			timeoutId = setTimeout(
+				() => reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError')),
+				timeout,
+			);
+		});
 
-		// Race between the operation and a timeout
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-		try {
-			const timeoutPromise = new Promise<never>((_, reject) => {
-				controller.signal.addEventListener('abort', () => {
-					reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
-				});
-			});
-
-			return await Promise.race([fn(), timeoutPromise]);
-		} finally {
-			clearTimeout(timeoutId);
-		}
+		return Promise.race([fn(), timeoutPromise]).finally(() => clearTimeout(timeoutId));
 	}
 
 	deactivate(): void {

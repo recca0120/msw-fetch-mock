@@ -303,6 +303,30 @@ describe('MockCallHistory', () => {
 
 			expect(history.filterCalls({ fullUrl: 'http://localhost:8787/api/users' })).toHaveLength(1);
 		});
+
+		it('should filter by headers in object criteria (exact Record match)', () => {
+			const history = new MockCallHistory();
+			history.record(createLog({ headers: { 'content-type': 'application/json' } }));
+			history.record(createLog({ headers: { 'content-type': 'text/plain' } }));
+			history.record(createLog({ headers: {} }));
+
+			const result = history.filterCalls({ headers: { 'content-type': 'application/json' } });
+
+			expect(result).toHaveLength(1);
+			expect(result[0].headers).toEqual({ 'content-type': 'application/json' });
+		});
+
+		it('should filter by searchParams in object criteria (exact Record match)', () => {
+			const history = new MockCallHistory();
+			history.record(createLog({ searchParams: { page: '1', limit: '10' } }));
+			history.record(createLog({ searchParams: { page: '2' } }));
+			history.record(createLog({ searchParams: {} }));
+
+			const result = history.filterCalls({ searchParams: { page: '1', limit: '10' } });
+
+			expect(result).toHaveLength(1);
+			expect(result[0].searchParams).toEqual({ page: '1', limit: '10' });
+		});
 	});
 
 	describe('filterCallsByMethod', () => {

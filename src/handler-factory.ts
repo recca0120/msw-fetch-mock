@@ -22,6 +22,9 @@ export const HandlerFactory: HandlerFactoryType = {
 		if (body === null || body === undefined) {
 			return new HttpResponse(null, { status, headers });
 		}
+		if (body instanceof ReadableStream) {
+			return new HttpResponse(body, { status, headers });
+		}
 		return HttpResponse.json(body, { status, headers });
 	},
 

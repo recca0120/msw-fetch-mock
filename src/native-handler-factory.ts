@@ -20,6 +20,9 @@ export const NativeHandlerFactory: HandlerFactory = {
 		if (body === null || body === undefined) {
 			return new Response(null, { status, headers });
 		}
+		if (body instanceof ReadableStream) {
+			return new Response(body, { status, headers });
+		}
 		return Response.json(body, { status, headers });
 	},
 
