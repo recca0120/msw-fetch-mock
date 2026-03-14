@@ -206,6 +206,28 @@ fetchMock
   .times(n) / .persist();                   // 重複控制
 ```
 
+#### 流式方法鏈接（Fluent Chaining）
+
+`.times()`、`.persist()`、`.delay()` 和 `.replyContentLength()` 現在都回傳 `MockReplyChain`，支援方法鏈接：
+
+```typescript
+fetchMock
+  .get('https://api.example.com')
+  .intercept({ path: '/data' })
+  .reply(200, { ok: true })
+  .times(3)
+  .delay(100);
+```
+
+#### 串流回應（Streaming Response）
+
+可直接將 `ReadableStream` 作為回應 body 傳入，系統會直接 passthrough，不會進行序列化：
+
+```typescript
+const stream = new ReadableStream({ /* ... */ });
+fetchMock.get(origin).intercept({ path: '/stream' }).reply(200, stream);
+```
+
 ### 呼叫歷史
 
 ```typescript
@@ -213,6 +235,13 @@ fetchMock.calls.lastCall(); // 最近一次
 fetchMock.calls.firstCall(); // 最早一次
 fetchMock.calls.nthCall(2); // 第 2 次呼叫（1-indexed）
 fetchMock.calls.filterCalls({ method: 'POST', path: '/users' }, { operator: 'AND' });
+```
+
+`filterCalls` 也支援以 `headers` 和 `searchParams` 進行過濾：
+
+```typescript
+fetchMock.calls.filterCalls({ headers: { 'content-type': 'application/json' } }, { operator: 'AND' });
+fetchMock.calls.filterCalls({ searchParams: { page: '1' } }, { operator: 'AND' });
 ```
 
 ### 斷言與清理

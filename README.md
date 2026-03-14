@@ -206,6 +206,28 @@ fetchMock
   .times(n) / .persist();                   // repeat control
 ```
 
+#### Fluent Chaining
+
+`.times()`, `.persist()`, `.delay()`, and `.replyContentLength()` all return a `MockReplyChain`, so you can chain them together:
+
+```typescript
+fetchMock
+  .get('https://api.example.com')
+  .intercept({ path: '/data' })
+  .reply(200, { ok: true })
+  .times(3)
+  .delay(100);
+```
+
+#### Streaming Response
+
+Pass a `ReadableStream` directly as the reply body — it is forwarded as-is without serialisation:
+
+```typescript
+const stream = new ReadableStream({ /* ... */ });
+fetchMock.get(origin).intercept({ path: '/stream' }).reply(200, stream);
+```
+
 ### Call History
 
 ```typescript
@@ -213,6 +235,13 @@ fetchMock.calls.lastCall(); // most recent
 fetchMock.calls.firstCall(); // earliest
 fetchMock.calls.nthCall(2); // 2nd call (1-indexed)
 fetchMock.calls.filterCalls({ method: 'POST', path: '/users' }, { operator: 'AND' });
+```
+
+`filterCalls` also supports matching by `headers` and `searchParams`:
+
+```typescript
+fetchMock.calls.filterCalls({ headers: { 'content-type': 'application/json' } }, { operator: 'AND' });
+fetchMock.calls.filterCalls({ searchParams: { page: '1' } }, { operator: 'AND' });
 ```
 
 ### Assertions & Cleanup
