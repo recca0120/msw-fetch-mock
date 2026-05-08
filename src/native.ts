@@ -17,6 +17,6 @@ export function createFetchMock(): FetchMock {
 }
 
 /** Pre-built singleton for quick standalone use. */
-export const fetchMock = createFetchMock();
+export const fetchMock: FetchMock = createFetchMock();
 
 export * from './exports';

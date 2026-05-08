@@ -17,7 +17,7 @@ export function createFetchMock(server?: SetupServerLike): FetchMock {
 }
 
 /** Pre-built singleton for quick standalone use (Cloudflare migration compatible). */
-export const fetchMock = createFetchMock();
+export const fetchMock: FetchMock = createFetchMock();
 
 export * from './exports';
 export type { SetupServerLike } from './types';
