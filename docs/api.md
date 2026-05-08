@@ -29,7 +29,7 @@ afterEach(() => {
 
 ## `createFetchMock(server?)` (Node)
 
-Creates a `FetchMock` with `NodeMswAdapter`. Optionally pass an existing MSW server.
+Creates a `FetchMock` with `NodeFetchInterceptor`. Optionally pass an existing MSW server.
 
 ```typescript
 import { createFetchMock } from 'msw-fetch-mock/node';
@@ -45,7 +45,7 @@ const fetchMock = createFetchMock(server);
 
 ## `createFetchMock(worker)` (Browser)
 
-Creates a `FetchMock` with `BrowserMswAdapter`. Requires an MSW worker.
+Creates a `FetchMock` with `BrowserFetchInterceptor`. Requires an MSW worker.
 
 ```typescript
 import { setupWorker } from 'msw/browser';
@@ -61,7 +61,7 @@ beforeAll(async () => {
 
 ## `createFetchMock()` (Native)
 
-Creates a `FetchMock` with `NativeFetchAdapter`. No MSW dependency required — patches `globalThis.fetch` directly.
+Creates a `FetchMock` with `NativeFetchInterceptor`. No MSW dependency required — patches `globalThis.fetch` directly.
 
 ```typescript
 import { createFetchMock } from 'msw-fetch-mock/native';
@@ -92,29 +92,29 @@ const server = setupServer();
 const fetchMock = createFetchMock(rest, server);
 ```
 
-## `new FetchMock(adapter?)`
+## `new FetchMock(interceptor?)`
 
-Creates a `FetchMock` instance with an explicit `MswAdapter`.
+Creates a `FetchMock` instance with an explicit `FetchInterceptor`.
 
 ```typescript
 import { FetchMock } from 'msw-fetch-mock';
-import { NodeMswAdapter } from 'msw-fetch-mock/node';
-import { BrowserMswAdapter } from 'msw-fetch-mock/browser';
-import { NativeFetchAdapter } from 'msw-fetch-mock/native';
+import { NodeFetchInterceptor } from 'msw-fetch-mock/node';
+import { BrowserFetchInterceptor } from 'msw-fetch-mock/browser';
+import { NativeFetchInterceptor } from 'msw-fetch-mock/native';
 
 // Node with external server
-const fetchMock = new FetchMock(new NodeMswAdapter(server));
+const fetchMock = new FetchMock(new NodeFetchInterceptor(server));
 
 // Browser with worker
-const fetchMock = new FetchMock(new BrowserMswAdapter(worker));
+const fetchMock = new FetchMock(new BrowserFetchInterceptor(worker));
 
 // Native (no MSW)
-const fetchMock = new FetchMock(new NativeFetchAdapter());
+const fetchMock = new FetchMock(new NativeFetchInterceptor());
 ```
 
 | Parameter | Type         | Required | Description                                           |
 | --------- | ------------ | -------- | ----------------------------------------------------- |
-| `adapter` | `MswAdapter` | No       | Environment adapter. Use `createFetchMock()` instead. |
+| `interceptor` | `FetchInterceptor` | No       | Environment interceptor. Use `createFetchMock()` instead. |
 
 ---
 
@@ -129,7 +129,7 @@ fetchMock.deactivate();             // stop intercepting
 
 > `activate()` returns `Promise<void>`. In Node.js, the promise resolves synchronously. In the browser, it waits for the Service Worker to start. Vitest and Jest handle async `beforeAll` natively.
 >
-> **Conflict detection (Node only):** In standalone mode, `activate()` checks whether `globalThis.fetch` is already patched by MSW. If so, it throws an error guiding you to use `new FetchMock(new NodeMswAdapter(server))` instead.
+> **Conflict detection (Node only):** In standalone mode, `activate()` checks whether `globalThis.fetch` is already patched by MSW. If so, it throws an error guiding you to use `new FetchMock(new NodeFetchInterceptor(server))` instead.
 
 #### `ActivateOptions`
 

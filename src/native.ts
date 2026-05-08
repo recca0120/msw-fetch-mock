@@ -1,19 +1,19 @@
 import { FetchMock } from './fetch-mock';
-import { NativeFetchAdapter } from './native-adapter';
 import { NativeHandlerFactory } from './native-handler-factory';
+import { NativeFetchInterceptor } from './native-interceptor';
 
 export { FetchMock } from './fetch-mock';
-export { NativeFetchAdapter } from './native-adapter';
 export { NativeHandlerFactory } from './native-handler-factory';
+export { NativeFetchInterceptor } from './native-interceptor';
 
-/** Register native as the default adapter environment so `new FetchMock()` works. */
-FetchMock._defaultAdapterFactory = () => new NativeFetchAdapter();
+/** Register native as the default interceptor so `new FetchMock()` works. */
+FetchMock._defaultInterceptorFactory = () => new NativeFetchInterceptor();
 
 /** Register native handler factory. */
 FetchMock._handlerFactory = NativeHandlerFactory;
 
 export function createFetchMock(): FetchMock {
-	return new FetchMock(new NativeFetchAdapter());
+	return new FetchMock(new NativeFetchInterceptor());
 }
 
 /** Pre-built singleton for quick standalone use. */

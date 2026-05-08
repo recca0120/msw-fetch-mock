@@ -172,7 +172,7 @@ fetchMock.activate({
 
 | 路徑                     | 環境                          | MSW 版本 |
 | ------------------------ | ----------------------------- | -------- |
-| `msw-fetch-mock`         | Node.js（re-exports `/node`） | v2       |
+| `msw-fetch-mock`         | Node.js（自動偵測 MSW，fallback 至 native） | v2（可選） |
 | `msw-fetch-mock/node`    | Node.js                       | v2       |
 | `msw-fetch-mock/browser` | 瀏覽器                        | v2       |
 | `msw-fetch-mock/native`  | 任何環境（無 MSW）            | 不需要   |
@@ -181,20 +181,20 @@ fetchMock.activate({
 ### `fetchMock`（單例）
 
 預先建立的 `FetchMock` 實例，適用於獨立使用。匯入後直接呼叫 `activate()` 即可 — 無需額外設定。
-可從 `msw-fetch-mock` 和 `msw-fetch-mock/node` 匯入。
+可從 `msw-fetch-mock`、`msw-fetch-mock/node` 和 `msw-fetch-mock/native` 匯入。
 
 ### `createFetchMock(server?)` / `createFetchMock(worker)`
 
-建立 `FetchMock` 的工廠函式，會自動搭配對應的 adapter。
+建立 `FetchMock` 的工廠函式，會自動搭配對應的 interceptor。
 
 - Node：`createFetchMock(server?)` — 可選擇性傳入現有的 MSW `SetupServer`
 - 瀏覽器：`createFetchMock(worker)` — 傳入 MSW `SetupWorker`（必要）
 - 原生：`createFetchMock()` — 無需參數，無 MSW 依賴
 - Legacy：`createFetchMock(rest, server?)` — 傳入 MSW v1 的 `rest` 物件
 
-### `new FetchMock(adapter?)`
+### `new FetchMock(interceptor?)`
 
-使用明確的 `MswAdapter` 建立 `FetchMock` 實例。可使用 `NodeMswAdapter`、`BrowserMswAdapter` 或 `NativeFetchAdapter`。
+使用明確的 `FetchInterceptor` 建立 `FetchMock` 實例。可使用 `NodeFetchInterceptor`、`BrowserFetchInterceptor` 或 `NativeFetchInterceptor`。
 
 ### 攔截與回應
 

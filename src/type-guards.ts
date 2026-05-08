@@ -1,4 +1,4 @@
-import { type MswAdapter, type SetupServerLike, type SetupWorkerLike } from './types';
+import { type FetchInterceptor, type SetupServerLike, type SetupWorkerLike } from './types';
 
 export function isSetupServerLike(input: unknown): input is SetupServerLike {
 	return (
@@ -22,13 +22,13 @@ export function isSetupWorkerLike(input: unknown): input is SetupWorkerLike {
 	);
 }
 
-export function isMswAdapter(input: unknown): input is MswAdapter {
+export function isFetchInterceptor(input: unknown): input is FetchInterceptor {
 	return (
 		typeof input === 'object' &&
 		input !== null &&
 		'activate' in input &&
-		typeof (input as MswAdapter).activate === 'function' &&
+		typeof (input as FetchInterceptor).activate === 'function' &&
 		'deactivate' in input &&
-		typeof (input as MswAdapter).deactivate === 'function'
+		typeof (input as FetchInterceptor).deactivate === 'function'
 	);
 }

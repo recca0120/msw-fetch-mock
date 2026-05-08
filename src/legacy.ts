@@ -21,7 +21,7 @@ export { createLegacyHandlerFactory } from './legacy-handler-factory';
  *
  * @param rest - The `rest` object from MSW v1 (`import { rest } from 'msw'`)
  * @param server - Optional MSW v1 setupServer instance. If omitted, you must pass a
- *   server or adapter to `new FetchMock(server)` yourself.
+ *   server or interceptor to `new FetchMock(server)` yourself.
  */
 export function createFetchMock(rest: LegacyRestApi, server?: SetupServerLike): FetchMock {
 	const factory = createLegacyHandlerFactory(rest);

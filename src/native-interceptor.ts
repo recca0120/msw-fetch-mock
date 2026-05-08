@@ -1,8 +1,8 @@
 import { formatUnhandledRequestWarning } from './messages';
 import { type NativeHandler } from './native-handler-factory';
-import { type MswAdapter, type ResolvedActivateOptions } from './types';
+import { type FetchInterceptor, type ResolvedActivateOptions } from './types';
 
-export class NativeFetchAdapter implements MswAdapter {
+export class NativeFetchInterceptor implements FetchInterceptor {
 	private originalFetch!: typeof globalThis.fetch;
 	private handlers: NativeHandler[] = [];
 	private options!: ResolvedActivateOptions;

@@ -1,6 +1,6 @@
-import { type MswAdapter, type ResolvedActivateOptions, type SetupWorkerLike } from './types';
+import { type FetchInterceptor, type ResolvedActivateOptions, type SetupWorkerLike } from './types';
 
-export class BrowserMswAdapter implements MswAdapter {
+export class BrowserFetchInterceptor implements FetchInterceptor {
 	private readonly worker: SetupWorkerLike;
 
 	constructor(worker: SetupWorkerLike) {

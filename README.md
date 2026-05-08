@@ -172,7 +172,7 @@ fetchMock.activate({
 
 | Path                     | Environment                  | MSW version  |
 | ------------------------ | ---------------------------- | ------------ |
-| `msw-fetch-mock`         | Node.js (re-exports `/node`) | v2           |
+| `msw-fetch-mock`         | Node.js (auto-detects MSW, falls back to native) | v2 (optional) |
 | `msw-fetch-mock/node`    | Node.js                      | v2           |
 | `msw-fetch-mock/browser` | Browser                      | v2           |
 | `msw-fetch-mock/native`  | Any (no MSW)                 | not required |
@@ -181,20 +181,20 @@ fetchMock.activate({
 ### `fetchMock` (singleton)
 
 A pre-built `FetchMock` instance for standalone use. Import and call `activate()` — no setup needed.
-Available from `msw-fetch-mock` and `msw-fetch-mock/node`.
+Available from `msw-fetch-mock`, `msw-fetch-mock/node`, and `msw-fetch-mock/native`.
 
 ### `createFetchMock(server?)` / `createFetchMock(worker)`
 
-Factory function that creates a `FetchMock` with the appropriate adapter.
+Factory function that creates a `FetchMock` with the appropriate interceptor.
 
 - Node: `createFetchMock(server?)` — optionally pass an existing MSW `SetupServer`
 - Browser: `createFetchMock(worker)` — pass an MSW `SetupWorker` (required)
 - Native: `createFetchMock()` — no arguments, no MSW dependency
 - Legacy: `createFetchMock(rest, server?)` — pass MSW v1 `rest` object
 
-### `new FetchMock(adapter?)`
+### `new FetchMock(interceptor?)`
 
-Creates a `FetchMock` instance with an explicit `MswAdapter`. Use `NodeMswAdapter`, `BrowserMswAdapter`, or `NativeFetchAdapter`.
+Creates a `FetchMock` instance with an explicit `FetchInterceptor`. Use `NodeFetchInterceptor`, `BrowserFetchInterceptor`, or `NativeFetchInterceptor`.
 
 ### Intercepting & Replying
 

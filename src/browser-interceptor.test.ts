@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BrowserMswAdapter } from './browser-adapter';
+import { BrowserFetchInterceptor } from './browser-interceptor';
 import { type ResolvedActivateOptions, type SetupWorkerLike } from './types';
 
 function createStubWorker(): SetupWorkerLike {
@@ -15,10 +15,10 @@ const noopCallback: ResolvedActivateOptions = {
 	onUnhandledRequest: () => {},
 };
 
-describe('BrowserMswAdapter', () => {
+describe('BrowserFetchInterceptor', () => {
 	it('should delegate use() to worker', () => {
 		const worker = createStubWorker();
-		const adapter = new BrowserMswAdapter(worker);
+		const adapter = new BrowserFetchInterceptor(worker);
 		const handler = { id: 'handler-1' };
 
 		adapter.use(handler);
@@ -28,7 +28,7 @@ describe('BrowserMswAdapter', () => {
 
 	it('should delegate resetHandlers() to worker', () => {
 		const worker = createStubWorker();
-		const adapter = new BrowserMswAdapter(worker);
+		const adapter = new BrowserFetchInterceptor(worker);
 		const handler = { id: 'handler-1' };
 
 		adapter.resetHandlers(handler);
@@ -38,7 +38,7 @@ describe('BrowserMswAdapter', () => {
 
 	it('should call worker.start() on activate', async () => {
 		const worker = createStubWorker();
-		const adapter = new BrowserMswAdapter(worker);
+		const adapter = new BrowserFetchInterceptor(worker);
 
 		await adapter.activate(noopCallback);
 
@@ -49,7 +49,7 @@ describe('BrowserMswAdapter', () => {
 
 	it('should return a Promise from activate', async () => {
 		const worker = createStubWorker();
-		const adapter = new BrowserMswAdapter(worker);
+		const adapter = new BrowserFetchInterceptor(worker);
 
 		const result = adapter.activate(noopCallback);
 
@@ -59,7 +59,7 @@ describe('BrowserMswAdapter', () => {
 
 	it('should call worker.stop() on deactivate', () => {
 		const worker = createStubWorker();
-		const adapter = new BrowserMswAdapter(worker);
+		const adapter = new BrowserFetchInterceptor(worker);
 
 		adapter.deactivate();
 
@@ -68,7 +68,7 @@ describe('BrowserMswAdapter', () => {
 
 	it('should pass onUnhandledRequest callback to worker.start()', async () => {
 		const worker = createStubWorker();
-		const adapter = new BrowserMswAdapter(worker);
+		const adapter = new BrowserFetchInterceptor(worker);
 		const callback = vi.fn();
 
 		await adapter.activate({ onUnhandledRequest: callback });

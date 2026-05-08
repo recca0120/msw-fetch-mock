@@ -12,7 +12,7 @@ export const NativeHandlerFactory: HandlerFactory = {
 	},
 
 	createCatchAllHandler(handlerFn): NativeHandler {
-		// For native adapter, catch-all uses '*' pattern and matches all methods
+		// For native interceptor, catch-all uses '*' pattern and matches all methods
 		return { method: 'GET', urlPattern: '*', handlerFn };
 	},
 

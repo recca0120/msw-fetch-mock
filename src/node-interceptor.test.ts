@@ -1,6 +1,6 @@
 import { setupServer } from 'msw/node';
 import { describe, expect, it, vi } from 'vitest';
-import { NodeMswAdapter } from './node-adapter';
+import { NodeFetchInterceptor } from './node-interceptor';
 import { type ResolvedActivateOptions, type SetupServerLike } from './types';
 
 function createStubServer(): SetupServerLike {
@@ -16,11 +16,11 @@ const noopCallback: ResolvedActivateOptions = {
 	onUnhandledRequest: () => {},
 };
 
-describe('NodeMswAdapter', () => {
+describe('NodeFetchInterceptor', () => {
 	describe('with external server', () => {
 		it('should delegate use() to server', () => {
 			const server = createStubServer();
-			const adapter = new NodeMswAdapter(server);
+			const adapter = new NodeFetchInterceptor(server);
 			const handler = { id: 'handler-1' };
 
 			adapter.use(handler);
@@ -30,7 +30,7 @@ describe('NodeMswAdapter', () => {
 
 		it('should delegate resetHandlers() to server', () => {
 			const server = createStubServer();
-			const adapter = new NodeMswAdapter(server);
+			const adapter = new NodeFetchInterceptor(server);
 			const handler = { id: 'handler-1' };
 
 			adapter.resetHandlers(handler);
@@ -40,7 +40,7 @@ describe('NodeMswAdapter', () => {
 
 		it('should not call listen() on activate for external server', () => {
 			const server = createStubServer();
-			const adapter = new NodeMswAdapter(server);
+			const adapter = new NodeFetchInterceptor(server);
 
 			adapter.activate(noopCallback);
 
@@ -49,7 +49,7 @@ describe('NodeMswAdapter', () => {
 
 		it('should not call close() on deactivate for external server', () => {
 			const server = createStubServer();
-			const adapter = new NodeMswAdapter(server);
+			const adapter = new NodeFetchInterceptor(server);
 
 			adapter.deactivate();
 
@@ -59,7 +59,7 @@ describe('NodeMswAdapter', () => {
 
 	describe('standalone (owns server)', () => {
 		it('should call listen() with onUnhandledRequest on activate', () => {
-			const adapter = new NodeMswAdapter();
+			const adapter = new NodeFetchInterceptor();
 			const callback = vi.fn();
 
 			adapter.activate({ onUnhandledRequest: callback });
@@ -72,7 +72,7 @@ describe('NodeMswAdapter', () => {
 		});
 
 		it('should call close() on deactivate when it owns the server', () => {
-			const adapter = new NodeMswAdapter();
+			const adapter = new NodeFetchInterceptor();
 			adapter.activate(noopCallback);
 
 			// Should not throw
@@ -84,7 +84,7 @@ describe('NodeMswAdapter', () => {
 			externalServer.listen();
 
 			try {
-				const adapter = new NodeMswAdapter();
+				const adapter = new NodeFetchInterceptor();
 				expect(() => adapter.activate(noopCallback)).toThrow(/already active/i);
 			} finally {
 				externalServer.close();

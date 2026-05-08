@@ -1,4 +1,4 @@
-import { BrowserMswAdapter } from './browser-adapter';
+import { BrowserFetchInterceptor } from './browser-interceptor';
 import {
 	isPending,
 	matchBody,
@@ -10,15 +10,15 @@ import {
 } from './matchers';
 import { formatUnhandledRequestWarning } from './messages';
 import { MockCallHistory } from './mock-call-history';
-import { isMswAdapter, isSetupServerLike, isSetupWorkerLike } from './type-guards';
+import { isFetchInterceptor, isSetupServerLike, isSetupWorkerLike } from './type-guards';
 import {
 	type ActivateOptions,
+	type FetchInterceptor,
 	type HandlerFactory,
 	type InterceptOptions,
 	type MockInterceptor,
 	type MockPool,
 	type MockReplyChain,
-	type MswAdapter,
 	type NetConnectMatcher,
 	type PendingInterceptor,
 	type ReplyCallback,
@@ -40,21 +40,8 @@ export type {
 	ReplyOptions,
 } from './types';
 
-/**
- * Thin wrapper: adapts a user-provided `setupServer` instance to {@link MswAdapter}.
- *
- * **Difference from {@link NodeMswAdapter}:**
- * - `createServerAdapter` manages the server lifecycle — calls `listen()` on
- *   activate and `close()` on deactivate.
- * - `NodeMswAdapter` creates and manages its own `setupServer` internally
- *   (calls `listen()` on activate and `close()` on deactivate).
- *
- * Both exist intentionally: `NodeMswAdapter` is used by `createFetchMock()`
- * for standalone usage, while `createServerAdapter` supports the
- * `new FetchMock(existingServer)` pattern where the user already has an MSW
- * server running.
- */
-function createServerAdapter(server: SetupServerLike): MswAdapter {
+/** Wraps a user-provided server without managing its lifecycle. */
+function wrapServer(server: SetupServerLike): FetchInterceptor {
 	return {
 		use: (...handlers: Array<unknown>) => server.use(...handlers),
 		resetHandlers: (...handlers: Array<unknown>) => server.resetHandlers(...handlers),
@@ -67,26 +54,30 @@ function createServerAdapter(server: SetupServerLike): MswAdapter {
 	};
 }
 
-function resolveAdapter(input?: SetupServerLike | SetupWorkerLike | MswAdapter): MswAdapter {
+function resolveInterceptor(
+	input?: SetupServerLike | SetupWorkerLike | FetchInterceptor,
+): FetchInterceptor {
 	if (!input) {
-		if (!FetchMock._defaultAdapterFactory) {
+		if (!FetchMock._defaultInterceptorFactory) {
 			throw new Error(
-				'FetchMock requires a server, worker, or adapter argument. ' +
+				'FetchMock requires a server, worker, or interceptor argument. ' +
 					'Use createFetchMock() from msw-fetch-mock/node or msw-fetch-mock/browser, ' +
 					'or pass a setupServer/setupWorker instance directly.',
 			);
 		}
-		return FetchMock._defaultAdapterFactory();
+		return FetchMock._defaultInterceptorFactory();
 	}
-	if (isMswAdapter(input)) return input;
-	if (isSetupServerLike(input)) return createServerAdapter(input);
-	if (isSetupWorkerLike(input)) return new BrowserMswAdapter(input as SetupWorkerLike);
-	throw new Error('Invalid argument: expected a setupServer, setupWorker, or MswAdapter instance.');
+	if (isFetchInterceptor(input)) return input;
+	if (isSetupServerLike(input)) return wrapServer(input);
+	if (isSetupWorkerLike(input)) return new BrowserFetchInterceptor(input);
+	throw new Error(
+		'Invalid argument: expected a setupServer, setupWorker, or FetchInterceptor instance.',
+	);
 }
 
 export class FetchMock {
 	/** @internal */
-	static _defaultAdapterFactory?: () => MswAdapter;
+	static _defaultInterceptorFactory?: () => FetchInterceptor;
 	/** @internal */
 	static _handlerFactory?: HandlerFactory;
 
@@ -122,7 +113,7 @@ export class FetchMock {
 	}
 
 	private readonly _calls = new MockCallHistory();
-	private adapter: MswAdapter;
+	private interceptor: FetchInterceptor;
 	private netConnectAllowed: NetConnectMatcher = false;
 	private handlerFns: Map<PendingInterceptor, (request: Request) => Promise<Response | undefined>> =
 		new Map();
@@ -139,10 +130,10 @@ export class FetchMock {
 	}
 
 	constructor(
-		input?: SetupServerLike | SetupWorkerLike | MswAdapter,
+		input?: SetupServerLike | SetupWorkerLike | FetchInterceptor,
 		handlerFactory?: HandlerFactory,
 	) {
-		this.adapter = resolveAdapter(input);
+		this.interceptor = resolveInterceptor(input);
 		this._instanceHandlerFactory = handlerFactory;
 	}
 
@@ -163,7 +154,7 @@ export class FetchMock {
 			// 'bypass' → do nothing
 		};
 
-		await this.adapter.activate({
+		await this.interceptor.activate({
 			onUnhandledRequest: this._onUnhandledRequest,
 			timeout,
 			forceConnectionClose,
@@ -201,7 +192,7 @@ export class FetchMock {
 	 *
 	 * The catch-all is installed once and stays active until reset/deactivate.
 	 * Adding or consuming interceptors only mutates in-memory data structures,
-	 * so no additional adapter.use() calls are needed.
+	 * so no additional interceptor.use() calls are needed.
 	 */
 	private ensureCatchAllInstalled(): void {
 		if (this.catchAllInstalled) return;
@@ -239,8 +230,8 @@ export class FetchMock {
 			return undefined;
 		});
 
-		this.adapter.resetHandlers();
-		this.adapter.use(catchAllHandler);
+		this.interceptor.resetHandlers();
+		this.interceptor.use(catchAllHandler);
 		this.catchAllInstalled = true;
 	}
 
@@ -279,7 +270,7 @@ export class FetchMock {
 		this.handlerFns.clear();
 		this._calls.clear();
 		this.catchAllInstalled = false;
-		this.adapter.deactivate();
+		this.interceptor.deactivate();
 	}
 
 	reset(): void {
@@ -287,7 +278,7 @@ export class FetchMock {
 		this._calls.clear();
 		this._defaultReplyHeaders = {};
 		// The catch-all handler is intentionally kept installed so that no
-		// additional adapter.use() / worker.use() calls are needed between
+		// additional interceptor.use() / worker.use() calls are needed between
 		// tests.  Because the catch-all reads `this.handlerFns` (now cleared),
 		// it will correctly fall through to `_onUnhandledRequest`.
 	}
