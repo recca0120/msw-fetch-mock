@@ -50,6 +50,20 @@ describe('NativeHandlerFactory', () => {
 			expect(response.body).toBeNull();
 		});
 
+		it('should return string body as-is without JSON serialization', async () => {
+			const response = NativeHandlerFactory.buildResponse(200, 'hello world');
+
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe('hello world');
+		});
+
+		it('should not double-serialize a JSON string', async () => {
+			const jsonString = JSON.stringify({ key: 'value' });
+			const response = NativeHandlerFactory.buildResponse(200, jsonString);
+
+			expect(await response.text()).toBe(jsonString);
+		});
+
 		it('should include custom headers', async () => {
 			const headers = new Headers({ 'X-Custom': 'test-value' });
 			const response = NativeHandlerFactory.buildResponse(200, { ok: true }, headers);

@@ -108,6 +108,9 @@ export function createLegacyHandlerFactory(rest: LegacyRestApi): HandlerFactory 
 			if (body === null || body === undefined) {
 				return new Response(null, { status, headers });
 			}
+			if (typeof body === 'string') {
+				return new Response(body, { status, headers });
+			}
 			const responseHeaders = new Headers(headers);
 			responseHeaders.set('content-type', 'application/json');
 			return new Response(JSON.stringify(body), { status, headers: responseHeaders });

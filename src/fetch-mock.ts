@@ -332,18 +332,26 @@ export class FetchMock {
 	): Promise<string | null | undefined> {
 		if (!pending.persist && pending.timesInvoked >= pending.times) return;
 		if (!this.matchOriginAndPath(request, origin, originStr, options.path)) return;
-		// Check method match
 		const expectedMethod = options.method ?? 'GET';
 		if (request.method !== expectedMethod) return;
 		if (!matchQuery(request, options.query)) return;
 		if (!matchHeaders(request, options.headers)) return;
 
-		const bodyText = (await request.text()) || null;
-		if (!matchBody(bodyText, options.body)) return;
-
+		// Claim this interceptor synchronously before any async work
+		// to prevent parallel requests from matching the same handler.
 		pending.timesInvoked++;
 		if (!pending.persist && pending.timesInvoked >= pending.times) {
 			pending.consumed = true;
+		}
+
+		const bodyText = (await request.text()) || null;
+		if (!matchBody(bodyText, options.body)) {
+			// Rollback: body didn't match after all
+			pending.timesInvoked--;
+			if (pending.consumed && !pending.persist) {
+				pending.consumed = false;
+			}
+			return;
 		}
 
 		if (this._callHistoryEnabled) {

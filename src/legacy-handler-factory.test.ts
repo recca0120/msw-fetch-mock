@@ -97,6 +97,21 @@ describe('legacyHandlerFactory', () => {
 			expect(response.headers.get('X-Custom')).toBe('test');
 		});
 
+		it('should return string body as-is without JSON serialization', async () => {
+			const factory = createLegacyHandlerFactory(createMockRestApi());
+			const response = factory.buildResponse(200, 'hello world');
+
+			expect(await response.text()).toBe('hello world');
+		});
+
+		it('should not double-serialize a JSON string', async () => {
+			const factory = createLegacyHandlerFactory(createMockRestApi());
+			const jsonString = JSON.stringify({ key: 'value' });
+			const response = factory.buildResponse(200, jsonString);
+
+			expect(await response.text()).toBe(jsonString);
+		});
+
 		it('should set content-type to application/json for JSON body', () => {
 			const factory = createLegacyHandlerFactory(createMockRestApi());
 			const response = factory.buildResponse(200, { ok: true });

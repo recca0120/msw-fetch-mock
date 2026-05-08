@@ -1583,6 +1583,87 @@ describe('replyContentLength', () => {
 	});
 });
 
+describe('parallel request race condition', () => {
+	const fetchMock = createFetchMock();
+
+	beforeAll(async () => {
+		await fetchMock.activate();
+		fetchMock.disableNetConnect();
+	});
+
+	afterEach(() => {
+		fetchMock.assertNoPendingInterceptors();
+		fetchMock.reset();
+	});
+
+	afterAll(() => fetchMock.deactivate());
+
+	it('should not let parallel requests match the same one-time handler', async () => {
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/item', method: 'GET' })
+			.reply(200, { id: 1 });
+
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/item', method: 'GET' })
+			.reply(200, { id: 2 });
+
+		const [res1, res2] = await Promise.all([
+			fetch(`${API_BASE}/${API_PREFIX}/item`),
+			fetch(`${API_BASE}/${API_PREFIX}/item`),
+		]);
+
+		const data1 = await res1.json();
+		const data2 = await res2.json();
+
+		const ids = [data1.id, data2.id].sort();
+		expect(ids).toEqual([1, 2]);
+	});
+});
+
+describe('string body serialization', () => {
+	const fetchMock = createFetchMock();
+
+	beforeAll(async () => {
+		await fetchMock.activate();
+		fetchMock.disableNetConnect();
+	});
+
+	afterEach(() => {
+		fetchMock.assertNoPendingInterceptors();
+		fetchMock.reset();
+	});
+
+	afterAll(() => fetchMock.deactivate());
+
+	it('should return string body as-is without double serialization', async () => {
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/text', method: 'GET' })
+			.reply(200, 'hello world');
+
+		const response = await fetch(`${API_BASE}/${API_PREFIX}/text`);
+		const text = await response.text();
+
+		expect(text).toBe('hello world');
+	});
+
+	it('should return JSON string without extra quotes', async () => {
+		const jsonString = JSON.stringify({ key: 'value' });
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/json-string', method: 'GET' })
+			.reply(200, jsonString);
+
+		const response = await fetch(`${API_BASE}/${API_PREFIX}/json-string`);
+		const text = await response.text();
+
+		expect(text).toBe(jsonString);
+		expect(JSON.parse(text)).toEqual({ key: 'value' });
+	});
+});
+
 describe('singleton export', () => {
 	it('should export fetchMock as a FetchMock instance', () => {
 		expect(singletonFetchMock).toBeInstanceOf(FetchMock);
