@@ -1,26 +1,12 @@
-export type {
-	ActivateOptions,
-	CallHistoryFilterCriteria,
-	HandlerFactory,
-	InterceptOptions,
-	MockCallHistoryLogData,
-	MockInterceptor,
-	MockPool,
-	MockReplyChain,
-	MswAdapter,
-	OnUnhandledRequest,
-	PendingInterceptor,
-	ReplyCallback,
-	ReplyOptions,
-	SetupServerLike,
-	SingleReplyCallback,
-	SingleReplyResult,
-} from './node';
-export {
-	createFetchMock,
-	FetchMock,
-	fetchMock,
-	MockCallHistory,
-	MockCallHistoryLog,
-	NodeMswAdapter,
-} from './node';
+import { FetchMock } from './fetch-mock';
+import { registerDefaultInterceptor } from './register-default-interceptor';
+
+await registerDefaultInterceptor();
+
+export function createFetchMock(): FetchMock {
+	return new FetchMock();
+}
+
+export const fetchMock: FetchMock = createFetchMock();
+
+export * from './exports';
