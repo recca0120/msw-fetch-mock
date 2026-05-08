@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isMswAdapter, isSetupServerLike, isSetupWorkerLike } from './type-guards';
+import { isFetchInterceptor, isSetupServerLike, isSetupWorkerLike } from './type-guards';
 
 describe('isSetupServerLike', () => {
 	it('should return true for object with listen and close methods', () => {
@@ -67,7 +67,7 @@ describe('isSetupWorkerLike', () => {
 	});
 });
 
-describe('isMswAdapter', () => {
+describe('isFetchInterceptor', () => {
 	it('should return true for object with activate and deactivate methods', () => {
 		const adapter = {
 			activate: () => {},
@@ -75,35 +75,35 @@ describe('isMswAdapter', () => {
 			use: () => {},
 			resetHandlers: () => {},
 		};
-		expect(isMswAdapter(adapter)).toBe(true);
+		expect(isFetchInterceptor(adapter)).toBe(true);
 	});
 
 	it('should return false for null', () => {
-		expect(isMswAdapter(null)).toBe(false);
+		expect(isFetchInterceptor(null)).toBe(false);
 	});
 
 	it('should return false for undefined', () => {
-		expect(isMswAdapter(undefined)).toBe(false);
+		expect(isFetchInterceptor(undefined)).toBe(false);
 	});
 
 	it('should return false for non-object', () => {
-		expect(isMswAdapter([])).toBe(false);
+		expect(isFetchInterceptor([])).toBe(false);
 	});
 
 	it('should return false when activate is missing', () => {
-		expect(isMswAdapter({ deactivate: () => {} })).toBe(false);
+		expect(isFetchInterceptor({ deactivate: () => {} })).toBe(false);
 	});
 
 	it('should return false when deactivate is missing', () => {
-		expect(isMswAdapter({ activate: () => {} })).toBe(false);
+		expect(isFetchInterceptor({ activate: () => {} })).toBe(false);
 	});
 
 	it('should return false when activate is not a function', () => {
-		expect(isMswAdapter({ activate: 123, deactivate: () => {} })).toBe(false);
+		expect(isFetchInterceptor({ activate: 123, deactivate: () => {} })).toBe(false);
 	});
 
-	it('should not match setupServer as MswAdapter (no activate/deactivate)', () => {
+	it('should not match setupServer as FetchInterceptor (no activate/deactivate)', () => {
 		const server = { listen: () => {}, close: () => {}, use: () => {}, resetHandlers: () => {} };
-		expect(isMswAdapter(server)).toBe(false);
+		expect(isFetchInterceptor(server)).toBe(false);
 	});
 });

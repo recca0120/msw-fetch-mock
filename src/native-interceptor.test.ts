@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { NativeFetchAdapter } from './native-adapter';
 import { type NativeHandler } from './native-handler-factory';
+import { NativeFetchInterceptor } from './native-interceptor';
 import { type ResolvedActivateOptions } from './types';
 
 const noopOptions: ResolvedActivateOptions = {
@@ -9,7 +9,7 @@ const noopOptions: ResolvedActivateOptions = {
 	forceConnectionClose: false,
 };
 
-describe('NativeFetchAdapter', () => {
+describe('NativeFetchInterceptor', () => {
 	let originalFetch: typeof globalThis.fetch;
 
 	beforeEach(() => {
@@ -23,7 +23,7 @@ describe('NativeFetchAdapter', () => {
 
 	describe('activate', () => {
 		it('should replace globalThis.fetch with a mock', () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 
 			adapter.activate(noopOptions);
 
@@ -35,7 +35,7 @@ describe('NativeFetchAdapter', () => {
 
 	describe('deactivate', () => {
 		it('should restore globalThis.fetch to original', () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			adapter.activate(noopOptions);
 
 			adapter.deactivate();
@@ -46,7 +46,7 @@ describe('NativeFetchAdapter', () => {
 
 	describe('use', () => {
 		it('should register a handler that can match requests', async () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			const handlerFn = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
 			const handler: NativeHandler = { method: 'GET', urlPattern: '/test', handlerFn };
 
@@ -63,7 +63,7 @@ describe('NativeFetchAdapter', () => {
 
 	describe('resetHandlers', () => {
 		it('should replace all handlers with new ones', async () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			const oldFn = vi.fn().mockResolvedValue(new Response('old'));
 			const newFn = vi.fn().mockResolvedValue(new Response('new'));
 			const oldHandler: NativeHandler = { method: 'GET', urlPattern: '/test', handlerFn: oldFn };
@@ -81,7 +81,7 @@ describe('NativeFetchAdapter', () => {
 		});
 
 		it('should clear all handlers when called with no arguments', async () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			const onUnhandled = vi.fn();
 			const handler: NativeHandler = {
 				method: 'GET',
@@ -106,7 +106,7 @@ describe('NativeFetchAdapter', () => {
 
 	describe('unhandled requests', () => {
 		it('should call onUnhandledRequest when no handler matches', async () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			const onUnhandled = vi.fn();
 
 			adapter.activate({
@@ -132,7 +132,7 @@ describe('NativeFetchAdapter', () => {
 		});
 
 		it('should call onUnhandledRequest when handler returns undefined', async () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			const onUnhandled = vi.fn();
 			const handler: NativeHandler = {
 				method: 'GET',
@@ -156,7 +156,7 @@ describe('NativeFetchAdapter', () => {
 
 	describe('multiple handlers', () => {
 		it('should try handlers in order and use the first match', async () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			const first = vi.fn().mockResolvedValue(undefined); // no match
 			const second = vi.fn().mockResolvedValue(new Response('second'));
 			const handler1: NativeHandler = { method: 'GET', urlPattern: '/test', handlerFn: first };
@@ -175,7 +175,7 @@ describe('NativeFetchAdapter', () => {
 
 	describe('timeout', () => {
 		it('should abort request when timeout is reached', async () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			// Handler that never resolves
 			const slowHandler: NativeHandler = {
 				method: 'GET',
@@ -196,7 +196,7 @@ describe('NativeFetchAdapter', () => {
 		});
 
 		it('should not abort when timeout is 0 (disabled)', async () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			const fastHandler: NativeHandler = {
 				method: 'GET',
 				urlPattern: '/fast',
@@ -217,7 +217,7 @@ describe('NativeFetchAdapter', () => {
 		});
 
 		it('should respect user-provided signal over timeout', async () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			const userController = new AbortController();
 			const handler: NativeHandler = {
 				method: 'GET',
@@ -244,7 +244,7 @@ describe('NativeFetchAdapter', () => {
 
 	describe('forceConnectionClose', () => {
 		it('should add Connection: close header when enabled', async () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			let capturedRequest: Request | null = null;
 			const handler: NativeHandler = {
 				method: 'GET',
@@ -269,7 +269,7 @@ describe('NativeFetchAdapter', () => {
 		});
 
 		it('should not add Connection header when disabled', async () => {
-			const adapter = new NativeFetchAdapter();
+			const adapter = new NativeFetchInterceptor();
 			let capturedRequest: Request | null = null;
 			const handler: NativeHandler = {
 				method: 'GET',

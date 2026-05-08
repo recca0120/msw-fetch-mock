@@ -96,7 +96,7 @@ export function recordCall(
 	callHistory: MockCallHistory,
 	request: Request,
 	bodyText: string | null,
-) {
+): void {
 	const url = new URL(request.url);
 	const requestHeaders: Record<string, string> = {};
 	request.headers.forEach((value, key) => {

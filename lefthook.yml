@@ -10,5 +10,7 @@ pre-push:
   commands:
     typecheck:
       run: npx tsc --noEmit
+    knip:
+      run: npx knip
     test:
       run: npx vitest run

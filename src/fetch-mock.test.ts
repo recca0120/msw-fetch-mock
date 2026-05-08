@@ -2,8 +2,8 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FetchMock } from './fetch-mock';
 import { createFetchMock, fetchMock as singletonFetchMock } from './node';
-import { NodeMswAdapter } from './node-adapter';
-import { type MswAdapter, type SetupServerLike, type SetupWorkerLike } from './types';
+import { NodeFetchInterceptor } from './node-interceptor';
+import { type FetchInterceptor, type SetupServerLike, type SetupWorkerLike } from './types';
 
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
@@ -1168,7 +1168,7 @@ describe('activate guard', () => {
 		externalServer.listen();
 
 		try {
-			const shared = new FetchMock(new NodeMswAdapter(externalServer));
+			const shared = new FetchMock(new NodeFetchInterceptor(externalServer));
 			await expect(shared.activate()).resolves.toBeUndefined();
 		} finally {
 			externalServer.close();
@@ -1251,7 +1251,7 @@ describe('onUnhandledRequest', () => {
 		externalServer.listen();
 
 		try {
-			const fm = new FetchMock(new NodeMswAdapter(externalServer));
+			const fm = new FetchMock(new NodeFetchInterceptor(externalServer));
 			// activate() with options should not throw or call listen() again
 			await expect(fm.activate({ onUnhandledRequest: 'warn' })).resolves.toBeUndefined();
 		} finally {
@@ -1608,7 +1608,7 @@ describe('constructor auto-detection', () => {
 		};
 	}
 
-	function createStubAdapter(): MswAdapter {
+	function createStubAdapter(): FetchInterceptor {
 		return {
 			use: vi.fn(),
 			resetHandlers: vi.fn(),
@@ -1703,7 +1703,7 @@ describe('constructor auto-detection', () => {
 		});
 	});
 
-	describe('MswAdapter (backward compat)', () => {
+	describe('FetchInterceptor (backward compat)', () => {
 		it('should use adapter directly on activate', async () => {
 			const adapter = createStubAdapter();
 			const fm = new FetchMock(adapter);

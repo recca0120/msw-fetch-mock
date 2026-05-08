@@ -29,7 +29,7 @@ afterEach(() => {
 
 ## `createFetchMock(server?)`（Node）
 
-建立搭配 `NodeMswAdapter` 的 `FetchMock`。可選擇性傳入現有的 MSW server。
+建立搭配 `NodeFetchInterceptor` 的 `FetchMock`。可選擇性傳入現有的 MSW server。
 
 ```typescript
 import { createFetchMock } from 'msw-fetch-mock/node';
@@ -45,7 +45,7 @@ const fetchMock = createFetchMock(server);
 
 ## `createFetchMock(worker)`（瀏覽器）
 
-建立搭配 `BrowserMswAdapter` 的 `FetchMock`。需要傳入 MSW worker。
+建立搭配 `BrowserFetchInterceptor` 的 `FetchMock`。需要傳入 MSW worker。
 
 ```typescript
 import { setupWorker } from 'msw/browser';
@@ -61,7 +61,7 @@ beforeAll(async () => {
 
 ## `createFetchMock()`（原生模式）
 
-建立搭配 `NativeFetchAdapter` 的 `FetchMock`。不需要 MSW 依賴 — 直接 patch `globalThis.fetch`。
+建立搭配 `NativeFetchInterceptor` 的 `FetchMock`。不需要 MSW 依賴 — 直接 patch `globalThis.fetch`。
 
 ```typescript
 import { createFetchMock } from 'msw-fetch-mock/native';
@@ -92,29 +92,29 @@ const server = setupServer();
 const fetchMock = createFetchMock(rest, server);
 ```
 
-## `new FetchMock(adapter?)`
+## `new FetchMock(interceptor?)`
 
-使用明確的 `MswAdapter` 建立 `FetchMock` 實例。
+使用明確的 `FetchInterceptor` 建立 `FetchMock` 實例。
 
 ```typescript
 import { FetchMock } from 'msw-fetch-mock';
-import { NodeMswAdapter } from 'msw-fetch-mock/node';
-import { BrowserMswAdapter } from 'msw-fetch-mock/browser';
-import { NativeFetchAdapter } from 'msw-fetch-mock/native';
+import { NodeFetchInterceptor } from 'msw-fetch-mock/node';
+import { BrowserFetchInterceptor } from 'msw-fetch-mock/browser';
+import { NativeFetchInterceptor } from 'msw-fetch-mock/native';
 
 // Node 搭配外部 server
-const fetchMock = new FetchMock(new NodeMswAdapter(server));
+const fetchMock = new FetchMock(new NodeFetchInterceptor(server));
 
 // 瀏覽器搭配 worker
-const fetchMock = new FetchMock(new BrowserMswAdapter(worker));
+const fetchMock = new FetchMock(new BrowserFetchInterceptor(worker));
 
 // 原生模式（無 MSW）
-const fetchMock = new FetchMock(new NativeFetchAdapter());
+const fetchMock = new FetchMock(new NativeFetchInterceptor());
 ```
 
 | 參數      | 型別         | 必要 | 說明                                         |
 | --------- | ------------ | ---- | -------------------------------------------- |
-| `adapter` | `MswAdapter` | 否   | 環境 adapter。建議改用 `createFetchMock()`。 |
+| `interceptor` | `FetchInterceptor` | 否   | 環境 interceptor。建議改用 `createFetchMock()`。 |
 
 ---
 

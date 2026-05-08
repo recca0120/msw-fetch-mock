@@ -1,23 +1,23 @@
 import { FetchMock } from './fetch-mock';
 import { HandlerFactory } from './handler-factory';
-import { NodeMswAdapter } from './node-adapter';
+import { NodeFetchInterceptor } from './node-interceptor';
 import { type SetupServerLike } from './types';
 
 export { FetchMock } from './fetch-mock';
-export { NodeMswAdapter } from './node-adapter';
+export { NodeFetchInterceptor } from './node-interceptor';
 
-/** Register Node.js as the default adapter environment so `new FetchMock()` works. */
-FetchMock._defaultAdapterFactory = () => new NodeMswAdapter();
+/** Register Node.js as the default interceptor so `new FetchMock()` works. */
+FetchMock._defaultInterceptorFactory = () => new NodeFetchInterceptor();
 
 /** Register MSW http handler factory. */
 FetchMock._handlerFactory = HandlerFactory;
 
 export function createFetchMock(server?: SetupServerLike): FetchMock {
-	return new FetchMock(new NodeMswAdapter(server));
+	return new FetchMock(new NodeFetchInterceptor(server));
 }
 
 /** Pre-built singleton for quick standalone use (Cloudflare migration compatible). */
-export const fetchMock = createFetchMock();
+export const fetchMock: FetchMock = createFetchMock();
 
 export * from './exports';
 export type { SetupServerLike } from './types';

@@ -100,8 +100,8 @@ export interface SetupWorkerLike {
 	stop(): void;
 }
 
-/** Environment-agnostic adapter interface for MSW server/worker */
-export interface MswAdapter {
+/** Environment-agnostic interceptor interface for fetch mocking */
+export interface FetchInterceptor {
 	use(...handlers: Array<unknown>): void;
 	resetHandlers(...handlers: Array<unknown>): void;
 	activate(options: ResolvedActivateOptions): void | Promise<void>;
