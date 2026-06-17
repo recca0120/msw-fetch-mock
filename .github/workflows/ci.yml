@@ -58,7 +58,7 @@ jobs:
       - run: pnpm install
       - run: pnpm build
       - run: npm pack && mv msw-fetch-mock-*.tgz msw-fetch-mock.tgz
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: package-tarball
           path: msw-fetch-mock.tgz
