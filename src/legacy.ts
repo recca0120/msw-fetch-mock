@@ -2,7 +2,6 @@ import { FetchMock } from './fetch-mock';
 import { createLegacyHandlerFactory, type LegacyRestApi } from './legacy-handler-factory';
 import { type SetupServerLike } from './types';
 
-export { FetchMock } from './fetch-mock';
 export type { LegacyRestApi } from './legacy-handler-factory';
 export { createLegacyHandlerFactory } from './legacy-handler-factory';
 

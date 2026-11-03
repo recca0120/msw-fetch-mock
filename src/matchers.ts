@@ -11,8 +11,11 @@ export function isPending(p: PendingInterceptor): boolean {
 	return p.timesInvoked < p.times;
 }
 
-export function escapeRegExp(str: string): string {
-	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Human-readable form of a string / RegExp / function matcher (for pendingInterceptors()). */
+export function describeMatcher(matcher: string | RegExp | ((value: string) => boolean)): string {
+	if (typeof matcher === 'string') return matcher;
+	if (typeof matcher === 'function') return '<function>';
+	return matcher.toString();
 }
 
 export function matchesValue(
@@ -98,22 +101,15 @@ export function recordCall(
 	bodyText: string | null,
 ): void {
 	const url = new URL(request.url);
-	const requestHeaders: Record<string, string> = {};
-	request.headers.forEach((value, key) => {
-		requestHeaders[key] = value;
-	});
-	const searchParams: Record<string, string> = {};
-	url.searchParams.forEach((value, key) => {
-		searchParams[key] = value;
-	});
 	callHistory.record({
 		body: bodyText,
 		method: request.method,
-		headers: requestHeaders,
+		// lowercased keys; for repeated keys the last value wins (same as iterating)
+		headers: Object.fromEntries(request.headers),
 		fullUrl: url.origin + url.pathname + url.search,
 		origin: url.origin,
 		path: url.pathname,
-		searchParams,
+		searchParams: Object.fromEntries(url.searchParams),
 		protocol: url.protocol,
 		host: url.host,
 		port: url.port,

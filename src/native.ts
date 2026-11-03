@@ -2,7 +2,6 @@ import { FetchMock } from './fetch-mock';
 import { NativeHandlerFactory } from './native-handler-factory';
 import { NativeFetchInterceptor } from './native-interceptor';
 
-export { FetchMock } from './fetch-mock';
 export { NativeHandlerFactory } from './native-handler-factory';
 export { NativeFetchInterceptor } from './native-interceptor';
 

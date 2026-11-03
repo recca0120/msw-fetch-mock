@@ -4,7 +4,6 @@ import { HandlerFactory } from './handler-factory';
 import { type SetupWorkerLike } from './types';
 
 export { BrowserFetchInterceptor } from './browser-interceptor';
-export { FetchMock } from './fetch-mock';
 
 /** Register MSW http handler factory. */
 FetchMock._handlerFactory = HandlerFactory;

@@ -1,46 +1,20 @@
-import { BrowserFetchInterceptor } from './browser-interceptor';
-import {
-	isPending,
-	matchBody,
-	matchesValue,
-	matchHeaders,
-	matchPath,
-	matchQuery,
-	recordCall,
-} from './matchers';
+import { InterceptorRegistry } from './interceptor-registry';
+import { matchesValue, recordCall } from './matchers';
 import { formatUnhandledRequestWarning } from './messages';
 import { MockCallHistory } from './mock-call-history';
-import { isFetchInterceptor, isSetupServerLike, isSetupWorkerLike } from './type-guards';
+import { resolveInterceptor } from './resolve-interceptor';
 import {
 	type ActivateOptions,
 	type FetchInterceptor,
 	type HandlerFactory,
-	type InterceptOptions,
-	type MockInterceptor,
 	type MockPool,
-	type MockReplyChain,
 	type NetConnectMatcher,
+	type OnUnhandledRequestCallback,
 	type PendingInterceptor,
-	type ReplyCallback,
 	type ReplyOptions,
-	type ResolvedActivateOptions,
 	type SetupServerLike,
 	type SetupWorkerLike,
-	type SingleReplyCallback,
 } from './types';
-
-export type {
-	ActivateOptions,
-	InterceptOptions,
-	MockInterceptor,
-	MockPool,
-	MockReplyChain,
-	OnUnhandledRequest,
-	PendingInterceptor,
-	ReplyOptions,
-} from './types';
-
-import { installFetchOptions } from './fetch-options';
 
 /**
  * UTF-8 byte length of a reply body as it is sent: strings as-is, other values as JSON.
@@ -52,46 +26,11 @@ function byteLengthOf(body: unknown): number | undefined {
 	return new TextEncoder().encode(text).byteLength;
 }
 
-/** Wraps a user-provided server without managing its lifecycle. */
-function wrapServer(server: SetupServerLike): FetchInterceptor {
-	let removeFetchOptions: () => void = () => {};
-	return {
-		use: (...handlers: Array<unknown>) => server.use(...handlers),
-		resetHandlers: (...handlers: Array<unknown>) => server.resetHandlers(...handlers),
-		listHandlers: () => server.listHandlers?.(),
-		activate(options: ResolvedActivateOptions) {
-			server.listen({ onUnhandledRequest: options.onUnhandledRequest });
-			removeFetchOptions = installFetchOptions(options);
-		},
-		deactivate() {
-			removeFetchOptions();
-			removeFetchOptions = () => {};
-			server.close();
-		},
-	};
-}
-
-function resolveInterceptor(
-	input?: SetupServerLike | SetupWorkerLike | FetchInterceptor,
-): FetchInterceptor {
-	if (!input) {
-		if (!FetchMock._defaultInterceptorFactory) {
-			throw new Error(
-				'FetchMock requires a server, worker, or interceptor argument. ' +
-					'Use createFetchMock() from msw-fetch-mock/node or msw-fetch-mock/browser, ' +
-					'or pass a setupServer/setupWorker instance directly.',
-			);
-		}
-		return FetchMock._defaultInterceptorFactory();
-	}
-	if (isFetchInterceptor(input)) return input;
-	if (isSetupServerLike(input)) return wrapServer(input);
-	if (isSetupWorkerLike(input)) return new BrowserFetchInterceptor(input);
-	throw new Error(
-		'Invalid argument: expected a setupServer, setupWorker, or FetchInterceptor instance.',
-	);
-}
-
+/**
+ * Public fetch-mock API. Owns the interceptor lifecycle (activate / deactivate,
+ * the catch-all handler), unhandled-request and net-connect policy, call history
+ * and default reply headers; matching is delegated to {@link InterceptorRegistry}.
+ */
 export class FetchMock {
 	/** @internal */
 	static _defaultInterceptorFactory?: () => FetchInterceptor;
@@ -99,6 +38,36 @@ export class FetchMock {
 	static _handlerFactory?: HandlerFactory;
 
 	private readonly _instanceHandlerFactory?: HandlerFactory;
+	private readonly _calls = new MockCallHistory();
+	private readonly interceptor: FetchInterceptor;
+	private readonly registry: InterceptorRegistry;
+	private netConnectAllowed: NetConnectMatcher = false;
+	private _defaultReplyHeaders: Record<string, string> = {};
+	private _callHistoryEnabled = true;
+	/** The installed catch-all handler; undefined until (re)installed by activate(). */
+	private catchAllHandler: unknown;
+	private _onUnhandledRequest?: OnUnhandledRequestCallback;
+
+	constructor(
+		input?: SetupServerLike | SetupWorkerLike | FetchInterceptor,
+		handlerFactory?: HandlerFactory,
+	) {
+		this.interceptor = resolveInterceptor(input, FetchMock._defaultInterceptorFactory);
+		this._instanceHandlerFactory = handlerFactory;
+		this.registry = new InterceptorRegistry({
+			buildResponse: (status, body, replyOptions, addContentLength) =>
+				this.buildResponse(status, body, replyOptions, addContentLength),
+			buildErrorResponse: () => this.handlerFactory.buildErrorResponse(),
+			recordCall: (request, bodyText) => {
+				if (this._callHistoryEnabled) recordCall(this._calls, request, bodyText);
+			},
+			onRegister: () => this.ensureCatchAllInstalled(),
+		});
+	}
+
+	get calls(): MockCallHistory {
+		return this._calls;
+	}
 
 	private get handlerFactory(): HandlerFactory {
 		const factory = this._instanceHandlerFactory ?? FetchMock._handlerFactory;
@@ -114,11 +83,10 @@ export class FetchMock {
 	private buildResponse(
 		status: number,
 		responseBody: unknown,
-		replyOptions?: ReplyOptions,
-		defaultHeaders?: Record<string, string>,
-		addContentLength?: boolean,
+		replyOptions: ReplyOptions | undefined,
+		addContentLength: boolean,
 	): Response {
-		const mergedHeaders: Record<string, string> = { ...defaultHeaders };
+		const mergedHeaders: Record<string, string> = { ...this._defaultReplyHeaders };
 		if (replyOptions?.headers) {
 			Object.assign(mergedHeaders, replyOptions.headers);
 		}
@@ -130,38 +98,12 @@ export class FetchMock {
 		return this.handlerFactory.buildResponse(status, responseBody, headers);
 	}
 
-	private readonly _calls = new MockCallHistory();
-	private interceptor: FetchInterceptor;
-	private netConnectAllowed: NetConnectMatcher = false;
-	private handlerFns: Map<PendingInterceptor, (request: Request) => Promise<Response | undefined>> =
-		new Map();
-	private _defaultReplyHeaders: Record<string, string> = {};
-	private _callHistoryEnabled = true;
-	private catchAllInstalled = false;
-	private catchAllHandler: unknown;
-	private _onUnhandledRequest?: (
-		request: Request,
-		print: { warning(): void; error(): void },
-	) => void;
-
-	get calls(): MockCallHistory {
-		return this._calls;
-	}
-
-	constructor(
-		input?: SetupServerLike | SetupWorkerLike | FetchInterceptor,
-		handlerFactory?: HandlerFactory,
-	) {
-		this.interceptor = resolveInterceptor(input);
-		this._instanceHandlerFactory = handlerFactory;
-	}
-
 	async activate(options?: ActivateOptions): Promise<void> {
 		const mode = options?.onUnhandledRequest ?? 'error';
 		const timeout = options?.timeout ?? 30000; // Default 30 seconds
 		const forceConnectionClose = options?.forceConnectionClose ?? false;
 
-		this._onUnhandledRequest = (request: Request, print: { warning(): void; error(): void }) => {
+		this._onUnhandledRequest = (request, print) => {
 			if (this.isNetConnectAllowed(request)) return;
 			if (typeof mode === 'function') {
 				mode(request, print);
@@ -183,7 +125,7 @@ export class FetchMock {
 		// the first fetch.  In browser environments `worker.use()` must finish
 		// before the Service Worker can match requests — doing it once here
 		// (behind the already-awaited `activate`) avoids per-test race conditions.
-		this.catchAllInstalled = false;
+		this.catchAllHandler = undefined;
 		this.ensureCatchAllInstalled();
 	}
 
@@ -196,18 +138,15 @@ export class FetchMock {
 	}
 
 	private isNetConnectAllowed(request: Request): boolean {
-		if (this.netConnectAllowed === true) return true;
-		if (this.netConnectAllowed === false) return false;
-		const host = new URL(request.url).host;
-		if (typeof this.netConnectAllowed === 'string') return host === this.netConnectAllowed;
-		if (this.netConnectAllowed instanceof RegExp) return this.netConnectAllowed.test(host);
-		return this.netConnectAllowed(host);
+		const allowed = this.netConnectAllowed;
+		if (typeof allowed === 'boolean') return allowed;
+		return matchesValue(new URL(request.url).host, allowed);
 	}
 
 	/**
-	 * Installs a single catch-all MSW handler that dispatches requests to
-	 * registered interceptors in FIFO order. All matching logic runs in the
-	 * main thread, eliminating race conditions with Service Worker messaging.
+	 * Creates the single catch-all handler that dispatches requests to the
+	 * registered interceptors (FIFO). All matching logic runs in the main thread,
+	 * eliminating race conditions with Service Worker messaging.
 	 *
 	 * The catch-all is installed once and stays active until reset/deactivate.
 	 * Adding or consuming interceptors only mutates in-memory data structures,
@@ -215,14 +154,8 @@ export class FetchMock {
 	 */
 	private createCatchAllHandler(): unknown {
 		return this.handlerFactory.createCatchAllHandler(async (request: Request) => {
-			// Iterate handlers in FIFO order (insertion order of Map)
-			for (const [pending, handlerFn] of this.handlerFns) {
-				if (pending.consumed && !pending.persist) continue;
-
-				// Clone request so each handler can read the body independently
-				const response = await handlerFn(request.clone());
-				if (response !== undefined) return response;
-			}
+			const response = await this.registry.dispatch(request);
+			if (response !== undefined) return response;
 
 			// No handler matched — invoke the onUnhandledRequest callback
 			// (handles net connect checks, error/warn modes, and custom callbacks).
@@ -249,11 +182,10 @@ export class FetchMock {
 	}
 
 	private ensureCatchAllInstalled(): void {
-		if (!this.catchAllInstalled) {
+		if (this.catchAllHandler === undefined) {
 			this.catchAllHandler = this.createCatchAllHandler();
 			this.interceptor.resetHandlers();
 			this.interceptor.use(this.catchAllHandler);
-			this.catchAllInstalled = true;
 			return;
 		}
 
@@ -300,24 +232,24 @@ export class FetchMock {
 	}
 
 	deactivate(): void {
-		this.handlerFns.clear();
+		this.registry.clear();
 		this._calls.clear();
-		this.catchAllInstalled = false;
+		this.catchAllHandler = undefined;
 		this.interceptor.deactivate();
 	}
 
 	reset(): void {
-		this.handlerFns.clear();
+		this.registry.clear();
 		this._calls.clear();
 		this._defaultReplyHeaders = {};
 		// The catch-all handler is intentionally kept installed so that no
 		// additional interceptor.use() / worker.use() calls are needed between
-		// tests.  Because the catch-all reads `this.handlerFns` (now cleared),
+		// tests.  Because the catch-all dispatches to the (now empty) registry,
 		// it will correctly fall through to `_onUnhandledRequest`.
 	}
 
 	assertNoPendingInterceptors(): void {
-		const unconsumed = [...this.handlerFns.keys()].filter(isPending);
+		const unconsumed = this.pendingInterceptors();
 		if (unconsumed.length > 0) {
 			const descriptions = unconsumed.map((p) => `  ${p.method} ${p.origin}${p.path}`);
 			throw new Error(`Pending interceptor(s) not consumed:\n${descriptions.join('\n')}`);
@@ -325,244 +257,10 @@ export class FetchMock {
 	}
 
 	pendingInterceptors(): PendingInterceptor[] {
-		return [...this.handlerFns.keys()].filter(isPending).map((p) => ({ ...p }));
-	}
-
-	private matchOriginAndPath(
-		request: Request,
-		origin: string | RegExp | ((origin: string) => boolean),
-		originStr: string,
-		path: InterceptOptions['path'],
-	): boolean {
-		if (typeof origin === 'string') {
-			// String origin: URL pattern already filtered by origin prefix,
-			// just match the path portion.
-			return matchPath(request, originStr, path);
-		}
-
-		// Non-string origin: URL pattern is catch-all (/.*/),
-		// so we must manually match both origin and path.
-		const url = new URL(request.url);
-
-		if (origin instanceof RegExp ? !origin.test(url.origin) : !origin(url.origin)) {
-			return false;
-		}
-
-		if (typeof path === 'string') {
-			return url.pathname === path || url.pathname.endsWith(path);
-		}
-
-		const fullPath = url.pathname + url.search;
-		return matchesValue(fullPath, path as RegExp | ((v: string) => boolean));
-	}
-
-	private async matchAndConsume(
-		request: Request,
-		pending: PendingInterceptor,
-		origin: string | RegExp | ((origin: string) => boolean),
-		originStr: string,
-		options: InterceptOptions,
-	): Promise<string | null | undefined> {
-		if (!pending.persist && pending.timesInvoked >= pending.times) return;
-		if (!this.matchOriginAndPath(request, origin, originStr, options.path)) return;
-		const expectedMethod = options.method ?? 'GET';
-		if (request.method !== expectedMethod) return;
-		if (!matchQuery(request, options.query)) return;
-		if (!matchHeaders(request, options.headers)) return;
-
-		// Claim this interceptor synchronously before any async work
-		// to prevent parallel requests from matching the same handler.
-		pending.timesInvoked++;
-		if (!pending.persist && pending.timesInvoked >= pending.times) {
-			pending.consumed = true;
-		}
-
-		const bodyText = (await request.text()) || null;
-		if (!matchBody(bodyText, options.body)) {
-			// Rollback: body didn't match after all
-			pending.timesInvoked--;
-			if (pending.consumed && !pending.persist) {
-				pending.consumed = false;
-			}
-			return;
-		}
-
-		if (this._callHistoryEnabled) {
-			recordCall(this._calls, request, bodyText);
-		}
-		return bodyText;
-	}
-
-	private registerHandler(
-		pending: PendingInterceptor,
-		handlerFn: (request: Request) => Promise<Response | undefined>,
-	): void {
-		this.handlerFns.set(pending, handlerFn);
-		this.ensureCatchAllInstalled();
-	}
-
-	private createMatchingHandler(
-		pending: PendingInterceptor,
-		origin: string | RegExp | ((origin: string) => boolean),
-		originStr: string,
-		options: InterceptOptions,
-		delayRef: { ms: number },
-		respond: (bodyText: string | null) => Promise<Response>,
-	): (request: Request) => Promise<Response | undefined> {
-		return async (request: Request) => {
-			const bodyText = await this.matchAndConsume(request, pending, origin, originStr, options);
-			if (bodyText === undefined) return;
-
-			if (delayRef.ms > 0) {
-				await new Promise<void>((resolve) => {
-					const timer = setTimeout(resolve, delayRef.ms);
-					const onAbort = () => {
-						clearTimeout(timer);
-						resolve();
-					};
-					if (request.signal?.aborted) {
-						onAbort();
-					} else {
-						request.signal?.addEventListener('abort', onAbort, { once: true });
-					}
-				});
-			}
-
-			return respond(bodyText);
-		};
-	}
-
-	private buildChain(
-		pending: PendingInterceptor,
-		delayRef: { ms: number },
-		contentLengthRef: { enabled: boolean } | undefined,
-		pool: MockPool,
-	): MockReplyChain {
-		const chain: MockReplyChain = {
-			times(n: number) {
-				pending.times = n;
-				pending.consumed = false;
-				return chain;
-			},
-			persist() {
-				pending.persist = true;
-				pending.consumed = false;
-				return chain;
-			},
-			delay(ms: number) {
-				delayRef.ms = ms;
-				return chain;
-			},
-			replyContentLength() {
-				if (contentLengthRef) contentLengthRef.enabled = true;
-				return chain;
-			},
-			intercept(options: InterceptOptions): MockInterceptor {
-				return pool.intercept(options);
-			},
-		};
-		return chain;
+		return this.registry.pending();
 	}
 
 	get(origin: string | RegExp | ((origin: string) => boolean)): MockPool {
-		const originStr =
-			typeof origin === 'string'
-				? origin
-				: origin instanceof RegExp
-					? origin.toString()
-					: '<function>';
-
-		const pool: MockPool = {
-			intercept: (options: InterceptOptions): MockInterceptor => {
-				// Validate: cannot use both path query string and query parameter
-				if (typeof options.path === 'string' && options.path.includes('?') && options.query) {
-					throw new Error(
-						'Cannot use both query string in path and query parameter. Use either path: "/api?limit=10" or path: "/api", query: { limit: "10" }',
-					);
-				}
-
-				const method = options.method ?? 'GET';
-				const pathStr =
-					typeof options.path === 'string'
-						? options.path
-						: typeof options.path === 'function'
-							? '<function>'
-							: options.path.toString();
-				const pending: PendingInterceptor = {
-					origin: originStr,
-					path: pathStr,
-					method,
-					consumed: false,
-					times: 1,
-					timesInvoked: 0,
-					persist: false,
-				};
-				return {
-					reply: (
-						statusOrCallback: number | SingleReplyCallback,
-						bodyOrCallback?: unknown | ReplyCallback,
-						replyOptions?: ReplyOptions,
-					): MockReplyChain => {
-						const delayRef = { ms: 0 };
-						const contentLengthRef = { enabled: false };
-
-						const respond = async (bodyText: string | null): Promise<Response> => {
-							if (typeof statusOrCallback === 'function') {
-								const result = await statusOrCallback({ body: bodyText });
-								return this.buildResponse(
-									result.statusCode,
-									result.data,
-									result.responseOptions,
-									this._defaultReplyHeaders,
-									contentLengthRef.enabled,
-								);
-							}
-
-							const responseBody =
-								typeof bodyOrCallback === 'function'
-									? await (bodyOrCallback as ReplyCallback)({ body: bodyText })
-									: bodyOrCallback;
-
-							return this.buildResponse(
-								statusOrCallback,
-								responseBody,
-								replyOptions,
-								this._defaultReplyHeaders,
-								contentLengthRef.enabled,
-							);
-						};
-
-						this.registerHandler(
-							pending,
-							this.createMatchingHandler(pending, origin, originStr, options, delayRef, respond),
-						);
-
-						return this.buildChain(pending, delayRef, contentLengthRef, pool);
-					},
-
-					replyWithError: (): MockReplyChain => {
-						const delayRef = { ms: 0 };
-
-						this.registerHandler(
-							pending,
-							this.createMatchingHandler(
-								pending,
-								origin,
-								originStr,
-								options,
-								delayRef,
-								async () => {
-									return this.handlerFactory.buildErrorResponse();
-								},
-							),
-						);
-
-						return this.buildChain(pending, delayRef, undefined, pool);
-					},
-				};
-			},
-		};
-
-		return pool;
+		return this.registry.get(origin);
 	}
 }

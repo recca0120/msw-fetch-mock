@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-	escapeRegExp,
 	isPending,
 	matchBody,
 	matchesValue,
@@ -40,24 +39,6 @@ describe('isPending', () => {
 
 	it('should return false for persist when timesInvoked > 0', () => {
 		expect(isPending(createPending({ persist: true, timesInvoked: 1 }))).toBe(false);
-	});
-});
-
-describe('escapeRegExp', () => {
-	it('should escape special regex characters', () => {
-		expect(escapeRegExp('http://example.com/api?q=1&b=2')).toBe(
-			'http://example\\.com/api\\?q=1&b=2',
-		);
-	});
-
-	it('should escape all special chars', () => {
-		const specialChars = ['.*+?^', '$', '{}()|[]\\'];
-		const input = specialChars.join('');
-		expect(escapeRegExp(input)).toBe('\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\');
-	});
-
-	it('should return plain string unchanged', () => {
-		expect(escapeRegExp('hello')).toBe('hello');
 	});
 });
 

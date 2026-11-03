@@ -17,14 +17,14 @@ export const NativeHandlerFactory: HandlerFactory = {
 	},
 
 	buildResponse(status, body, headers) {
-		if (body === null || body === undefined) {
-			return new Response(null, { status, headers });
-		}
-		if (body instanceof ReadableStream) {
-			return new Response(body, { status, headers });
-		}
-		if (typeof body === 'string') {
-			return new Response(body, { status, headers });
+		// No body, a string or a stream is sent as-is; anything else as JSON.
+		if (
+			body === null ||
+			body === undefined ||
+			typeof body === 'string' ||
+			body instanceof ReadableStream
+		) {
+			return new Response(body ?? null, { status, headers });
 		}
 		return Response.json(body, { status, headers });
 	},
