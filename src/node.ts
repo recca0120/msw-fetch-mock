@@ -3,7 +3,6 @@ import { HandlerFactory } from './handler-factory';
 import { NodeFetchInterceptor } from './node-interceptor';
 import { type SetupServerLike } from './types';
 
-export { FetchMock } from './fetch-mock';
 export { NodeFetchInterceptor } from './node-interceptor';
 
 /** Register Node.js as the default interceptor so `new FetchMock()` works. */

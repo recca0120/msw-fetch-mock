@@ -1,5 +1,6 @@
 import { BrowserFetchInterceptor } from './browser-interceptor';
 import {
+	describeMatcher,
 	isPending,
 	matchBody,
 	matchesValue,
@@ -20,6 +21,7 @@ import {
 	type MockPool,
 	type MockReplyChain,
 	type NetConnectMatcher,
+	type OnUnhandledRequestCallback,
 	type PendingInterceptor,
 	type ReplyCallback,
 	type ReplyOptions,
@@ -29,16 +31,14 @@ import {
 	type SingleReplyCallback,
 } from './types';
 
-export type {
-	ActivateOptions,
-	InterceptOptions,
-	MockInterceptor,
-	MockPool,
-	MockReplyChain,
-	OnUnhandledRequest,
-	PendingInterceptor,
-	ReplyOptions,
-} from './types';
+/**
+ * Tries to answer a request for one interceptor; resolves undefined when it does not match.
+ * `readBody` reads the request body once per request, shared by all interceptors.
+ */
+type MatchingHandler = (
+	request: Request,
+	readBody: () => Promise<string | null>,
+) => Promise<Response | undefined>;
 
 import { installFetchOptions } from './fetch-options';
 
@@ -133,16 +133,12 @@ export class FetchMock {
 	private readonly _calls = new MockCallHistory();
 	private interceptor: FetchInterceptor;
 	private netConnectAllowed: NetConnectMatcher = false;
-	private handlerFns: Map<PendingInterceptor, (request: Request) => Promise<Response | undefined>> =
-		new Map();
+	private handlerFns: Map<PendingInterceptor, MatchingHandler> = new Map();
 	private _defaultReplyHeaders: Record<string, string> = {};
 	private _callHistoryEnabled = true;
 	private catchAllInstalled = false;
 	private catchAllHandler: unknown;
-	private _onUnhandledRequest?: (
-		request: Request,
-		print: { warning(): void; error(): void },
-	) => void;
+	private _onUnhandledRequest?: OnUnhandledRequestCallback;
 
 	get calls(): MockCallHistory {
 		return this._calls;
@@ -161,7 +157,7 @@ export class FetchMock {
 		const timeout = options?.timeout ?? 30000; // Default 30 seconds
 		const forceConnectionClose = options?.forceConnectionClose ?? false;
 
-		this._onUnhandledRequest = (request: Request, print: { warning(): void; error(): void }) => {
+		this._onUnhandledRequest = (request, print) => {
 			if (this.isNetConnectAllowed(request)) return;
 			if (typeof mode === 'function') {
 				mode(request, print);
@@ -196,12 +192,9 @@ export class FetchMock {
 	}
 
 	private isNetConnectAllowed(request: Request): boolean {
-		if (this.netConnectAllowed === true) return true;
-		if (this.netConnectAllowed === false) return false;
-		const host = new URL(request.url).host;
-		if (typeof this.netConnectAllowed === 'string') return host === this.netConnectAllowed;
-		if (this.netConnectAllowed instanceof RegExp) return this.netConnectAllowed.test(host);
-		return this.netConnectAllowed(host);
+		const allowed = this.netConnectAllowed;
+		if (typeof allowed === 'boolean') return allowed;
+		return matchesValue(new URL(request.url).host, allowed);
 	}
 
 	/**
@@ -215,12 +208,23 @@ export class FetchMock {
 	 */
 	private createCatchAllHandler(): unknown {
 		return this.handlerFactory.createCatchAllHandler(async (request: Request) => {
+			// Read the body at most once per request, and only once an interceptor's
+			// cheap checks (origin, path, method, query, headers) have passed. Reading
+			// a clone leaves the original request unread for passthrough.
+			let bodyText: Promise<string | null> | undefined;
+			const readBody = () => {
+				bodyText ??= request
+					.clone()
+					.text()
+					.then((text) => text || null);
+				return bodyText;
+			};
+
 			// Iterate handlers in FIFO order (insertion order of Map)
 			for (const [pending, handlerFn] of this.handlerFns) {
 				if (pending.consumed && !pending.persist) continue;
 
-				// Clone request so each handler can read the body independently
-				const response = await handlerFn(request.clone());
+				const response = await handlerFn(request, readBody);
 				if (response !== undefined) return response;
 			}
 
@@ -317,7 +321,7 @@ export class FetchMock {
 	}
 
 	assertNoPendingInterceptors(): void {
-		const unconsumed = [...this.handlerFns.keys()].filter(isPending);
+		const unconsumed = this.pendingInterceptors();
 		if (unconsumed.length > 0) {
 			const descriptions = unconsumed.map((p) => `  ${p.method} ${p.origin}${p.path}`);
 			throw new Error(`Pending interceptor(s) not consumed:\n${descriptions.join('\n')}`);
@@ -331,42 +335,34 @@ export class FetchMock {
 	private matchOriginAndPath(
 		request: Request,
 		origin: string | RegExp | ((origin: string) => boolean),
-		originStr: string,
 		path: InterceptOptions['path'],
 	): boolean {
 		if (typeof origin === 'string') {
-			// String origin: URL pattern already filtered by origin prefix,
-			// just match the path portion.
-			return matchPath(request, originStr, path);
+			// String origin: matchPath checks the origin prefix and the path below it.
+			return matchPath(request, origin, path);
 		}
 
-		// Non-string origin: URL pattern is catch-all (/.*/),
-		// so we must manually match both origin and path.
+		// RegExp / function origin: match the origin, then the path on its own.
 		const url = new URL(request.url);
-
-		if (origin instanceof RegExp ? !origin.test(url.origin) : !origin(url.origin)) {
-			return false;
-		}
+		if (!matchesValue(url.origin, origin)) return false;
 
 		if (typeof path === 'string') {
 			return url.pathname === path || url.pathname.endsWith(path);
 		}
 
-		const fullPath = url.pathname + url.search;
-		return matchesValue(fullPath, path as RegExp | ((v: string) => boolean));
+		return matchesValue(url.pathname + url.search, path);
 	}
 
 	private async matchAndConsume(
 		request: Request,
+		readBody: () => Promise<string | null>,
 		pending: PendingInterceptor,
 		origin: string | RegExp | ((origin: string) => boolean),
-		originStr: string,
 		options: InterceptOptions,
 	): Promise<string | null | undefined> {
 		if (!pending.persist && pending.timesInvoked >= pending.times) return;
-		if (!this.matchOriginAndPath(request, origin, originStr, options.path)) return;
-		const expectedMethod = options.method ?? 'GET';
-		if (request.method !== expectedMethod) return;
+		if (!this.matchOriginAndPath(request, origin, options.path)) return;
+		if (request.method !== pending.method) return;
 		if (!matchQuery(request, options.query)) return;
 		if (!matchHeaders(request, options.headers)) return;
 
@@ -377,7 +373,7 @@ export class FetchMock {
 			pending.consumed = true;
 		}
 
-		const bodyText = (await request.text()) || null;
+		const bodyText = await readBody();
 		if (!matchBody(bodyText, options.body)) {
 			// Rollback: body didn't match after all
 			pending.timesInvoked--;
@@ -393,10 +389,7 @@ export class FetchMock {
 		return bodyText;
 	}
 
-	private registerHandler(
-		pending: PendingInterceptor,
-		handlerFn: (request: Request) => Promise<Response | undefined>,
-	): void {
+	private registerHandler(pending: PendingInterceptor, handlerFn: MatchingHandler): void {
 		this.handlerFns.set(pending, handlerFn);
 		this.ensureCatchAllInstalled();
 	}
@@ -404,13 +397,12 @@ export class FetchMock {
 	private createMatchingHandler(
 		pending: PendingInterceptor,
 		origin: string | RegExp | ((origin: string) => boolean),
-		originStr: string,
 		options: InterceptOptions,
 		delayRef: { ms: number },
 		respond: (bodyText: string | null) => Promise<Response>,
-	): (request: Request) => Promise<Response | undefined> {
-		return async (request: Request) => {
-			const bodyText = await this.matchAndConsume(request, pending, origin, originStr, options);
+	): MatchingHandler {
+		return async (request, readBody) => {
+			const bodyText = await this.matchAndConsume(request, readBody, pending, origin, options);
 			if (bodyText === undefined) return;
 
 			if (delayRef.ms > 0) {
@@ -465,12 +457,7 @@ export class FetchMock {
 	}
 
 	get(origin: string | RegExp | ((origin: string) => boolean)): MockPool {
-		const originStr =
-			typeof origin === 'string'
-				? origin
-				: origin instanceof RegExp
-					? origin.toString()
-					: '<function>';
+		const originStr = describeMatcher(origin);
 
 		const pool: MockPool = {
 			intercept: (options: InterceptOptions): MockInterceptor => {
@@ -481,17 +468,10 @@ export class FetchMock {
 					);
 				}
 
-				const method = options.method ?? 'GET';
-				const pathStr =
-					typeof options.path === 'string'
-						? options.path
-						: typeof options.path === 'function'
-							? '<function>'
-							: options.path.toString();
 				const pending: PendingInterceptor = {
 					origin: originStr,
-					path: pathStr,
-					method,
+					path: describeMatcher(options.path),
+					method: options.method ?? 'GET',
 					consumed: false,
 					times: 1,
 					timesInvoked: 0,
@@ -534,7 +514,7 @@ export class FetchMock {
 
 						this.registerHandler(
 							pending,
-							this.createMatchingHandler(pending, origin, originStr, options, delayRef, respond),
+							this.createMatchingHandler(pending, origin, options, delayRef, respond),
 						);
 
 						return this.buildChain(pending, delayRef, contentLengthRef, pool);
@@ -545,16 +525,9 @@ export class FetchMock {
 
 						this.registerHandler(
 							pending,
-							this.createMatchingHandler(
-								pending,
-								origin,
-								originStr,
-								options,
-								delayRef,
-								async () => {
-									return this.handlerFactory.buildErrorResponse();
-								},
-							),
+							this.createMatchingHandler(pending, origin, options, delayRef, async () => {
+								return this.handlerFactory.buildErrorResponse();
+							}),
 						);
 
 						return this.buildChain(pending, delayRef, undefined, pool);
