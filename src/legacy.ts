@@ -19,12 +19,22 @@ export { createLegacyHandlerFactory } from './legacy-handler-factory';
  * ```
  *
  * @param rest - The `rest` object from MSW v1 (`import { rest } from 'msw'`)
- * @param server - Optional MSW v1 setupServer instance. If omitted, you must pass a
- *   server or interceptor to `new FetchMock(server)` yourself.
+ * @param server - The MSW v1 setupServer instance to intercept with. Required: without
+ *   it there is nothing to intercept with (the parameter stays optional in the type only
+ *   for compatibility). To bring your own interceptor, use
+ *   `new FetchMock(interceptor, createLegacyHandlerFactory(rest))`.
+ * @throws When `server` is omitted.
  */
 export function createFetchMock(rest: LegacyRestApi, server?: SetupServerLike): FetchMock {
-	const factory = createLegacyHandlerFactory(rest);
-	return new FetchMock(server, factory);
+	if (!server) {
+		// Never fall back to process-wide defaults: those are MSW v2 / native
+		// interceptors registered by other entries and cannot run MSW v1 handlers.
+		throw new Error(
+			'createFetchMock(rest) from msw-fetch-mock/legacy requires an MSW v1 server: ' +
+				'createFetchMock(rest, setupServer()).',
+		);
+	}
+	return new FetchMock(server, createLegacyHandlerFactory(rest));
 }
 
 export * from './exports';

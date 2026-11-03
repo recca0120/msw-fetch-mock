@@ -44,7 +44,7 @@ it('mocks a GET request', async () => {
 | -------------------------------------------- | ----------------------------------------------- |
 | `import { fetchMock } from 'msw-fetch-mock'` | N/A (no singleton — must use `createFetchMock`) |
 | `import { createFetchMock } from '.../node'` | `import { createFetchMock } from '.../legacy'`  |
-| `createFetchMock(server?)`                   | `createFetchMock(rest, server?)`                |
+| `createFetchMock(server?)`                   | `createFetchMock(rest, server)`                |
 | `import { http } from 'msw'`                 | `import { rest } from 'msw'`                    |
 
 ## Key Differences
@@ -52,7 +52,7 @@ it('mocks a GET request', async () => {
 | Aspect            | MSW v2                                    | MSW v1 (Legacy)                       |
 | ----------------- | ----------------------------------------- | ------------------------------------- |
 | Import            | `msw-fetch-mock` or `msw-fetch-mock/node` | `msw-fetch-mock/legacy`               |
-| Factory           | `createFetchMock(server?)`                | `createFetchMock(rest, server?)`      |
+| Factory           | `createFetchMock(server?)`                | `createFetchMock(rest, server)`      |
 | Singleton         | `fetchMock` pre-built instance            | Not available — use `createFetchMock` |
 | Handler internals | Uses `http.*` + `HttpResponse`            | Uses `rest.*` + `(req, res, ctx)`     |
 | MSW version       | `msw@^2.12.7`                             | `msw@^1.0.0`                          |
@@ -63,7 +63,7 @@ The `msw-fetch-mock/legacy` subpath exports:
 
 | Export                           | Type     | Description                                       |
 | -------------------------------- | -------- | ------------------------------------------------- |
-| `createFetchMock(rest, server?)` | Function | Create a FetchMock instance for MSW v1            |
+| `createFetchMock(rest, server)` | Function | Create a FetchMock instance for MSW v1            |
 | `FetchMock`                      | Class    | Core mock class (same as v2)                      |
 | `createLegacyHandlerFactory`     | Function | Low-level: create a v1-compatible handler factory |
 | `LegacyRestApi`                  | Type     | Type for MSW v1's `rest` object                   |
