@@ -310,7 +310,7 @@ describe('FetchMock (native adapter)', () => {
 	});
 });
 
-describe('documented options (native) — control group for BUG-2', () => {
+describe('documented options (native) — control group for BUG-2 / BUG-3', () => {
 	afterEach(() => vi.useRealTimers());
 
 	it('[BUG-2] should set Content-Length to the byte length of a string body', async () => {
@@ -323,6 +323,60 @@ describe('documented options (native) — control group for BUG-2', () => {
 
 			expect(await response.text()).toBe('hello');
 			expect(response.headers.get('Content-Length')).toBe('5'); // 5 ASCII chars = 5 bytes
+		} finally {
+			fm.deactivate();
+		}
+	});
+
+	it('[BUG-3] timeout: a reply delayed past the timeout rejects with TimeoutError', async () => {
+		vi.useFakeTimers();
+		const fm = createFetchMock();
+		await fm.activate({ timeout: 100 });
+		try {
+			fm.get(API_BASE).intercept({ path: '/slow' }).reply(200, 'late').delay(1000);
+
+			let settled = false;
+			const result = fetch(`${API_BASE}/slow`).then(
+				() => 'resolved',
+				(e: unknown) => (e as Error).name,
+			);
+			result.finally(() => {
+				settled = true;
+			});
+
+			await vi.advanceTimersByTimeAsync(100);
+			expect(settled).toBe(true);
+			expect(await result).toBe('TimeoutError');
+		} finally {
+			fm.deactivate();
+		}
+	});
+
+	it('[BUG-3] forceConnectionClose: keeps the headers of a Request passed to fetch()', async () => {
+		const fm = createFetchMock();
+		await fm.activate({ forceConnectionClose: true });
+		try {
+			fm.get(API_BASE).intercept({ path: '/ping' }).reply(200, 'pong');
+
+			await fetch(new Request(`${API_BASE}/ping`, { headers: { 'x-trace': 'abc' } }));
+
+			const headers = fm.calls.lastCall()?.headers;
+			expect(headers?.['x-trace']).toBe('abc');
+			expect(headers?.connection).toBe('close');
+		} finally {
+			fm.deactivate();
+		}
+	});
+
+	it('[BUG-3] forceConnectionClose: requests carry "Connection: close"', async () => {
+		const fm = createFetchMock();
+		await fm.activate({ forceConnectionClose: true });
+		try {
+			fm.get(API_BASE).intercept({ path: '/ping' }).reply(200, 'pong');
+
+			await fetch(`${API_BASE}/ping`);
+
+			expect(fm.calls.lastCall()?.headers.connection).toBe('close');
 		} finally {
 			fm.deactivate();
 		}

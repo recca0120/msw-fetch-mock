@@ -1,7 +1,9 @@
+import { installFetchOptions } from './fetch-options';
 import { type FetchInterceptor, type ResolvedActivateOptions, type SetupWorkerLike } from './types';
 
 export class BrowserFetchInterceptor implements FetchInterceptor {
 	private readonly worker: SetupWorkerLike;
+	private removeFetchOptions: () => void = () => {};
 
 	constructor(worker: SetupWorkerLike) {
 		this.worker = worker;
@@ -23,9 +25,12 @@ export class BrowserFetchInterceptor implements FetchInterceptor {
 		await this.worker.start({
 			onUnhandledRequest: options.onUnhandledRequest,
 		});
+		this.removeFetchOptions = installFetchOptions(options);
 	}
 
 	deactivate(): void {
+		this.removeFetchOptions();
+		this.removeFetchOptions = () => {};
 		this.worker.stop();
 	}
 }

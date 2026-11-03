@@ -1698,6 +1698,81 @@ describe('replyContentLength', () => {
 	});
 });
 
+describe('[BUG-3] documented activate() options in MSW (node) mode', () => {
+	// ActivateOptions documents `timeout` ("for each fetch request") and
+	// `forceConnectionClose` without restricting them to native mode.
+	afterEach(() => vi.useRealTimers());
+
+	it('timeout: a reply delayed past the timeout rejects with TimeoutError', async () => {
+		vi.useFakeTimers();
+		const fm = createFetchMock();
+		await fm.activate({ timeout: 100 });
+		try {
+			fm.get(API_BASE).intercept({ path: '/slow' }).reply(200, 'late').delay(1000);
+
+			let settled = false;
+			const result = fetch(`${API_BASE}/slow`).then(
+				() => 'resolved',
+				(e: unknown) => (e as Error).name,
+			);
+			result.finally(() => {
+				settled = true;
+			});
+
+			await vi.advanceTimersByTimeAsync(100);
+			expect(settled).toBe(true);
+			expect(await result).toBe('TimeoutError');
+		} finally {
+			fm.deactivate();
+		}
+	});
+
+	it.each([
+		['standalone', () => createFetchMock()],
+		['createFetchMock(server)', () => createFetchMock(setupServer())],
+		['new FetchMock(server)', () => new FetchMock(setupServer())],
+	] as const)('deactivate() restores the original fetch (%s)', async (_, create) => {
+		const original = globalThis.fetch;
+		const fm = create();
+		await fm.activate({ timeout: 100, forceConnectionClose: true });
+		expect(globalThis.fetch).not.toBe(original);
+
+		fm.deactivate();
+
+		expect(globalThis.fetch).toBe(original);
+	});
+
+	it('[BUG-3] forceConnectionClose: keeps the headers of a Request passed to fetch()', async () => {
+		const fm = createFetchMock();
+		await fm.activate({ forceConnectionClose: true });
+		try {
+			fm.get(API_BASE).intercept({ path: '/ping' }).reply(200, 'pong');
+
+			await fetch(new Request(`${API_BASE}/ping`, { headers: { 'x-trace': 'abc' } }));
+
+			const headers = fm.calls.lastCall()?.headers;
+			expect(headers?.['x-trace']).toBe('abc');
+			expect(headers?.connection).toBe('close');
+		} finally {
+			fm.deactivate();
+		}
+	});
+
+	it('forceConnectionClose: requests carry "Connection: close"', async () => {
+		const fm = createFetchMock();
+		await fm.activate({ forceConnectionClose: true });
+		try {
+			fm.get(API_BASE).intercept({ path: '/ping' }).reply(200, 'pong');
+
+			await fetch(`${API_BASE}/ping`);
+
+			expect(fm.calls.lastCall()?.headers.connection).toBe('close');
+		} finally {
+			fm.deactivate();
+		}
+	});
+});
+
 describe('parallel request race condition', () => {
 	const fetchMock = createFetchMock();
 
