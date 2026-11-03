@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createFetchMock, FetchMock, fetchMock as singletonFetchMock } from './native';
 
 const API_BASE = 'http://localhost:8787';
@@ -202,18 +202,29 @@ describe('FetchMock (native adapter)', () => {
 
 	describe('delay', () => {
 		it('should delay the response by at least the specified ms', async () => {
-			fetchMock
-				.get(`${API_BASE}/${API_PREFIX}`)
-				.intercept({ path: '/slow', method: 'GET' })
-				.reply(200, { ok: true })
-				.delay(100);
+			vi.useFakeTimers();
+			try {
+				fetchMock
+					.get(`${API_BASE}/${API_PREFIX}`)
+					.intercept({ path: '/slow', method: 'GET' })
+					.reply(200, { ok: true })
+					.delay(100);
 
-			const start = Date.now();
-			const response = await fetch(`${API_BASE}/${API_PREFIX}/slow`);
-			const elapsed = Date.now() - start;
+				let settled = false;
+				const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow`).finally(() => {
+					settled = true;
+				});
 
-			expect(response.status).toBe(200);
-			expect(elapsed).toBeGreaterThanOrEqual(90);
+				// 1ms before the delay elapses: no response yet
+				await vi.advanceTimersByTimeAsync(99);
+				expect(settled).toBe(false);
+
+				await vi.advanceTimersByTimeAsync(1);
+				const response = await fetchPromise;
+				expect(response.status).toBe(200);
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 	});
 
@@ -306,13 +317,17 @@ describe('singleton export (native)', () => {
 });
 
 describe('activate returns promise (native)', () => {
-	it('should return a value from activate()', async () => {
+	it('should return a Promise from activate() that resolves once fetch is patched', async () => {
+		const before = globalThis.fetch;
 		const fm = createFetchMock();
-		const result = fm.activate();
-		// activate can return void or Promise<void>
-		if (result instanceof Promise) {
-			await result;
+		try {
+			const result = fm.activate();
+			expect(result).toBeInstanceOf(Promise);
+			await expect(result).resolves.toBeUndefined();
+			expect(globalThis.fetch).not.toBe(before);
+		} finally {
+			fm.deactivate();
 		}
-		fm.deactivate();
+		expect(globalThis.fetch).toBe(before);
 	});
 });

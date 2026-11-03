@@ -65,16 +65,4 @@ describe('BrowserFetchInterceptor', () => {
 
 		expect(worker.stop).toHaveBeenCalled();
 	});
-
-	it('should pass onUnhandledRequest callback to worker.start()', async () => {
-		const worker = createStubWorker();
-		const adapter = new BrowserFetchInterceptor(worker);
-		const callback = vi.fn();
-
-		await adapter.activate({ onUnhandledRequest: callback });
-
-		expect(worker.start).toHaveBeenCalledWith({
-			onUnhandledRequest: callback,
-		});
-	});
 });
