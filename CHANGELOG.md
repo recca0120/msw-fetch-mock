@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-11-03
+
+### Features
+
+- **MSW v3 support.** The `msw` peer range is now `^1.0.0 || ^2.12.7 || ^3.0.0`. MSW v3 itself requires Node.js >= 22.12. What changed to support it:
+  - The unhandled-request policy is passed to MSW under both `onUnhandledRequest` (v1/v2) and `onUnhandledFrame` (v3).
+  - In browser mode, a worker you already started yourself is not started again (MSW v3 throws on a second `start()`).
+  - The duplicate-server guard ("Another MSW server is already active") also detects MSW v3.
+- **`deactivate()` now returns a `Promise<void>`.** It settles once the interceptor has fully stopped (MSW v3's `worker.stop()` is async). Cleanup still happens synchronously, so code that does not await it behaves as before.
+
+### ⚠️ Breaking Changes
+
+- **`HandlerFactory.createHandler` was removed** (deprecated in 0.6.3). FetchMock never called it. To register a single MSW v1 route yourself, call `rest.get(url, resolver)` (or another `rest` method) directly. Custom `HandlerFactory` implementations can drop the method.
+- **`deactivate()`'s return type changed from `void` to `Promise<void>`** (see Features). It only affects code that relies on the `void` type, for example lint rules against unhandled promises.
+
+### Internal
+
+- The unit suite runs against both MSW v2 and v3 (vitest projects `msw2` / `msw3`).
+- `scripts/test-e2e.sh --msw=3` runs the e2e suites against MSW v3, and CI does too in a new `e2e-msw3` job.
+- The e2e script now checks the installed msw against the peer range itself. Since 0.6.4 it installs with `npm install --no-save`, which does not fail on a peer conflict.
+
 ## [0.6.4] - 2026-11-03
 
 No changes to the public API or to behavior.
