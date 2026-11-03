@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { type NativeHandler } from './native-handler-factory';
 import { NativeFetchInterceptor } from './native-interceptor';
 import { type ResolvedActivateOptions } from './types';
@@ -11,13 +11,21 @@ const noopOptions: ResolvedActivateOptions = {
 
 describe('NativeFetchInterceptor', () => {
 	let originalFetch: typeof globalThis.fetch;
+	/**
+	 * Stands in for the real network: the interceptor captures `globalThis.fetch` on
+	 * activate and passes unhandled requests to it, so no test can reach the internet.
+	 */
+	let network: Mock<typeof globalThis.fetch>;
 
 	beforeEach(() => {
 		originalFetch = globalThis.fetch;
+		network = vi.fn<typeof globalThis.fetch>(async () => new Response('from network'));
+		globalThis.fetch = network;
 	});
 
 	afterEach(() => {
 		// Safety: always restore
+		vi.useRealTimers();
 		globalThis.fetch = originalFetch;
 	});
 
@@ -27,7 +35,7 @@ describe('NativeFetchInterceptor', () => {
 
 			adapter.activate(noopOptions);
 
-			expect(globalThis.fetch).not.toBe(originalFetch);
+			expect(globalThis.fetch).not.toBe(network);
 
 			adapter.deactivate();
 		});
@@ -40,7 +48,8 @@ describe('NativeFetchInterceptor', () => {
 
 			adapter.deactivate();
 
-			expect(globalThis.fetch).toBe(originalFetch);
+			// restores whatever fetch was installed when it was activated
+			expect(globalThis.fetch).toBe(network);
 		});
 	});
 
@@ -99,6 +108,7 @@ describe('NativeFetchInterceptor', () => {
 
 			await globalThis.fetch('http://example.com/test');
 			expect(onUnhandled).toHaveBeenCalled();
+			expect(network).toHaveBeenCalledTimes(1);
 
 			adapter.deactivate();
 		});
@@ -115,18 +125,14 @@ describe('NativeFetchInterceptor', () => {
 				forceConnectionClose: false,
 			});
 
-			// The noop callback doesn't throw, so the adapter falls through to
-			// originalFetch which may fail with a network error — ignore it.
-			try {
-				await globalThis.fetch('http://127.0.0.1:1/path');
-			} catch {
-				// expected: real fetch may fail in CI
-			}
+			// The callback doesn't call print.error(), so the request is passed to the network
+			const response = await globalThis.fetch('http://example.com/path');
 
 			expect(onUnhandled).toHaveBeenCalledWith(
 				expect.any(Request),
 				expect.objectContaining({ warning: expect.any(Function), error: expect.any(Function) }),
 			);
+			expect(await response.text()).toBe('from network');
 
 			adapter.deactivate();
 		});
@@ -149,6 +155,7 @@ describe('NativeFetchInterceptor', () => {
 
 			await globalThis.fetch('http://example.com/test');
 			expect(onUnhandled).toHaveBeenCalled();
+			expect(network).toHaveBeenCalledTimes(1);
 
 			adapter.deactivate();
 		});
@@ -174,71 +181,107 @@ describe('NativeFetchInterceptor', () => {
 	});
 
 	describe('timeout', () => {
+		// The interceptor tries every handler for every request, so each one checks its path.
+		const neverResolves: NativeHandler = {
+			method: 'GET',
+			urlPattern: '/slow',
+			handlerFn: (req) =>
+				new URL(req.url).pathname === '/slow' ? new Promise(() => {}) : Promise.resolve(undefined),
+		};
+		const respondsOk: NativeHandler = {
+			method: 'GET',
+			urlPattern: '/fast',
+			handlerFn: (req) =>
+				Promise.resolve(new URL(req.url).pathname === '/fast' ? new Response('ok') : undefined),
+		};
+
+		/** Starts a fetch and tracks whether it settled, without awaiting it. */
+		function track(promise: Promise<Response>) {
+			const state: { settled: boolean; error?: unknown } = { settled: false };
+			promise.then(
+				() => {
+					state.settled = true;
+				},
+				(error: unknown) => {
+					state.settled = true;
+					state.error = error;
+				},
+			);
+			return state;
+		}
+
 		it('should abort request when timeout is reached', async () => {
-			const adapter = new NativeFetchInterceptor();
-			// Handler that never resolves
-			const slowHandler: NativeHandler = {
-				method: 'GET',
-				urlPattern: '/slow',
-				handlerFn: () => new Promise(() => {}), // never resolves
-			};
+			vi.useFakeTimers();
+			try {
+				const adapter = new NativeFetchInterceptor();
+				adapter.activate({ ...noopOptions, timeout: 100 });
+				adapter.use(neverResolves);
 
-			adapter.activate({
-				onUnhandledRequest: () => {},
-				timeout: 100, // 100ms timeout
-				forceConnectionClose: false,
-			});
-			adapter.use(slowHandler);
+				const state = track(globalThis.fetch('http://example.com/slow'));
 
-			await expect(globalThis.fetch('http://example.com/slow')).rejects.toThrow();
+				await vi.advanceTimersByTimeAsync(99);
+				expect(state.settled).toBe(false);
 
-			adapter.deactivate();
+				await vi.advanceTimersByTimeAsync(1);
+				expect(state.settled).toBe(true);
+				expect((state.error as Error).name).toBe('TimeoutError');
+
+				adapter.deactivate();
+			} finally {
+				// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+				vi.useRealTimers();
+			}
 		});
 
 		it('should not abort when timeout is 0 (disabled)', async () => {
-			const adapter = new NativeFetchInterceptor();
-			const fastHandler: NativeHandler = {
-				method: 'GET',
-				urlPattern: '/fast',
-				handlerFn: vi.fn().mockResolvedValue(new Response('ok')),
-			};
+			vi.useFakeTimers();
+			try {
+				const adapter = new NativeFetchInterceptor();
+				adapter.activate({ ...noopOptions, timeout: 0 });
+				adapter.use(neverResolves, respondsOk);
 
-			adapter.activate({
-				onUnhandledRequest: () => {},
-				timeout: 0, // disabled
-				forceConnectionClose: false,
-			});
-			adapter.use(fastHandler);
+				// a fast request responds normally…
+				const response = await globalThis.fetch('http://example.com/fast');
+				expect(response.status).toBe(200);
 
-			const response = await globalThis.fetch('http://example.com/fast');
-			expect(response.status).toBe(200);
+				// …and a slow one is never cut off
+				const state = track(globalThis.fetch('http://example.com/slow'));
+				await vi.advanceTimersByTimeAsync(60_000);
+				expect(state.settled).toBe(false);
 
-			adapter.deactivate();
+				adapter.deactivate();
+			} finally {
+				// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+				vi.useRealTimers();
+			}
 		});
 
 		it('should respect user-provided signal over timeout', async () => {
-			const adapter = new NativeFetchInterceptor();
-			const userController = new AbortController();
-			const handler: NativeHandler = {
-				method: 'GET',
-				urlPattern: '/test',
-				handlerFn: vi.fn().mockResolvedValue(new Response('ok')),
-			};
+			vi.useFakeTimers();
+			try {
+				const adapter = new NativeFetchInterceptor();
+				adapter.activate({ ...noopOptions, timeout: 100 });
+				adapter.use(neverResolves, respondsOk);
+				const userController = new AbortController();
 
-			adapter.activate({
-				onUnhandledRequest: () => {},
-				timeout: 100,
-				forceConnectionClose: false,
-			});
-			adapter.use(handler);
+				// User provides their own signal - the request still responds normally…
+				const response = await globalThis.fetch('http://example.com/fast', {
+					signal: userController.signal,
+				});
+				expect(response.status).toBe(200);
 
-			// User provides their own signal - timeout should be ignored
-			const response = await globalThis.fetch('http://example.com/test', {
-				signal: userController.signal,
-			});
-			expect(response.status).toBe(200);
+				// …and the 100ms timeout does not apply
+				const state = track(
+					globalThis.fetch('http://example.com/slow', { signal: userController.signal }),
+				);
+				await vi.advanceTimersByTimeAsync(1_000);
+				expect(state.settled).toBe(false);
 
-			adapter.deactivate();
+				adapter.deactivate();
+			} finally {
+				// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+				vi.useRealTimers();
+			}
 		});
 	});
 

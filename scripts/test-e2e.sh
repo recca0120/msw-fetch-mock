@@ -91,7 +91,7 @@ for suite in "${suites[@]}"; do
   (cd "$suite_dir" && npm pkg set "dependencies.msw-fetch-mock=$TARBALL_PATH")
 
   # Clean install to avoid stale cache
-  rm -rf "$suite_dir/node_modules"
+  rm -rf "$suite_dir/node_modules" "$suite_dir/package-lock.json"
   (cd "$suite_dir" && npm install --install-links)
 
   # Run tests

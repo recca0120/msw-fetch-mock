@@ -1,3 +1,4 @@
+import { withConnectionClose, withTimeout } from './fetch-options';
 import { formatUnhandledRequestWarning } from './messages';
 import { type NativeHandler } from './native-handler-factory';
 import { type FetchInterceptor, type ResolvedActivateOptions } from './types';
@@ -11,14 +12,16 @@ export class NativeFetchInterceptor implements FetchInterceptor {
 		this.options = options;
 		this.originalFetch = globalThis.fetch;
 		globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-			// Apply forceConnectionClose if enabled
-			const modifiedInit = this.applyConnectionClose(init);
-
-			// Create request
+			const modifiedInit = this.options.forceConnectionClose
+				? withConnectionClose(input, init)
+				: init;
 			const request = new Request(input, modifiedInit);
 
-			// Wrap execution with timeout if configured
-			return this.withTimeout(() => this.handleRequest(request, input, modifiedInit), init?.signal);
+			return withTimeout(
+				() => this.handleRequest(request, input, modifiedInit),
+				this.options.timeout,
+				init?.signal,
+			);
 		};
 	}
 
@@ -50,30 +53,6 @@ export class NativeFetchInterceptor implements FetchInterceptor {
 		});
 
 		return this.originalFetch(input, init);
-	}
-
-	private applyConnectionClose(init?: RequestInit): RequestInit | undefined {
-		if (!this.options.forceConnectionClose) {
-			return init;
-		}
-		const headers = new Headers(init?.headers);
-		headers.set('Connection', 'close');
-		return { ...init, headers };
-	}
-
-	private withTimeout<T>(fn: () => Promise<T>, userSignal?: AbortSignal | null): Promise<T> {
-		const timeout = this.options.timeout;
-		if (timeout <= 0 || userSignal) return fn();
-
-		let timeoutId: ReturnType<typeof setTimeout>;
-		const timeoutPromise = new Promise<never>((_, reject) => {
-			timeoutId = setTimeout(
-				() => reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError')),
-				timeout,
-			);
-		});
-
-		return Promise.race([fn(), timeoutPromise]).finally(() => clearTimeout(timeoutId));
 	}
 
 	deactivate(): void {

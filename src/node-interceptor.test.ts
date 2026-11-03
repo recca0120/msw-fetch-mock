@@ -1,7 +1,7 @@
 import { setupServer } from 'msw/node';
 import { describe, expect, it, vi } from 'vitest';
-import { createFetchMock } from './node';
 import { NodeFetchInterceptor } from './node-interceptor';
+import { CLOSED_ORIGIN } from './test-utils';
 import { type ResolvedActivateOptions, type SetupServerLike } from './types';
 
 function createStubServer(): SetupServerLike {
@@ -58,38 +58,32 @@ describe('NodeFetchInterceptor', () => {
 		});
 	});
 
-	it('should install the catch-all only once when the server has no listHandlers()', async () => {
-		const server = createStubServer();
-		const fm = createFetchMock(server);
-		await fm.activate();
-
-		fm.get('http://a.test').intercept({ path: '/1' }).reply(200, '');
-		fm.get('http://a.test').intercept({ path: '/2' }).reply(200, '');
-
-		// activate() installs it once; registering intercepts must not add duplicates
-		expect(server.use).toHaveBeenCalledTimes(1);
-	});
-
 	describe('standalone (owns server)', () => {
-		it('should call listen() with onUnhandledRequest on activate', () => {
+		it('should start intercepting with the given onUnhandledRequest on activate', async () => {
 			const adapter = new NodeFetchInterceptor();
 			const callback = vi.fn();
 
 			adapter.activate({ onUnhandledRequest: callback });
+			try {
+				// no handlers installed, so the request is unhandled and reaches the callback
+				await fetch(`${CLOSED_ORIGIN}/unhandled`).catch(() => null);
 
-			// After activate, server should be created and listening
-			// We verify by calling use() which would throw if no server
-			expect(() => adapter.use({ id: 'test' })).not.toThrow();
-
-			adapter.deactivate();
+				expect(callback).toHaveBeenCalledTimes(1);
+				expect((callback.mock.calls[0]?.[0] as Request).url).toBe(`${CLOSED_ORIGIN}/unhandled`);
+			} finally {
+				adapter.deactivate();
+			}
 		});
 
-		it('should call close() on deactivate when it owns the server', () => {
+		it('should release its server on deactivate', () => {
 			const adapter = new NodeFetchInterceptor();
 			adapter.activate(noopCallback);
+			adapter.deactivate();
 
-			// Should not throw
-			expect(() => adapter.deactivate()).not.toThrow();
+			// had the server stayed active, a new standalone interceptor would refuse to start
+			const next = new NodeFetchInterceptor();
+			expect(() => next.activate(noopCallback)).not.toThrow();
+			next.deactivate();
 		});
 
 		it('should throw when another MSW server is already active', () => {

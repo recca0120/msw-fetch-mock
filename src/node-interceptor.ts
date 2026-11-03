@@ -1,10 +1,12 @@
 import { setupServer } from 'msw/node';
+import { installFetchOptions } from './fetch-options';
 import { type FetchInterceptor, type ResolvedActivateOptions, type SetupServerLike } from './types';
 
 /** MSW interceptor that owns and manages its own `setupServer` lifecycle. */
 export class NodeFetchInterceptor implements FetchInterceptor {
 	private server: SetupServerLike | null;
 	private readonly ownsServer: boolean;
+	private removeFetchOptions: () => void = () => {};
 
 	constructor(externalServer?: SetupServerLike) {
 		this.server = externalServer ?? null;
@@ -24,7 +26,10 @@ export class NodeFetchInterceptor implements FetchInterceptor {
 	}
 
 	activate(options: ResolvedActivateOptions): void {
-		if (!this.ownsServer) return;
+		if (!this.ownsServer) {
+			this.removeFetchOptions = installFetchOptions(options);
+			return;
+		}
 
 		// MSW v2 silently reuses interceptors when a second server calls listen().
 		// We detect this via @mswjs/interceptors internal Symbols on globalThis.fetch
@@ -50,9 +55,12 @@ export class NodeFetchInterceptor implements FetchInterceptor {
 		(this.server as ReturnType<typeof setupServer>).listen({
 			onUnhandledRequest: options.onUnhandledRequest,
 		});
+		this.removeFetchOptions = installFetchOptions(options);
 	}
 
 	deactivate(): void {
+		this.removeFetchOptions();
+		this.removeFetchOptions = () => {};
 		if (this.ownsServer) {
 			this.server?.close();
 			this.server = null;

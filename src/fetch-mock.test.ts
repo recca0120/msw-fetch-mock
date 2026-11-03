@@ -1,34 +1,14 @@
-import { createServer } from 'node:net';
 import { HttpResponse, http } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FetchMock } from './fetch-mock';
 import { createFetchMock, fetchMock as singletonFetchMock } from './node';
 import { NodeFetchInterceptor } from './node-interceptor';
+import { CLOSED_HOST, CLOSED_ORIGIN, causeCode } from './test-utils';
 import { type FetchInterceptor, type SetupServerLike, type SetupWorkerLike } from './types';
 
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
-
-/**
- * A local port that is guaranteed to be closed: bind to an ephemeral port, then release it.
- * Requests let through to the network fail fast with ECONNREFUSED — no external network.
- */
-async function getClosedPort(): Promise<number> {
-	const server = createServer();
-	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-	const { port } = server.address() as { port: number };
-	await new Promise<void>((resolve) => server.close(() => resolve()));
-	return port;
-}
-
-const CLOSED_HOST = `127.0.0.1:${await getClosedPort()}`;
-const CLOSED_ORIGIN = `http://${CLOSED_HOST}`;
-
-/** The error cause code, proving the request was let through to the network. */
-function causeCode(error: unknown): string | undefined {
-	return (error as { cause?: { code?: string } }).cause?.code;
-}
 
 describe('FetchMock', () => {
 	const fetchMock = createFetchMock();
@@ -165,19 +145,21 @@ describe('FetchMock', () => {
 	});
 
 	describe('reply with callback', () => {
-		it('should pass request to reply callback', async () => {
+		it('should pass the request to the reply callback and send its result', async () => {
 			fetchMock
 				.get(`${API_BASE}/${API_PREFIX}`)
 				.intercept({ path: '/posts', method: 'POST' })
-				.reply(200, { id: 'new-post' });
+				.reply(200, (req: { body: string | null }) => ({ echoed: req.body }));
 
-			await fetch(`${API_BASE}/${API_PREFIX}/posts`, {
+			const response = await fetch(`${API_BASE}/${API_PREFIX}/posts`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ content: 'Hello' }),
 			});
 
-			expect(fetchMock.calls.lastCall()?.json()).toEqual({ content: 'Hello' });
+			expect(response.status).toBe(200);
+			// the callback receives the raw request body and its return value becomes the JSON reply
+			expect(await response.json()).toEqual({ echoed: '{"content":"Hello"}' });
 		});
 	});
 
@@ -434,6 +416,8 @@ describe('times', () => {
 		fetchMock.disableNetConnect();
 	});
 
+	// some tests intentionally leave interceptors pending; reset so order does not matter
+	afterEach(() => fetchMock.reset());
 	afterAll(() => fetchMock.deactivate());
 
 	it('should match interceptor exactly N times', async () => {
@@ -472,6 +456,8 @@ describe('persist', () => {
 		fetchMock.disableNetConnect();
 	});
 
+	// some tests intentionally leave interceptors pending; reset so order does not matter
+	afterEach(() => fetchMock.reset());
 	afterAll(() => fetchMock.deactivate());
 
 	it('should match indefinitely', async () => {
@@ -498,6 +484,8 @@ describe('pendingInterceptors', () => {
 		fetchMock.disableNetConnect();
 	});
 
+	// some tests intentionally leave interceptors pending; reset so order does not matter
+	afterEach(() => fetchMock.reset());
 	afterAll(() => fetchMock.deactivate());
 
 	it('should return empty array when no interceptors', () => {
@@ -768,19 +756,21 @@ describe('call history', () => {
 	});
 
 	it('should clear history on deactivate()', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/posts', method: 'GET' })
-			.reply(200, { posts: [] });
+		try {
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/posts', method: 'GET' })
+				.reply(200, { posts: [] });
 
-		await fetch(`${API_BASE}/${API_PREFIX}/posts`);
-		expect(fetchMock.calls.length).toBe(1);
+			await fetch(`${API_BASE}/${API_PREFIX}/posts`);
+			expect(fetchMock.calls.length).toBe(1);
 
-		fetchMock.deactivate();
-		expect(fetchMock.calls.length).toBe(0);
-
-		// Re-activate for remaining tests
-		await fetchMock.activate();
+			fetchMock.deactivate();
+			expect(fetchMock.calls.length).toBe(0);
+		} finally {
+			// re-activate the shared instance for the remaining tests, even if this one failed
+			await fetchMock.activate();
+		}
 	});
 
 	it('should preserve history on assertNoPendingInterceptors()', async () => {
@@ -860,54 +850,44 @@ describe('enableNetConnect', () => {
 
 	afterEach(() => fetchMock.deactivate());
 
+	// Blocked requests fail inside fetchMock before any connection is attempted;
+	// requests let through reach the closed local port and fail with ECONNREFUSED.
+	async function fetchClosedOrigin(): Promise<unknown> {
+		return fetch(`${CLOSED_ORIGIN}/test`).catch((e: unknown) => e);
+	}
+
 	it('should block unmatched requests when disableNetConnect() is called', async () => {
 		fetchMock.disableNetConnect();
 
-		await expect(fetch('http://no-such-host.test/path')).rejects.toThrow(/fetch/i);
-	});
-
-	it('should allow all requests when enableNetConnect() is called without args', async () => {
-		fetchMock.disableNetConnect();
-		fetchMock.enableNetConnect();
-
-		// Should NOT throw MSW handler error; will throw network error instead
-		const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+		const error = await fetchClosedOrigin();
 		expect(error).toBeInstanceOf(Error);
-		expect((error as Error).message).not.toMatch(/request handler/i);
-	});
-
-	it('should allow specific host when enableNetConnect(string) is called', async () => {
-		fetchMock.disableNetConnect();
-		fetchMock.enableNetConnect('192.0.2.1:1');
-
-		const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
-		expect(error).toBeInstanceOf(Error);
-		expect((error as Error).message).not.toMatch(/request handler/i);
+		expect((error as Error).message).toMatch(/fetch/i);
+		expect(causeCode(error)).not.toBe('ECONNREFUSED');
 	});
 
 	it('should block non-matching host when enableNetConnect(string) is called', async () => {
 		fetchMock.disableNetConnect();
 		fetchMock.enableNetConnect('allowed.test');
 
-		await expect(fetch('http://blocked.test/path')).rejects.toThrow(/fetch/i);
+		const error = await fetchClosedOrigin();
+		expect(error).toBeInstanceOf(Error);
+		expect((error as Error).message).toMatch(/fetch/i);
+		expect(causeCode(error)).not.toBe('ECONNREFUSED');
 	});
 
-	it('should allow matching host when enableNetConnect(RegExp) is called', async () => {
+	it.each([
+		['without args', undefined],
+		['with a host string', CLOSED_HOST],
+		['with a RegExp', /^127\.0\.0\.1:/],
+		['with a function', (host: string) => host.startsWith('127.0.0.1')],
+	] as const)('should let matching requests reach the network when enableNetConnect() is called %s', async (_, matcher) => {
 		fetchMock.disableNetConnect();
-		fetchMock.enableNetConnect(/192\.0\.2/);
+		fetchMock.enableNetConnect(matcher);
 
-		const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+		const error = await fetchClosedOrigin();
 		expect(error).toBeInstanceOf(Error);
 		expect((error as Error).message).not.toMatch(/request handler/i);
-	});
-
-	it('should allow matching host when enableNetConnect(function) is called', async () => {
-		fetchMock.disableNetConnect();
-		fetchMock.enableNetConnect((host) => host.startsWith('192.0.2'));
-
-		const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
-		expect(error).toBeInstanceOf(Error);
-		expect((error as Error).message).not.toMatch(/request handler/i);
+		expect(causeCode(error)).toBe('ECONNREFUSED');
 	});
 });
 
@@ -999,113 +979,92 @@ describe('delay', () => {
 	});
 
 	afterEach(() => {
+		// restore first, so a failed fake-timer test cannot leak fake time into the next one
+		vi.useRealTimers();
 		fetchMock.assertNoPendingInterceptors();
 		fetchMock.reset();
 	});
 	afterAll(() => fetchMock.deactivate());
 
 	it('should delay the response by at least the specified ms', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/slow', method: 'GET' })
-			.reply(200, { ok: true })
-			.delay(100);
+		vi.useFakeTimers();
+		try {
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/slow', method: 'GET' })
+				.reply(200, { ok: true })
+				.delay(100);
 
-		const start = Date.now();
-		const response = await fetch(`${API_BASE}/${API_PREFIX}/slow`);
-		const elapsed = Date.now() - start;
+			let settled = false;
+			const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow`).finally(() => {
+				settled = true;
+			});
 
-		expect(response.status).toBe(200);
-		expect(elapsed).toBeGreaterThanOrEqual(90); // allow 10ms tolerance
+			// 1ms before the delay elapses: no response yet
+			await vi.advanceTimersByTimeAsync(99);
+			expect(settled).toBe(false);
+
+			// delay elapsed: the reply is delivered
+			await vi.advanceTimersByTimeAsync(1);
+			const response = await fetchPromise;
+			expect(response.status).toBe(200);
+			expect(await response.json()).toEqual({ ok: true });
+		} finally {
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
+		}
 	});
 
 	it('should clear the delay timer when request is aborted (no lingering timers)', async () => {
 		vi.useFakeTimers();
+		try {
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/abort-timer-cleanup', method: 'GET' })
+				.reply(200, { ok: true })
+				.delay(1000);
 
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/abort-timer-cleanup', method: 'GET' })
-			.reply(200, { ok: true })
-			.delay(1000);
+			const controller = new AbortController();
+			const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/abort-timer-cleanup`, {
+				signal: controller.signal,
+			}).catch(() => {});
 
-		const controller = new AbortController();
-		const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/abort-timer-cleanup`, {
-			signal: controller.signal,
-		}).catch(() => {});
+			controller.abort();
+			await vi.advanceTimersByTimeAsync(0);
+			await fetchPromise;
 
-		controller.abort();
-		await vi.advanceTimersByTimeAsync(0);
-		await fetchPromise;
-
-		// timer should be cleared — no lingering fake timers
-		expect(vi.getTimerCount()).toBe(0);
-
-		vi.useRealTimers();
+			// timer should be cleared — no lingering fake timers
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
+		}
 	});
 
-	it('should reject with AbortError when request is aborted during delay', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/slow-abort', method: 'GET' })
-			.reply(200, { ok: true })
-			.delay(500);
-
-		const controller = new AbortController();
-		const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow-abort`, {
-			signal: controller.signal,
-		});
-
-		setTimeout(() => controller.abort(), 50);
-
-		await expect(fetchPromise).rejects.toThrow();
-	});
-
-	it('should reject with an error named AbortError when aborted', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/slow-abort-name', method: 'GET' })
-			.reply(200, { ok: true })
-			.delay(500);
-
-		const controller = new AbortController();
-		const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow-abort-name`, {
-			signal: controller.signal,
-		});
-
-		setTimeout(() => controller.abort(), 50);
-
-		const error = await fetchPromise.catch((e) => e);
-		expect(error.name).toBe('AbortError');
-	});
-
-	it('should resolve normally when not aborted', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/slow-no-abort', method: 'GET' })
-			.reply(200, { ok: true })
-			.delay(50);
-
-		const response = await fetch(`${API_BASE}/${API_PREFIX}/slow-no-abort`);
-		expect(response.status).toBe(200);
-		expect(await response.json()).toEqual({ ok: true });
-	});
-
-	it('should complete within delay time when using fake timers', async () => {
+	it('should reject with an error named AbortError when aborted during the delay', async () => {
 		vi.useFakeTimers();
+		try {
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/slow-abort-name', method: 'GET' })
+				.reply(200, { ok: true })
+				.delay(500);
 
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/fake-timer', method: 'GET' })
-			.reply(200, { ok: true })
-			.delay(1000);
+			const controller = new AbortController();
+			const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow-abort-name`, {
+				signal: controller.signal,
+			}).catch((e: unknown) => e);
 
-		const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/fake-timer`);
-		await vi.advanceTimersByTimeAsync(1000);
-		const response = await fetchPromise;
+			// abort 50ms into the 500ms delay
+			await vi.advanceTimersByTimeAsync(50);
+			controller.abort();
 
-		expect(response.status).toBe(200);
-
-		vi.useRealTimers();
+			const error = await fetchPromise;
+			expect((error as Error).name).toBe('AbortError');
+		} finally {
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
+		}
 	});
 });
 
@@ -1118,6 +1077,7 @@ describe('retry scenarios', () => {
 	});
 
 	afterEach(() => {
+		vi.useRealTimers();
 		fetchMock.assertNoPendingInterceptors();
 		fetchMock.reset();
 	});
@@ -1144,31 +1104,33 @@ describe('retry scenarios', () => {
 
 	it('should handle retry with delay using fake timers', async () => {
 		vi.useFakeTimers();
+		try {
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/retry-delay', method: 'GET' })
+				.reply(503)
+				.times(1)
+				.delay(500);
 
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/retry-delay', method: 'GET' })
-			.reply(503)
-			.times(1)
-			.delay(500);
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/retry-delay', method: 'GET' })
+				.reply(200, { ok: true })
+				.persist();
 
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/retry-delay', method: 'GET' })
-			.reply(200, { ok: true })
-			.persist();
+			const firstPromise = fetch(`${API_BASE}/${API_PREFIX}/retry-delay`);
+			await vi.advanceTimersByTimeAsync(500);
+			const first = await firstPromise;
+			expect(first.status).toBe(503);
 
-		const firstPromise = fetch(`${API_BASE}/${API_PREFIX}/retry-delay`);
-		await vi.advanceTimersByTimeAsync(500);
-		const first = await firstPromise;
-		expect(first.status).toBe(503);
-
-		const secondPromise = fetch(`${API_BASE}/${API_PREFIX}/retry-delay`);
-		await vi.advanceTimersByTimeAsync(500);
-		const second = await secondPromise;
-		expect(second.status).toBe(200);
-
-		vi.useRealTimers();
+			const secondPromise = fetch(`${API_BASE}/${API_PREFIX}/retry-delay`);
+			await vi.advanceTimersByTimeAsync(500);
+			const second = await secondPromise;
+			expect(second.status).toBe(200);
+		} finally {
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
+		}
 	});
 });
 
@@ -1204,34 +1166,46 @@ describe('onUnhandledRequest', () => {
 		await fm.activate({ onUnhandledRequest: 'error' });
 
 		try {
-			await expect(fetch('http://no-such-host.test/path')).rejects.toThrow(/fetch/i);
+			const error = await fetch(`${CLOSED_ORIGIN}/test`).catch((e: unknown) => e);
+			expect(error).toBeInstanceOf(Error);
+			expect((error as Error).message).toMatch(/fetch/i);
+			expect(causeCode(error)).not.toBe('ECONNREFUSED');
 		} finally {
 			fm.deactivate();
 		}
 	});
 
-	it('should allow unhandled requests through when onUnhandledRequest is "warn"', async () => {
+	it('should allow unhandled requests through and warn once when onUnhandledRequest is "warn"', async () => {
 		const fm = createFetchMock();
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		await fm.activate({ onUnhandledRequest: 'warn' });
 
 		try {
-			const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+			const error = await fetch(`${CLOSED_ORIGIN}/test`).catch((e: unknown) => e);
 			expect(error).toBeInstanceOf(Error);
 			expect((error as Error).message).not.toMatch(/request handler/i);
+			expect(causeCode(error)).toBe('ECONNREFUSED');
+			expect(warn).toHaveBeenCalledTimes(1);
+			expect(warn.mock.calls[0]?.[0]).toContain(`GET ${CLOSED_ORIGIN}/test`);
 		} finally {
+			warn.mockRestore();
 			fm.deactivate();
 		}
 	});
 
 	it('should silently allow unhandled requests when onUnhandledRequest is "bypass"', async () => {
 		const fm = createFetchMock();
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		await fm.activate({ onUnhandledRequest: 'bypass' });
 
 		try {
-			const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+			const error = await fetch(`${CLOSED_ORIGIN}/test`).catch((e: unknown) => e);
 			expect(error).toBeInstanceOf(Error);
 			expect((error as Error).message).not.toMatch(/request handler/i);
+			expect(causeCode(error)).toBe('ECONNREFUSED');
+			expect(warn).not.toHaveBeenCalled();
 		} finally {
+			warn.mockRestore();
 			fm.deactivate();
 		}
 	});
@@ -1247,8 +1221,8 @@ describe('onUnhandledRequest', () => {
 		});
 
 		try {
-			await fetch('http://192.0.2.1:1/test').catch(() => null);
-			expect(capturedUrl).toBe('http://192.0.2.1:1/test');
+			await fetch(`${CLOSED_ORIGIN}/test`).catch(() => null);
+			expect(capturedUrl).toBe(`${CLOSED_ORIGIN}/test`);
 		} finally {
 			fm.deactivate();
 		}
@@ -1257,12 +1231,13 @@ describe('onUnhandledRequest', () => {
 	it('should respect enableNetConnect even in error mode', async () => {
 		const fm = createFetchMock();
 		await fm.activate({ onUnhandledRequest: 'error' });
-		fm.enableNetConnect('192.0.2.1:1');
+		fm.enableNetConnect(CLOSED_HOST);
 
 		try {
-			const error = await fetch('http://192.0.2.1:1/test').catch((e: unknown) => e);
+			const error = await fetch(`${CLOSED_ORIGIN}/test`).catch((e: unknown) => e);
 			expect(error).toBeInstanceOf(Error);
 			expect((error as Error).message).not.toMatch(/request handler/i);
+			expect(causeCode(error)).toBe('ECONNREFUSED');
 		} finally {
 			fm.deactivate();
 		}
@@ -1368,6 +1343,38 @@ describe('user calls server.resetHandlers() on a server passed to fetchMock', ()
 	});
 });
 
+describe('server passed to fetchMock without listHandlers()', () => {
+	it('should install the catch-all only once, so an unhandled request is reported once', async () => {
+		// A real server whose wrapper hides listHandlers(), as a minimal SetupServerLike would.
+		const real = setupServer();
+		real.listen({ onUnhandledRequest: 'bypass' });
+		const server: SetupServerLike = {
+			use: (...handlers) => real.use(...(handlers as Parameters<typeof real.use>)),
+			resetHandlers: (...handlers) =>
+				real.resetHandlers(...(handlers as Parameters<typeof real.resetHandlers>)),
+			listen: (options) => real.listen(options),
+			close: () => real.close(),
+		};
+		const fm = createFetchMock(server);
+		const onUnhandledRequest = vi.fn();
+		await fm.activate({ onUnhandledRequest });
+
+		try {
+			// each intercept registration must not add another catch-all
+			fm.get(API_BASE).intercept({ path: '/1' }).reply(200, 'one');
+			fm.get(API_BASE).intercept({ path: '/2' }).reply(200, 'two');
+			expect(await (await fetch(`${API_BASE}/1`)).text()).toBe('one');
+			expect(await (await fetch(`${API_BASE}/2`)).text()).toBe('two');
+
+			// a duplicated catch-all would run the unhandled path once per copy
+			await fetch(`${CLOSED_ORIGIN}/unhandled`).catch(() => null);
+			expect(onUnhandledRequest).toHaveBeenCalledTimes(1);
+		} finally {
+			real.close();
+		}
+	});
+});
+
 describe('consumed interceptor', () => {
 	it('should treat consumed interceptor request as unhandled', async () => {
 		const captured: string[] = [];
@@ -1378,19 +1385,22 @@ describe('consumed interceptor', () => {
 			},
 		});
 
-		fm.get('http://example.test')
-			.intercept({ path: '/data', method: 'GET' })
-			.reply(200, { ok: true });
+		try {
+			fm.get(CLOSED_ORIGIN).intercept({ path: '/data', method: 'GET' }).reply(200, { ok: true });
 
-		// Consume the interceptor
-		await fetch('http://example.test/data');
+			// Consume the interceptor
+			const first = await fetch(`${CLOSED_ORIGIN}/data`);
+			expect(first.status).toBe(200);
 
-		// Second request - consumed interceptor should trigger onUnhandledRequest callback
-		await fetch('http://example.test/data').catch(() => null);
+			// Second request - consumed interceptor should trigger onUnhandledRequest callback
+			// (and, since the callback does not error, be let through to the closed port)
+			const error = await fetch(`${CLOSED_ORIGIN}/data`).catch((e: unknown) => e);
 
-		expect(captured).toContain('http://example.test/data');
-
-		fm.deactivate();
+			expect(captured).toEqual([`${CLOSED_ORIGIN}/data`]);
+			expect(causeCode(error)).toBe('ECONNREFUSED');
+		} finally {
+			fm.deactivate();
+		}
 	});
 });
 
@@ -1460,30 +1470,6 @@ describe('defaultReplyHeaders', () => {
 		const response = await fetch(`${API_BASE}/${API_PREFIX}/data`);
 
 		expect(response.headers.get('X-Will-Be-Cleared')).toBeNull();
-	});
-});
-
-describe('replyWithError with Error parameter', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
-
-	it('should accept Error parameter and reject the fetch', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/fail', method: 'GET' })
-			.replyWithError(new Error('custom network failure'));
-
-		await expect(fetch(`${API_BASE}/${API_PREFIX}/fail`)).rejects.toThrow();
 	});
 });
 
@@ -1613,6 +1599,8 @@ describe('enableCallHistory / disableCallHistory', () => {
 	});
 
 	afterEach(() => {
+		// reset() does not restore call recording, so re-enable it even if a test failed
+		fetchMock.enableCallHistory();
 		fetchMock.assertNoPendingInterceptors();
 		fetchMock.reset();
 	});
@@ -1640,9 +1628,6 @@ describe('enableCallHistory / disableCallHistory', () => {
 		await fetch(`${API_BASE}/${API_PREFIX}/posts`);
 
 		expect(fetchMock.calls.length).toBe(0);
-
-		// Re-enable for cleanup
-		fetchMock.enableCallHistory();
 	});
 
 	it('should resume recording after enableCallHistory()', async () => {
@@ -1688,6 +1673,124 @@ describe('replyContentLength', () => {
 		const contentLength = response.headers.get('Content-Length');
 		expect(contentLength).not.toBeNull();
 		expect(Number(contentLength)).toBe(JSON.stringify(body).length);
+	});
+
+	// Content-Length is a byte count of the body actually sent.
+	it.each([
+		['an ASCII string', 'hello', 5], // 5 ASCII chars = 5 bytes, sent as-is (no JSON quotes)
+		['a non-ASCII string', 'héllo', 6], // "é" is 2 bytes in UTF-8
+		['a non-ASCII object', { name: 'é' }, 13], // '{"name":"é"}' = 12 chars, 13 bytes
+	] as const)('[BUG-2] should set Content-Length to the byte length of %s body', async (_, body, bytes) => {
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/data', method: 'GET' })
+			.reply(200, body)
+			.replyContentLength();
+
+		const response = await fetch(`${API_BASE}/${API_PREFIX}/data`);
+		const sent = new Uint8Array(await response.arrayBuffer());
+
+		expect(sent.byteLength).toBe(bytes);
+		expect(response.headers.get('Content-Length')).toBe(String(bytes));
+	});
+
+	it('[BUG-2] should not set Content-Length for a ReadableStream body (length unknown)', async () => {
+		const stream = new ReadableStream({
+			start(controller) {
+				controller.enqueue(new TextEncoder().encode('streamed'));
+				controller.close();
+			},
+		});
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/stream', method: 'GET' })
+			.reply(200, stream)
+			.replyContentLength();
+
+		const response = await fetch(`${API_BASE}/${API_PREFIX}/stream`);
+
+		expect(await response.text()).toBe('streamed');
+		expect(response.headers.get('Content-Length')).toBeNull();
+	});
+});
+
+describe('[BUG-3] documented activate() options in MSW (node) mode', () => {
+	// ActivateOptions documents `timeout` ("for each fetch request") and
+	// `forceConnectionClose` without restricting them to native mode.
+	afterEach(() => vi.useRealTimers());
+
+	it('timeout: a reply delayed past the timeout rejects with TimeoutError', async () => {
+		vi.useFakeTimers();
+		try {
+			const fm = createFetchMock();
+			await fm.activate({ timeout: 100 });
+			try {
+				fm.get(API_BASE).intercept({ path: '/slow' }).reply(200, 'late').delay(1000);
+
+				let settled = false;
+				const result = fetch(`${API_BASE}/slow`).then(
+					() => 'resolved',
+					(e: unknown) => (e as Error).name,
+				);
+				result.finally(() => {
+					settled = true;
+				});
+
+				await vi.advanceTimersByTimeAsync(100);
+				expect(settled).toBe(true);
+				expect(await result).toBe('TimeoutError');
+			} finally {
+				fm.deactivate();
+			}
+		} finally {
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
+		}
+	});
+
+	it.each([
+		['standalone', () => createFetchMock()],
+		['createFetchMock(server)', () => createFetchMock(setupServer())],
+		['new FetchMock(server)', () => new FetchMock(setupServer())],
+	] as const)('deactivate() restores the original fetch (%s)', async (_, create) => {
+		const original = globalThis.fetch;
+		const fm = create();
+		await fm.activate({ timeout: 100, forceConnectionClose: true });
+		expect(globalThis.fetch).not.toBe(original);
+
+		fm.deactivate();
+
+		expect(globalThis.fetch).toBe(original);
+	});
+
+	it('[BUG-3] forceConnectionClose: keeps the headers of a Request passed to fetch()', async () => {
+		const fm = createFetchMock();
+		await fm.activate({ forceConnectionClose: true });
+		try {
+			fm.get(API_BASE).intercept({ path: '/ping' }).reply(200, 'pong');
+
+			await fetch(new Request(`${API_BASE}/ping`, { headers: { 'x-trace': 'abc' } }));
+
+			const headers = fm.calls.lastCall()?.headers;
+			expect(headers?.['x-trace']).toBe('abc');
+			expect(headers?.connection).toBe('close');
+		} finally {
+			fm.deactivate();
+		}
+	});
+
+	it('forceConnectionClose: requests carry "Connection: close"', async () => {
+		const fm = createFetchMock();
+		await fm.activate({ forceConnectionClose: true });
+		try {
+			fm.get(API_BASE).intercept({ path: '/ping' }).reply(200, 'pong');
+
+			await fetch(`${API_BASE}/ping`);
+
+			expect(fm.calls.lastCall()?.headers.connection).toBe('close');
+		} finally {
+			fm.deactivate();
+		}
 	});
 });
 

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createFetchMock, FetchMock, fetchMock as singletonFetchMock } from './native';
 
 const API_BASE = 'http://localhost:8787';
@@ -202,18 +202,29 @@ describe('FetchMock (native adapter)', () => {
 
 	describe('delay', () => {
 		it('should delay the response by at least the specified ms', async () => {
-			fetchMock
-				.get(`${API_BASE}/${API_PREFIX}`)
-				.intercept({ path: '/slow', method: 'GET' })
-				.reply(200, { ok: true })
-				.delay(100);
+			vi.useFakeTimers();
+			try {
+				fetchMock
+					.get(`${API_BASE}/${API_PREFIX}`)
+					.intercept({ path: '/slow', method: 'GET' })
+					.reply(200, { ok: true })
+					.delay(100);
 
-			const start = Date.now();
-			const response = await fetch(`${API_BASE}/${API_PREFIX}/slow`);
-			const elapsed = Date.now() - start;
+				let settled = false;
+				const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow`).finally(() => {
+					settled = true;
+				});
 
-			expect(response.status).toBe(200);
-			expect(elapsed).toBeGreaterThanOrEqual(90);
+				// 1ms before the delay elapses: no response yet
+				await vi.advanceTimersByTimeAsync(99);
+				expect(settled).toBe(false);
+
+				await vi.advanceTimersByTimeAsync(1);
+				const response = await fetchPromise;
+				expect(response.status).toBe(200);
+			} finally {
+				vi.useRealTimers();
+			}
 		});
 	});
 
@@ -299,6 +310,84 @@ describe('FetchMock (native adapter)', () => {
 	});
 });
 
+describe('documented options (native) — control group for BUG-2 / BUG-3', () => {
+	afterEach(() => vi.useRealTimers());
+
+	it('[BUG-2] should set Content-Length to the byte length of a string body', async () => {
+		const fm = createFetchMock();
+		await fm.activate();
+		try {
+			fm.get(API_BASE).intercept({ path: '/data' }).reply(200, 'hello').replyContentLength();
+
+			const response = await fetch(`${API_BASE}/data`);
+
+			expect(await response.text()).toBe('hello');
+			expect(response.headers.get('Content-Length')).toBe('5'); // 5 ASCII chars = 5 bytes
+		} finally {
+			fm.deactivate();
+		}
+	});
+
+	it('[BUG-3] timeout: a reply delayed past the timeout rejects with TimeoutError', async () => {
+		vi.useFakeTimers();
+		try {
+			const fm = createFetchMock();
+			await fm.activate({ timeout: 100 });
+			try {
+				fm.get(API_BASE).intercept({ path: '/slow' }).reply(200, 'late').delay(1000);
+
+				let settled = false;
+				const result = fetch(`${API_BASE}/slow`).then(
+					() => 'resolved',
+					(e: unknown) => (e as Error).name,
+				);
+				result.finally(() => {
+					settled = true;
+				});
+
+				await vi.advanceTimersByTimeAsync(100);
+				expect(settled).toBe(true);
+				expect(await result).toBe('TimeoutError');
+			} finally {
+				fm.deactivate();
+			}
+		} finally {
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
+		}
+	});
+
+	it('[BUG-3] forceConnectionClose: keeps the headers of a Request passed to fetch()', async () => {
+		const fm = createFetchMock();
+		await fm.activate({ forceConnectionClose: true });
+		try {
+			fm.get(API_BASE).intercept({ path: '/ping' }).reply(200, 'pong');
+
+			await fetch(new Request(`${API_BASE}/ping`, { headers: { 'x-trace': 'abc' } }));
+
+			const headers = fm.calls.lastCall()?.headers;
+			expect(headers?.['x-trace']).toBe('abc');
+			expect(headers?.connection).toBe('close');
+		} finally {
+			fm.deactivate();
+		}
+	});
+
+	it('[BUG-3] forceConnectionClose: requests carry "Connection: close"', async () => {
+		const fm = createFetchMock();
+		await fm.activate({ forceConnectionClose: true });
+		try {
+			fm.get(API_BASE).intercept({ path: '/ping' }).reply(200, 'pong');
+
+			await fetch(`${API_BASE}/ping`);
+
+			expect(fm.calls.lastCall()?.headers.connection).toBe('close');
+		} finally {
+			fm.deactivate();
+		}
+	});
+});
+
 describe('singleton export (native)', () => {
 	it('should export fetchMock as a FetchMock instance', () => {
 		expect(singletonFetchMock).toBeInstanceOf(FetchMock);
@@ -306,13 +395,17 @@ describe('singleton export (native)', () => {
 });
 
 describe('activate returns promise (native)', () => {
-	it('should return a value from activate()', async () => {
+	it('should return a Promise from activate() that resolves once fetch is patched', async () => {
+		const before = globalThis.fetch;
 		const fm = createFetchMock();
-		const result = fm.activate();
-		// activate can return void or Promise<void>
-		if (result instanceof Promise) {
-			await result;
+		try {
+			const result = fm.activate();
+			expect(result).toBeInstanceOf(Promise);
+			await expect(result).resolves.toBeUndefined();
+			expect(globalThis.fetch).not.toBe(before);
+		} finally {
+			fm.deactivate();
 		}
-		fm.deactivate();
+		expect(globalThis.fetch).toBe(before);
 	});
 });
