@@ -40,6 +40,13 @@ export class NativeFetchInterceptor implements FetchInterceptor {
 			}
 		}
 
+		// Like MSW: a handler that ran but returned nothing has handled the request
+		// as a passthrough (FetchMock's catch-all already applied the unhandled-request
+		// policy). Only a request no handler saw at all is "unhandled" here.
+		if (this.handlers.length > 0) {
+			return this.originalFetch(input, init);
+		}
+
 		this.options.onUnhandledRequest(request, {
 			warning: () => {
 				console.warn(formatUnhandledRequestWarning(request.method, request.url));

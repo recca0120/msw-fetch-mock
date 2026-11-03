@@ -1375,6 +1375,35 @@ describe('server passed to fetchMock without listHandlers()', () => {
 	});
 });
 
+describe('[BUG-4] unhandled requests are reported once (node — control group)', () => {
+	it('a custom onUnhandledRequest callback runs once per unhandled request', async () => {
+		const fm = createFetchMock();
+		const onUnhandledRequest = vi.fn();
+		await fm.activate({ onUnhandledRequest });
+		try {
+			await fetch(`${CLOSED_ORIGIN}/unhandled`).catch(() => null);
+
+			expect(onUnhandledRequest).toHaveBeenCalledTimes(1);
+		} finally {
+			fm.deactivate();
+		}
+	});
+
+	it('"warn" prints one warning per unhandled request', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const fm = createFetchMock();
+		await fm.activate({ onUnhandledRequest: 'warn' });
+		try {
+			await fetch(`${CLOSED_ORIGIN}/unhandled`).catch(() => null);
+
+			expect(warn).toHaveBeenCalledTimes(1);
+		} finally {
+			warn.mockRestore();
+			fm.deactivate();
+		}
+	});
+});
+
 describe('consumed interceptor', () => {
 	it('should treat consumed interceptor request as unhandled', async () => {
 		const captured: string[] = [];

@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createFetchMock, FetchMock, fetchMock as singletonFetchMock } from './native';
+import { CLOSED_ORIGIN } from './test-utils';
 
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
@@ -383,6 +384,35 @@ describe('documented options (native) — control group for BUG-2 / BUG-3', () =
 
 			expect(fm.calls.lastCall()?.headers.connection).toBe('close');
 		} finally {
+			fm.deactivate();
+		}
+	});
+});
+
+describe('[BUG-4] unhandled requests are reported once (native)', () => {
+	it('a custom onUnhandledRequest callback runs once per unhandled request', async () => {
+		const fm = createFetchMock();
+		const onUnhandledRequest = vi.fn();
+		await fm.activate({ onUnhandledRequest });
+		try {
+			await fetch(`${CLOSED_ORIGIN}/unhandled`).catch(() => null);
+
+			expect(onUnhandledRequest).toHaveBeenCalledTimes(1);
+		} finally {
+			fm.deactivate();
+		}
+	});
+
+	it('"warn" prints one warning per unhandled request', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const fm = createFetchMock();
+		await fm.activate({ onUnhandledRequest: 'warn' });
+		try {
+			await fetch(`${CLOSED_ORIGIN}/unhandled`).catch(() => null);
+
+			expect(warn).toHaveBeenCalledTimes(1);
+		} finally {
+			warn.mockRestore();
 			fm.deactivate();
 		}
 	});
