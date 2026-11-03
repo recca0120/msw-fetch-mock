@@ -12,9 +12,9 @@ FetchMock._defaultInterceptorFactory = () => new NativeFetchInterceptor();
 FetchMock._handlerFactory = NativeHandlerFactory;
 
 export function createFetchMock(): FetchMock {
-	// Pass the handler factory explicitly: the statics above are process-wide and
-	// another entry imported later (e.g. /node) would overwrite them.
-	return new FetchMock(new NativeFetchInterceptor(), NativeHandlerFactory);
+  // Pass the handler factory explicitly: the statics above are process-wide and
+  // another entry imported later (e.g. /node) would overwrite them.
+  return new FetchMock(new NativeFetchInterceptor(), NativeHandlerFactory);
 }
 
 /** Pre-built singleton for quick standalone use. */

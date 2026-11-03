@@ -1,21 +1,21 @@
 {
-	"compilerOptions": {
-		"target": "ES2022",
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"ignoreDeprecations": "6.0",
-		"strict": true,
-		"erasableSyntaxOnly": true,
-		"isolatedDeclarations": true,
-		"esModuleInterop": true,
-		"skipLibCheck": true,
-		"forceConsistentCasingInFileNames": true,
-		"isolatedModules": true,
-		"verbatimModuleSyntax": true,
-		"declaration": true,
-		"declarationMap": true,
-		"outDir": "dist"
-	},
-	"include": ["src"],
-	"exclude": ["src/**/*.test.ts", "src/**/*.contract.ts", "src/test-utils.ts"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "erasableSyntaxOnly": true,
+    "isolatedDeclarations": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.contract.ts", "src/test-utils.ts"]
 }

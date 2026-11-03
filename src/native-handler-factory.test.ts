@@ -2,57 +2,57 @@ import { describe, expect, it } from 'vitest';
 import { NativeHandlerFactory } from './native-handler-factory';
 
 describe('NativeHandlerFactory', () => {
-	describe('buildResponse', () => {
-		it('should return a JSON Response with status 200', async () => {
-			const response = NativeHandlerFactory.buildResponse(200, { data: 1 });
+  describe('buildResponse', () => {
+    it('should return a JSON Response with status 200', async () => {
+      const response = NativeHandlerFactory.buildResponse(200, { data: 1 });
 
-			expect(response).toBeInstanceOf(Response);
-			expect(response.status).toBe(200);
-			expect(await response.json()).toEqual({ data: 1 });
-		});
+      expect(response).toBeInstanceOf(Response);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ data: 1 });
+    });
 
-		it('should return a Response with null body for status 204', () => {
-			const response = NativeHandlerFactory.buildResponse(204, null);
+    it('should return a Response with null body for status 204', () => {
+      const response = NativeHandlerFactory.buildResponse(204, null);
 
-			expect(response.status).toBe(204);
-			expect(response.body).toBeNull();
-		});
+      expect(response.status).toBe(204);
+      expect(response.body).toBeNull();
+    });
 
-		it('should return a Response with undefined body', () => {
-			const response = NativeHandlerFactory.buildResponse(204, undefined);
+    it('should return a Response with undefined body', () => {
+      const response = NativeHandlerFactory.buildResponse(204, undefined);
 
-			expect(response.status).toBe(204);
-			expect(response.body).toBeNull();
-		});
+      expect(response.status).toBe(204);
+      expect(response.body).toBeNull();
+    });
 
-		it('should return string body as-is without JSON serialization', async () => {
-			const response = NativeHandlerFactory.buildResponse(200, 'hello world');
+    it('should return string body as-is without JSON serialization', async () => {
+      const response = NativeHandlerFactory.buildResponse(200, 'hello world');
 
-			expect(response.status).toBe(200);
-			expect(await response.text()).toBe('hello world');
-		});
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('hello world');
+    });
 
-		it('should not double-serialize a JSON string', async () => {
-			const jsonString = JSON.stringify({ key: 'value' });
-			const response = NativeHandlerFactory.buildResponse(200, jsonString);
+    it('should not double-serialize a JSON string', async () => {
+      const jsonString = JSON.stringify({ key: 'value' });
+      const response = NativeHandlerFactory.buildResponse(200, jsonString);
 
-			expect(await response.text()).toBe(jsonString);
-		});
+      expect(await response.text()).toBe(jsonString);
+    });
 
-		it('should include custom headers', async () => {
-			const headers = new Headers({ 'X-Custom': 'test-value' });
-			const response = NativeHandlerFactory.buildResponse(200, { ok: true }, headers);
+    it('should include custom headers', async () => {
+      const headers = new Headers({ 'X-Custom': 'test-value' });
+      const response = NativeHandlerFactory.buildResponse(200, { ok: true }, headers);
 
-			expect(response.headers.get('X-Custom')).toBe('test-value');
-			expect(await response.json()).toEqual({ ok: true });
-		});
-	});
+      expect(response.headers.get('X-Custom')).toBe('test-value');
+      expect(await response.json()).toEqual({ ok: true });
+    });
+  });
 
-	describe('buildErrorResponse', () => {
-		it('should return an error Response', () => {
-			const response = NativeHandlerFactory.buildErrorResponse();
+  describe('buildErrorResponse', () => {
+    it('should return an error Response', () => {
+      const response = NativeHandlerFactory.buildErrorResponse();
 
-			expect(response.type).toBe('error');
-		});
-	});
+      expect(response.type).toBe('error');
+    });
+  });
 });

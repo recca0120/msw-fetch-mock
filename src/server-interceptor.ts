@@ -11,39 +11,39 @@ import { type FetchInterceptor, type ResolvedActivateOptions, type SetupServerLi
  * on activate() and removed on deactivate().
  */
 export class ServerFetchInterceptor implements FetchInterceptor {
-	private readonly server: SetupServerLike;
-	private readonly manageLifecycle: boolean;
-	private removeFetchOptions: () => void = () => {};
+  private readonly server: SetupServerLike;
+  private readonly manageLifecycle: boolean;
+  private removeFetchOptions: () => void = () => {};
 
-	constructor(server: SetupServerLike, options: { manageLifecycle: boolean }) {
-		this.server = server;
-		this.manageLifecycle = options.manageLifecycle;
-	}
+  constructor(server: SetupServerLike, options: { manageLifecycle: boolean }) {
+    this.server = server;
+    this.manageLifecycle = options.manageLifecycle;
+  }
 
-	use(...handlers: Array<unknown>): void {
-		this.server.use(...handlers);
-	}
+  use(...handlers: Array<unknown>): void {
+    this.server.use(...handlers);
+  }
 
-	resetHandlers(...handlers: Array<unknown>): void {
-		this.server.resetHandlers(...handlers);
-	}
+  resetHandlers(...handlers: Array<unknown>): void {
+    this.server.resetHandlers(...handlers);
+  }
 
-	listHandlers(): ReadonlyArray<unknown> | undefined {
-		return this.server.listHandlers?.();
-	}
+  listHandlers(): ReadonlyArray<unknown> | undefined {
+    return this.server.listHandlers?.();
+  }
 
-	activate(options: ResolvedActivateOptions): void {
-		if (this.manageLifecycle) {
-			this.server.listen(toMswListenOptions(options.onUnhandledRequest));
-		}
-		this.removeFetchOptions = installFetchOptions(options);
-	}
+  activate(options: ResolvedActivateOptions): void {
+    if (this.manageLifecycle) {
+      this.server.listen(toMswListenOptions(options.onUnhandledRequest));
+    }
+    this.removeFetchOptions = installFetchOptions(options);
+  }
 
-	deactivate(): void {
-		this.removeFetchOptions();
-		this.removeFetchOptions = () => {};
-		if (this.manageLifecycle) {
-			this.server.close();
-		}
-	}
+  deactivate(): void {
+    this.removeFetchOptions();
+    this.removeFetchOptions = () => {};
+    if (this.manageLifecycle) {
+      this.server.close();
+    }
+  }
 }

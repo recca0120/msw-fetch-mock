@@ -1,118 +1,120 @@
 {
-	"root": true,
-	"$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
-	"vcs": {
-		"clientKind": "git",
-		"enabled": true,
-		"useIgnoreFile": true,
-		"defaultBranch": "main"
-	},
-	"files": {
-		"includes": [
-			"**",
-			"!**/node_modules",
-			"!**/dist",
-			"!**/coverage",
-			"!**/pnpm-lock.yaml",
-			"!**/*.md",
-			"!**/*.yml",
-			"!**/*.yaml"
-		],
-		"ignoreUnknown": true
-	},
-	"formatter": {
-		"enabled": true,
-		"indentStyle": "tab",
-		"lineWidth": 100,
-		"lineEnding": "lf"
-	},
-	"javascript": {
-		"formatter": {
-			"quoteStyle": "single",
-			"semicolons": "always",
-			"trailingCommas": "all",
-			"bracketSpacing": true,
-			"arrowParentheses": "always"
-		}
-	},
-	"json": {
-		"formatter": {
-			"indentStyle": "tab",
-			"trailingCommas": "none"
-		}
-	},
-	"linter": {
-		"enabled": true,
-		"rules": {
-			"preset": "recommended",
-			"correctness": {
-				"noUnusedImports": "error",
-				"noUnusedVariables": "error",
-				"noUnusedFunctionParameters": "warn",
-				"noUndeclaredDependencies": "error"
-			},
-			"style": {
-				"useImportType": {
-					"level": "error",
-					"options": { "style": "inlineType" }
-				},
-				"noNonNullAssertion": "warn",
-				"useConst": "error",
-				"noUselessElse": "error",
-				"noInferrableTypes": "error",
-				"noParameterAssign": "error",
-				"useDefaultParameterLast": "error"
-			},
-			"suspicious": {
-				"noVar": "error",
-				"noDoubleEquals": "error",
-				"noConsole": "warn",
-				"noImportCycles": "error"
-			},
-			"performance": {
-				"noAccumulatingSpread": "warn"
-			}
-		}
-	},
-	"assist": {
-		"enabled": true,
-		"actions": {
-			"source": {
-				"organizeImports": "on"
-			}
-		}
-	},
-	"overrides": [
-		{
-			"includes": [
-				"**/*.test.ts",
-				"**/*.test.tsx",
-				"**/*.spec.ts",
-				"**/*.contract.ts",
-				"e2e/**/*.test.*"
-			],
-			"linter": {
-				"rules": {
-					"suspicious": { "noConsole": "off" },
-					"style": { "noNonNullAssertion": "off" }
-				}
-			}
-		},
-		{
-			"includes": ["src/fetch-mock.ts", "src/native-adapter.ts"],
-			"linter": {
-				"rules": {
-					"suspicious": { "noConsole": "off" }
-				}
-			}
-		},
-		{
-			"includes": ["*.config.ts", "*.config.js", "*.config.mjs"],
-			"linter": {
-				"rules": {
-					"suspicious": { "noConsole": "off" }
-				}
-			}
-		}
-	]
+  "root": true,
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "vcs": {
+    "clientKind": "git",
+    "enabled": true,
+    "useIgnoreFile": true,
+    "defaultBranch": "main"
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/coverage",
+      "!**/pnpm-lock.yaml",
+      "!**/*.md",
+      "!**/*.yml",
+      "!**/*.yaml"
+    ],
+    "ignoreUnknown": true
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "bracketSpacing": true,
+      "arrowParentheses": "always"
+    }
+  },
+  "json": {
+    "formatter": {
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "trailingCommas": "none"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error",
+        "noUnusedFunctionParameters": "warn",
+        "noUndeclaredDependencies": "error"
+      },
+      "style": {
+        "useImportType": {
+          "level": "error",
+          "options": { "style": "inlineType" }
+        },
+        "noNonNullAssertion": "warn",
+        "useConst": "error",
+        "noUselessElse": "error",
+        "noInferrableTypes": "error",
+        "noParameterAssign": "error",
+        "useDefaultParameterLast": "error"
+      },
+      "suspicious": {
+        "noVar": "error",
+        "noDoubleEquals": "error",
+        "noConsole": "warn",
+        "noImportCycles": "error"
+      },
+      "performance": {
+        "noAccumulatingSpread": "warn"
+      }
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.contract.ts",
+        "e2e/**/*.test.*"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": { "noConsole": "off" },
+          "style": { "noNonNullAssertion": "off" }
+        }
+      }
+    },
+    {
+      "includes": ["src/fetch-mock.ts", "src/native-adapter.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": { "noConsole": "off" }
+        }
+      }
+    },
+    {
+      "includes": ["*.config.ts", "*.config.js", "*.config.mjs"],
+      "linter": {
+        "rules": {
+          "suspicious": { "noConsole": "off" }
+        }
+      }
+    }
+  ]
 }

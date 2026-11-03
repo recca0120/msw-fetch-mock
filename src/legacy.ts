@@ -26,15 +26,15 @@ export { createLegacyHandlerFactory } from './legacy-handler-factory';
  * @throws When `server` is omitted.
  */
 export function createFetchMock(rest: LegacyRestApi, server?: SetupServerLike): FetchMock {
-	if (!server) {
-		// Never fall back to process-wide defaults: those are MSW v2 / native
-		// interceptors registered by other entries and cannot run MSW v1 handlers.
-		throw new Error(
-			'createFetchMock(rest) from msw-fetch-mock/legacy requires an MSW v1 server: ' +
-				'createFetchMock(rest, setupServer()).',
-		);
-	}
-	return new FetchMock(server, createLegacyHandlerFactory(rest));
+  if (!server) {
+    // Never fall back to process-wide defaults: those are MSW v2 / native
+    // interceptors registered by other entries and cannot run MSW v1 handlers.
+    throw new Error(
+      'createFetchMock(rest) from msw-fetch-mock/legacy requires an MSW v1 server: ' +
+        'createFetchMock(rest, setupServer()).',
+    );
+  }
+  return new FetchMock(server, createLegacyHandlerFactory(rest));
 }
 
 export * from './exports';

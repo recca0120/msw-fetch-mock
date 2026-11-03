@@ -8,11 +8,11 @@ type FetchOptions = Pick<ResolvedActivateOptions, 'timeout' | 'forceConnectionCl
  * headers are only used when `init` has none.
  */
 export function withConnectionClose(input: RequestInfo | URL, init?: RequestInit): RequestInit {
-	const headers = new Headers(
-		init?.headers ?? (input instanceof Request ? input.headers : undefined),
-	);
-	headers.set('Connection', 'close');
-	return { ...init, headers };
+  const headers = new Headers(
+    init?.headers ?? (input instanceof Request ? input.headers : undefined),
+  );
+  headers.set('Connection', 'close');
+  return { ...init, headers };
 }
 
 /**
@@ -20,21 +20,21 @@ export function withConnectionClose(input: RequestInfo | URL, init?: RequestInit
  * Disabled when `timeout <= 0` or when the caller passed their own abort signal.
  */
 export function withTimeout<T>(
-	fn: () => Promise<T>,
-	timeout: number,
-	userSignal?: AbortSignal | null,
+  fn: () => Promise<T>,
+  timeout: number,
+  userSignal?: AbortSignal | null,
 ): Promise<T> {
-	if (timeout <= 0 || userSignal) return fn();
+  if (timeout <= 0 || userSignal) return fn();
 
-	let timeoutId: ReturnType<typeof setTimeout>;
-	const timeoutPromise = new Promise<never>((_, reject) => {
-		timeoutId = setTimeout(
-			() => reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError')),
-			timeout,
-		);
-	});
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError')),
+      timeout,
+    );
+  });
 
-	return Promise.race([fn(), timeoutPromise]).finally(() => clearTimeout(timeoutId));
+  return Promise.race([fn(), timeoutPromise]).finally(() => clearTimeout(timeoutId));
 }
 
 /** Our fetch wrappers → the fetch each one wraps (see unwrapFetch). */
@@ -42,11 +42,11 @@ const wrappedFetches = new WeakMap<typeof globalThis.fetch, typeof globalThis.fe
 
 /** Strips any fetch-options wrappers installed by this module, e.g. to inspect MSW's patch. */
 export function unwrapFetch(fetchFn: typeof globalThis.fetch): typeof globalThis.fetch {
-	let current = fetchFn;
-	for (let inner = wrappedFetches.get(current); inner; inner = wrappedFetches.get(inner)) {
-		current = inner;
-	}
-	return current;
+  let current = fetchFn;
+  for (let inner = wrappedFetches.get(current); inner; inner = wrappedFetches.get(inner)) {
+    current = inner;
+  }
+  return current;
 }
 
 /**
@@ -55,19 +55,19 @@ export function unwrapFetch(fetchFn: typeof globalThis.fetch): typeof globalThis
  * Returns a function that removes the wrapper. Installs nothing when both are disabled.
  */
 export function installFetchOptions(options: FetchOptions): () => void {
-	const { timeout, forceConnectionClose } = options;
-	if (timeout <= 0 && !forceConnectionClose) return () => {};
+  const { timeout, forceConnectionClose } = options;
+  if (timeout <= 0 && !forceConnectionClose) return () => {};
 
-	const wrappedFetch = globalThis.fetch;
-	const fetchWithOptions: typeof globalThis.fetch = function fetchWithOptions(input, init) {
-		const nextInit = forceConnectionClose ? withConnectionClose(input, init) : init;
-		return withTimeout(() => wrappedFetch(input, nextInit), timeout, init?.signal);
-	};
-	wrappedFetches.set(fetchWithOptions, wrappedFetch);
-	globalThis.fetch = fetchWithOptions;
+  const wrappedFetch = globalThis.fetch;
+  const fetchWithOptions: typeof globalThis.fetch = function fetchWithOptions(input, init) {
+    const nextInit = forceConnectionClose ? withConnectionClose(input, init) : init;
+    return withTimeout(() => wrappedFetch(input, nextInit), timeout, init?.signal);
+  };
+  wrappedFetches.set(fetchWithOptions, wrappedFetch);
+  globalThis.fetch = fetchWithOptions;
 
-	return () => {
-		// Only unwrap if nothing replaced fetch since; otherwise we would drop that patch.
-		if (globalThis.fetch === fetchWithOptions) globalThis.fetch = wrappedFetch;
-	};
+  return () => {
+    // Only unwrap if nothing replaced fetch since; otherwise we would drop that patch.
+    if (globalThis.fetch === fetchWithOptions) globalThis.fetch = wrappedFetch;
+  };
 }

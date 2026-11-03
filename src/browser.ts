@@ -9,8 +9,8 @@ export { BrowserFetchInterceptor } from './browser-interceptor';
 FetchMock._handlerFactory = HandlerFactory;
 
 export function createFetchMock(worker: SetupWorkerLike): FetchMock {
-	// Pass the handler factory explicitly: the static above is process-wide.
-	return new FetchMock(new BrowserFetchInterceptor(worker), HandlerFactory);
+  // Pass the handler factory explicitly: the static above is process-wide.
+  return new FetchMock(new BrowserFetchInterceptor(worker), HandlerFactory);
 }
 
 export * from './exports';

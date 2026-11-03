@@ -2,29 +2,29 @@ import { type HandlerFactory } from './types';
 
 /** Duck-typed MSW v1 request object */
 interface LegacyReq {
-	url: { toString(): string };
-	method: string;
-	headers: { all(): Record<string, string> };
-	body?: unknown;
+  url: { toString(): string };
+  method: string;
+  headers: { all(): Record<string, string> };
+  body?: unknown;
 }
 
 /** Duck-typed MSW v1 response composer */
 type LegacyRes = {
-	(...transformers: unknown[]): unknown;
-	networkError(msg: string): unknown;
+  (...transformers: unknown[]): unknown;
+  networkError(msg: string): unknown;
 };
 
 /** Duck-typed MSW v1 context utilities */
 interface LegacyCtx {
-	status(code: number): unknown;
-	set(key: string, value: string): unknown;
-	body(text: string): unknown;
+  status(code: number): unknown;
+  set(key: string, value: string): unknown;
+  body(text: string): unknown;
 }
 
 /** Duck-typed interface for MSW v1's `rest` API methods */
 export type LegacyRestMethod = (
-	url: string | RegExp,
-	resolver: (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => unknown,
+  url: string | RegExp,
+  resolver: (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => unknown,
 ) => unknown;
 
 /** Duck-typed interface for MSW v1's `rest` namespace (only `rest.all` is used). */
@@ -32,44 +32,44 @@ export type LegacyRestApi = { all: LegacyRestMethod };
 
 /** Convert MSW v1 request object to standard Request */
 function convertV1Request(req: LegacyReq): Request {
-	const headers = new Headers(req.headers.all());
-	const hasBody = !['GET', 'HEAD'].includes(req.method);
-	const body =
-		hasBody && req.body != null
-			? typeof req.body === 'string'
-				? req.body
-				: JSON.stringify(req.body)
-			: undefined;
+  const headers = new Headers(req.headers.all());
+  const hasBody = !['GET', 'HEAD'].includes(req.method);
+  const body =
+    hasBody && req.body != null
+      ? typeof req.body === 'string'
+        ? req.body
+        : JSON.stringify(req.body)
+      : undefined;
 
-	return new Request(req.url.toString(), {
-		method: req.method,
-		headers,
-		body,
-	});
+  return new Request(req.url.toString(), {
+    method: req.method,
+    headers,
+    body,
+  });
 }
 
 /** Convert standard Response to MSW v1 res(ctx...) format */
 async function convertToV1Response(
-	response: Response,
-	res: LegacyRes,
-	ctx: LegacyCtx,
+  response: Response,
+  res: LegacyRes,
+  ctx: LegacyCtx,
 ): Promise<unknown> {
-	if (response.type === 'error') {
-		return res.networkError('Failed to fetch');
-	}
+  if (response.type === 'error') {
+    return res.networkError('Failed to fetch');
+  }
 
-	const transformers: unknown[] = [ctx.status(response.status)];
+  const transformers: unknown[] = [ctx.status(response.status)];
 
-	response.headers.forEach((value: string, key: string) => {
-		transformers.push(ctx.set(key, value));
-	});
+  response.headers.forEach((value: string, key: string) => {
+    transformers.push(ctx.set(key, value));
+  });
 
-	const text = await response.text();
-	if (text) {
-		transformers.push(ctx.body(text));
-	}
+  const text = await response.text();
+  if (text) {
+    transformers.push(ctx.body(text));
+  }
 
-	return res(...transformers);
+  return res(...transformers);
 }
 
 /**
@@ -82,34 +82,34 @@ async function convertToV1Response(
  * @param rest - The `rest` object from `msw` v1 (e.g., `import { rest } from 'msw'`)
  */
 export function createLegacyHandlerFactory(rest: LegacyRestApi): HandlerFactory {
-	return {
-		buildResponse(status, body, headers) {
-			if (body === null || body === undefined) {
-				return new Response(null, { status, headers });
-			}
-			// Passed through like the v2 and native factories; convertToV1Response
-			// reads it to text, since MSW v1 responses cannot stream.
-			if (body instanceof ReadableStream) {
-				return new Response(body, { status, headers });
-			}
-			if (typeof body === 'string') {
-				return new Response(body, { status, headers });
-			}
-			const responseHeaders = new Headers(headers);
-			responseHeaders.set('content-type', 'application/json');
-			return new Response(JSON.stringify(body), { status, headers: responseHeaders });
-		},
+  return {
+    buildResponse(status, body, headers) {
+      if (body === null || body === undefined) {
+        return new Response(null, { status, headers });
+      }
+      // Passed through like the v2 and native factories; convertToV1Response
+      // reads it to text, since MSW v1 responses cannot stream.
+      if (body instanceof ReadableStream) {
+        return new Response(body, { status, headers });
+      }
+      if (typeof body === 'string') {
+        return new Response(body, { status, headers });
+      }
+      const responseHeaders = new Headers(headers);
+      responseHeaders.set('content-type', 'application/json');
+      return new Response(JSON.stringify(body), { status, headers: responseHeaders });
+    },
 
-		createCatchAllHandler(handlerFn) {
-			return rest.all('*', async (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => {
-				const response = await handlerFn(convertV1Request(req));
-				if (!response) return undefined; // passthrough
-				return convertToV1Response(response, res, ctx);
-			});
-		},
+    createCatchAllHandler(handlerFn) {
+      return rest.all('*', async (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => {
+        const response = await handlerFn(convertV1Request(req));
+        if (!response) return undefined; // passthrough
+        return convertToV1Response(response, res, ctx);
+      });
+    },
 
-		buildErrorResponse() {
-			return Response.error();
-		},
-	};
+    buildErrorResponse() {
+      return Response.error();
+    },
+  };
 }
