@@ -1,4 +1,5 @@
 import { installFetchOptions } from './fetch-options';
+import { toMswListenOptions } from './msw-listen-options';
 import { type FetchInterceptor, type ResolvedActivateOptions, type SetupWorkerLike } from './types';
 
 export class BrowserFetchInterceptor implements FetchInterceptor {
@@ -22,15 +23,19 @@ export class BrowserFetchInterceptor implements FetchInterceptor {
 	}
 
 	async activate(options: ResolvedActivateOptions): Promise<void> {
-		await this.worker.start({
-			onUnhandledRequest: options.onUnhandledRequest,
-		});
+		// MSW v3 throws when start() is called on an already started worker (v2
+		// only warned), e.g. one the user started themselves. v3 exposes
+		// `readyState` (0 = disabled); v2 has no such property.
+		const alreadyStarted = this.worker.readyState !== undefined && this.worker.readyState !== 0;
+		if (!alreadyStarted) {
+			await this.worker.start(toMswListenOptions(options.onUnhandledRequest));
+		}
 		this.removeFetchOptions = installFetchOptions(options);
 	}
 
-	deactivate(): void {
+	deactivate(): void | Promise<void> {
 		this.removeFetchOptions();
 		this.removeFetchOptions = () => {};
-		this.worker.stop();
+		return this.worker.stop();
 	}
 }

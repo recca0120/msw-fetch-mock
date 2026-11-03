@@ -14,6 +14,28 @@ restore_worker_scripts() {
   git -C "$PKG_DIR" checkout -- "$E2E_DIR/*/public/mockServiceWorker.js" 2>/dev/null || true
 }
 
+# `npm install --no-save <tarball> msw@x` does not fail on a peer conflict, so check
+# that the installed msw satisfies msw-fetch-mock's peerDependencies (npm's semver).
+check_msw_peer() {
+  node -e '
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const semver = require(path.join(process.argv[1], "npm/node_modules/semver"));
+    const read = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
+    if (!fs.existsSync("node_modules/msw/package.json")) {
+      console.log("peer check skipped: msw is not installed (native suite)");
+      process.exit(0);
+    }
+    const range = read("node_modules/msw-fetch-mock/package.json").peerDependencies.msw;
+    const version = read("node_modules/msw/package.json").version;
+    if (!semver.satisfies(version, range)) {
+      console.error(`msw@${version} does not satisfy msw-fetch-mock peer "${range}"`);
+      process.exit(1);
+    }
+    console.log(`peer ok: msw@${version} satisfies "${range}"`);
+  ' "$(npm root -g)"
+}
+
 cleanup() {
   restore_worker_scripts
 
@@ -28,9 +50,13 @@ trap cleanup EXIT
 # Parse arguments
 run_all=false
 suites=()
+# Override the suites' msw version, e.g. --msw=3 (default: as in each package.json)
+msw_major=""
 
 for arg in "$@"; do
-  if [ "$arg" = "--all" ]; then
+  if [[ "$arg" == --msw=* ]]; then
+    msw_major="${arg#--msw=}"
+  elif [ "$arg" = "--all" ]; then
     run_all=true
   else
     suites+=("$arg")
@@ -89,10 +115,15 @@ for suite in "${suites[@]}"; do
   # Clean install (a stale lockfile would pin the previous tarball), with
   # msw-fetch-mock taken from the tarball; --no-save leaves package.json as is.
   rm -rf "$suite_dir/node_modules" "$suite_dir/package-lock.json"
-  (cd "$suite_dir" && npm install --no-save "$TARBALL_PATH")
+  (cd "$suite_dir" && npm install --no-save "$TARBALL_PATH" ${msw_major:+"msw@^$msw_major"})
 
-  # Run tests
-  if (cd "$suite_dir" && npm test); then
+  # Browser suites need the worker script of the installed msw version
+  if [ -n "$msw_major" ] && [ -f "$suite_dir/public/mockServiceWorker.js" ]; then
+    (cd "$suite_dir" && npx msw init public --no-save)
+  fi
+
+  # Run tests (after checking the peer range, which --no-save installs skip)
+  if (cd "$suite_dir" && check_msw_peer && npm test); then
     echo "=== PASS: $suite ==="
   else
     echo "=== FAIL: $suite ==="
@@ -107,7 +138,7 @@ echo ""
 echo "=============================="
 echo "  E2E Test Summary"
 echo "=============================="
-echo "  Ran: ${suites[*]}"
+echo "  Ran: ${suites[*]}${msw_major:+ (msw@^$msw_major)}"
 
 if [ ${#failed[@]} -eq 0 ]; then
   echo "  Result: ALL PASSED"

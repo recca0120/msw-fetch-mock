@@ -1,4 +1,5 @@
 import { setupServer } from 'msw/node';
+import { unwrapFetch } from './fetch-options';
 import { ServerFetchInterceptor } from './server-interceptor';
 import { type FetchInterceptor, type ResolvedActivateOptions, type SetupServerLike } from './types';
 
@@ -50,20 +51,32 @@ export class NodeFetchInterceptor implements FetchInterceptor {
 }
 
 /**
- * MSW v2 silently reuses interceptors when a second server calls listen().
- * We detect this via @mswjs/interceptors internal Symbols on globalThis.fetch
- * ("isPatchedModule") and globalThis ("fetch"). If these internals change
- * in a future MSW release, the guard fails open (no crash, just shared state).
+ * A second `setupServer().listen()` silently takes over interception from the first
+ * (MSW v2 and v3 alike), breaking the other server's mocks.
+ *
+ * Detection relies on @mswjs/interceptors internals; if they change in a future MSW
+ * release, the guard fails open (no false errors, just shared state).
  * See node-interceptor.test.ts "should throw when another MSW server is already active".
  */
 function assertNoOtherMswServer(): void {
-	const isFetchPatched =
-		typeof globalThis.fetch === 'function' &&
-		Object.getOwnPropertySymbols(globalThis.fetch).some((s) => s.description === 'isPatchedModule');
-	const isInterceptorActive = Object.getOwnPropertySymbols(globalThis).some(
+	// Look underneath our own timeout / forceConnectionClose wrapper.
+	const fetchFn =
+		typeof globalThis.fetch === 'function' ? unwrapFetch(globalThis.fetch) : undefined;
+
+	// MSW v2: Symbols on the patched fetch ("isPatchedModule") and on globalThis ("fetch").
+	const v2FetchPatched =
+		fetchFn !== undefined &&
+		Object.getOwnPropertySymbols(fetchFn).some((s) => s.description === 'isPatchedModule');
+	const v2InterceptorActive = Object.getOwnPropertySymbols(globalThis).some(
 		(s) => s.description === 'fetch',
 	);
-	if (isFetchPatched || isInterceptorActive) {
+
+	// MSW v3: interceptor state is module-private; the only observable signal is that
+	// fetch was replaced by an anonymous arrow function (native fetch is named "fetch").
+	// Trade-off: a user-assigned anonymous globalThis.fetch also counts as "active".
+	const v3FetchPatched = fetchFn !== undefined && fetchFn.name === '';
+
+	if (v2FetchPatched || v2InterceptorActive || v3FetchPatched) {
 		throw new Error(
 			'Another MSW server is already active. ' +
 				'Pass your existing server to new FetchMock(server) instead.',

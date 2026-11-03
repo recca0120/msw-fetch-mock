@@ -10,6 +10,36 @@ import { type FetchInterceptor, type SetupServerLike } from './types';
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
 
+/**
+ * Tracks timers created with the given delay, so assertions only cover our own timers.
+ * Install after `vi.useFakeTimers()`; call `restore()` when done.
+ */
+function trackTimers(ms: number) {
+	const realSet = globalThis.setTimeout;
+	const realClear = globalThis.clearTimeout;
+	const live = new Set<unknown>();
+	const setSpy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+		handler: () => void,
+		delay?: number,
+		...args: unknown[]
+	) => {
+		const id = realSet(handler, delay, ...args);
+		if (delay === ms) live.add(id);
+		return id;
+	}) as typeof setTimeout);
+	const clearSpy = vi.spyOn(globalThis, 'clearTimeout').mockImplementation((id) => {
+		live.delete(id);
+		realClear(id);
+	});
+	return {
+		live: () => [...live],
+		restore: () => {
+			setSpy.mockRestore();
+			clearSpy.mockRestore();
+		},
+	};
+}
+
 describe('FetchMock', () => {
 	const fetchMock = createFetchMock();
 
@@ -1015,8 +1045,9 @@ describe('delay', () => {
 		}
 	});
 
-	it('should clear the delay timer when request is aborted (no lingering timers)', async () => {
+	it('[AC-4] should clear the delay timer when request is aborted (no lingering timers)', async () => {
 		vi.useFakeTimers();
+		const delayTimers = trackTimers(1000);
 		try {
 			fetchMock
 				.get(`${API_BASE}/${API_PREFIX}`)
@@ -1029,13 +1060,22 @@ describe('delay', () => {
 				signal: controller.signal,
 			}).catch(() => {});
 
+			// Abort only once the request is inside the delay (interceptor consumed).
+			// In MSW v3 an abort issued earlier never reaches the handler at all.
+			for (let i = 0; i < 100 && fetchMock.pendingInterceptors().length > 0; i++) {
+				await vi.advanceTimersByTimeAsync(1);
+			}
+			expect(fetchMock.pendingInterceptors()).toHaveLength(0);
+
 			controller.abort();
 			await vi.advanceTimersByTimeAsync(0);
 			await fetchPromise;
 
-			// timer should be cleared — no lingering fake timers
-			expect(vi.getTimerCount()).toBe(0);
+			// our 1000ms delay timer is cleared; other timers (undici's in MSW v3, the
+			// fetch-options timeout) are not ours to assert on
+			expect(delayTimers.live()).toHaveLength(0);
 		} finally {
+			delayTimers.restore();
 			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
 			vi.useRealTimers();
 		}
@@ -1135,7 +1175,21 @@ describe('retry scenarios', () => {
 });
 
 describe('activate guard', () => {
-	it('should throw when another MSW server is already listening', async () => {
+	it('[AC-2] should throw when another standalone fetchMock is already active', async () => {
+		// The first one wraps MSW's fetch with the timeout / forceConnectionClose wrapper
+		// (on by default); the guard must still see the MSW patch underneath.
+		const first = createFetchMock();
+		await first.activate();
+
+		try {
+			const second = createFetchMock();
+			await expect(second.activate()).rejects.toThrow(/already active/i);
+		} finally {
+			first.deactivate();
+		}
+	});
+
+	it('[AC-2] should throw when another MSW server is already listening', async () => {
 		const externalServer = setupServer();
 		externalServer.listen();
 
@@ -1253,6 +1307,73 @@ describe('onUnhandledRequest', () => {
 			await expect(fm.activate({ onUnhandledRequest: 'warn' })).resolves.toBeUndefined();
 		} finally {
 			externalServer.close();
+		}
+	});
+
+	describe('[AC-5] no extra warnings from MSW itself', () => {
+		let warn: ReturnType<typeof vi.spyOn>;
+		let error: ReturnType<typeof vi.spyOn>;
+
+		beforeEach(() => {
+			warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+			error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		});
+
+		afterEach(() => {
+			warn.mockRestore();
+			error.mockRestore();
+		});
+
+		// Each case owns the listen() call, so msw-fetch-mock alone decides what is printed.
+		const modes = [
+			['standalone', () => createFetchMock()],
+			['wrapped server', () => new FetchMock(setupServer())],
+		] as const;
+
+		for (const [label, create] of modes) {
+			it(`${label}: "bypass" prints nothing for an unhandled request`, async () => {
+				const fm = create();
+				await fm.activate({ onUnhandledRequest: 'bypass' });
+
+				try {
+					await fetch(`${CLOSED_ORIGIN}/test`).catch(() => null);
+
+					expect(warn).not.toHaveBeenCalled();
+					expect(error).not.toHaveBeenCalled();
+				} finally {
+					fm.deactivate();
+				}
+			});
+
+			it(`${label}: "warn" prints exactly one warning for an unhandled request`, async () => {
+				const fm = create();
+				await fm.activate({ onUnhandledRequest: 'warn' });
+
+				try {
+					await fetch(`${CLOSED_ORIGIN}/test`).catch(() => null);
+
+					expect(warn).toHaveBeenCalledTimes(1);
+					expect(warn.mock.calls[0]?.[0]).toMatch(/without a matching request handler/);
+					expect(error).not.toHaveBeenCalled();
+				} finally {
+					fm.deactivate();
+				}
+			});
+
+			it(`${label}: a host allowed by enableNetConnect prints nothing`, async () => {
+				const fm = create();
+				await fm.activate({ onUnhandledRequest: 'error' });
+				fm.enableNetConnect(CLOSED_HOST);
+
+				try {
+					await fetch(`${CLOSED_ORIGIN}/test`).catch(() => null);
+
+					expect(warn).not.toHaveBeenCalled();
+					expect(error).not.toHaveBeenCalled();
+				} finally {
+					fm.deactivate();
+				}
+			});
 		}
 	});
 });

@@ -97,10 +97,13 @@ export interface SetupServerLike {
 
 /** Structural type for MSW's setupWorker return type */
 export interface SetupWorkerLike {
+	/** MSW v3+ only: 0 = disabled (not started). */
+	readonly readyState?: number;
 	use(...handlers: Array<unknown>): void;
 	resetHandlers(...handlers: Array<unknown>): void;
 	start(options?: Record<string, unknown>): Promise<void>;
-	stop(): void;
+	/** MSW v3 returns a Promise that settles once in-flight requests are done. */
+	stop(): void | Promise<void>;
 	listHandlers?(): ReadonlyArray<unknown>;
 }
 
@@ -109,7 +112,7 @@ export interface FetchInterceptor {
 	use(...handlers: Array<unknown>): void;
 	resetHandlers(...handlers: Array<unknown>): void;
 	activate(options: ResolvedActivateOptions): void | Promise<void>;
-	deactivate(): void;
+	deactivate(): void | Promise<void>;
 	/**
 	 * Currently installed handlers; used to detect a removed catch-all.
 	 * Return `undefined` (or omit) when the underlying server/worker cannot list them.

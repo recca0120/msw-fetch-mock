@@ -89,7 +89,7 @@ describe('NodeFetchInterceptor', () => {
 			next.deactivate();
 		});
 
-		it('should throw when another MSW server is already active', () => {
+		it('[AC-2] should throw when another MSW server is already active', () => {
 			const externalServer = setupServer();
 			externalServer.listen();
 

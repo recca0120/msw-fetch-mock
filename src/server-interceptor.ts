@@ -1,4 +1,5 @@
 import { installFetchOptions } from './fetch-options';
+import { toMswListenOptions } from './msw-listen-options';
 import { type FetchInterceptor, type ResolvedActivateOptions, type SetupServerLike } from './types';
 
 /**
@@ -33,7 +34,7 @@ export class ServerFetchInterceptor implements FetchInterceptor {
 
 	activate(options: ResolvedActivateOptions): void {
 		if (this.manageLifecycle) {
-			this.server.listen({ onUnhandledRequest: options.onUnhandledRequest });
+			this.server.listen(toMswListenOptions(options.onUnhandledRequest));
 		}
 		this.removeFetchOptions = installFetchOptions(options);
 	}
