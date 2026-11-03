@@ -9,14 +9,13 @@ TARBALL=""
 DEFAULT_SUITES=(jest-esm jest-cjs node-test node-cjs legacy-cjs native-esm native-cjs)
 ALL_SUITES=(jest-esm jest-cjs node-test node-cjs legacy-cjs native-esm native-cjs vitest-browser)
 
+# msw's postinstall rewrites a suite's tracked worker script (e.g. vitest-browser)
+restore_worker_scripts() {
+  git -C "$PKG_DIR" checkout -- "$E2E_DIR/*/public/mockServiceWorker.js" 2>/dev/null || true
+}
+
 cleanup() {
-  # Restore e2e package.json files
-  for suite in "${ALL_SUITES[@]}"; do
-    local pkg="$E2E_DIR/$suite/package.json"
-    if [ -f "$pkg" ]; then
-      git checkout -- "$pkg" 2>/dev/null || true
-    fi
-  done
+  restore_worker_scripts
 
   # Remove tarball
   if [ -n "$TARBALL" ] && [ -f "$TARBALL" ]; then
@@ -87,12 +86,10 @@ for suite in "${suites[@]}"; do
   echo ""
   echo "=== Running: $suite ==="
 
-  # Point dependency to tarball
-  (cd "$suite_dir" && npm pkg set "dependencies.msw-fetch-mock=$TARBALL_PATH")
-
-  # Clean install to avoid stale cache
+  # Clean install (a stale lockfile would pin the previous tarball), with
+  # msw-fetch-mock taken from the tarball; --no-save leaves package.json as is.
   rm -rf "$suite_dir/node_modules" "$suite_dir/package-lock.json"
-  (cd "$suite_dir" && npm install --install-links)
+  (cd "$suite_dir" && npm install --no-save "$TARBALL_PATH")
 
   # Run tests
   if (cd "$suite_dir" && npm test); then
@@ -102,8 +99,7 @@ for suite in "${suites[@]}"; do
     failed+=("$suite")
   fi
 
-  # Restore package.json immediately
-  git checkout -- "$suite_dir/package.json" 2>/dev/null || true
+  restore_worker_scripts
 done
 
 # Summary
