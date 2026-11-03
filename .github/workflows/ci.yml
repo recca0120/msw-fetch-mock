@@ -153,3 +153,17 @@ jobs:
       - run: cd e2e/vitest-browser && npm pkg set "dependencies.msw-fetch-mock=file:../../msw-fetch-mock.tgz" && npm install
       - run: cd e2e/vitest-browser && npx playwright install --with-deps chromium
       - run: cd e2e/vitest-browser && npm test
+
+  # The e2e suites against MSW v3 (legacy-cjs is MSW v1 only). The script builds
+  # and packs the library, installs msw@^3, and checks msw-fetch-mock's peer range.
+  e2e-msw3:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install
+      - run: bash scripts/test-e2e.sh --msw=3 jest-esm jest-cjs node-test node-cjs native-esm native-cjs vitest-browser
