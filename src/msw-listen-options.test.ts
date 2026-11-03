@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { toMswListenOptions } from './msw-listen-options';
 
 type FrameHandler = (args: {
-	frame: { protocol?: string; data?: { request?: unknown } };
+	frame: { data?: { request?: unknown } };
 	defaults: { warn(): void; error(): void };
 }) => void;
 
@@ -19,7 +19,7 @@ describe('[AC-5] toMswListenOptions', () => {
 		const request = new Request('http://example.test/a');
 		const defaults = { warn: vi.fn(), error: vi.fn() };
 
-		onUnhandledFrame({ frame: { protocol: 'http', data: { request } }, defaults });
+		onUnhandledFrame({ frame: { data: { request } }, defaults });
 
 		expect(callback).toHaveBeenCalledWith(request, {
 			warning: defaults.warn,
@@ -27,12 +27,12 @@ describe('[AC-5] toMswListenOptions', () => {
 		});
 	});
 
-	it('ignores non-HTTP frames (e.g. WebSocket)', () => {
+	it('ignores frames without a Request (e.g. a WebSocket connection)', () => {
 		const callback = vi.fn();
 		const onUnhandledFrame = toMswListenOptions(callback).onUnhandledFrame as FrameHandler;
 		const defaults = { warn: vi.fn(), error: vi.fn() };
 
-		onUnhandledFrame({ frame: { protocol: 'ws', data: {} }, defaults });
+		onUnhandledFrame({ frame: { data: {} }, defaults });
 
 		expect(callback).not.toHaveBeenCalled();
 		expect(defaults.warn).not.toHaveBeenCalled();

@@ -1066,6 +1066,7 @@ describe('delay', () => {
 				await vi.advanceTimersByTimeAsync(1);
 			}
 			expect(fetchMock.pendingInterceptors()).toHaveLength(0);
+			expect(delayTimers.live()).toHaveLength(1); // the delay timer exists before the abort
 
 			controller.abort();
 			await vi.advanceTimersByTimeAsync(0);
@@ -1078,6 +1079,29 @@ describe('delay', () => {
 			delayTimers.restore();
 			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
 			vi.useRealTimers();
+		}
+	});
+
+	it('should reject with an AbortError when aborted before the request reaches the handler', async () => {
+		fetchMock
+			.get(`${API_BASE}/${API_PREFIX}`)
+			.intercept({ path: '/early-abort', method: 'GET' })
+			.reply(200, { ok: true })
+			.delay(1000);
+
+		try {
+			const controller = new AbortController();
+			const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/early-abort`, {
+				signal: controller.signal,
+			}).catch((e: unknown) => e);
+			controller.abort();
+
+			// Same for users in MSW v2 and v3, although in v3 the request never reaches
+			// the handler (fetch goes through undici, which checks the signal first).
+			expect(((await fetchPromise) as Error).name).toBe('AbortError');
+		} finally {
+			// v2 consumes the interceptor, v3 leaves it pending: neither is asserted here
+			fetchMock.reset();
 		}
 	});
 
@@ -1229,39 +1253,72 @@ describe('onUnhandledRequest', () => {
 		}
 	});
 
-	it('should allow unhandled requests through and warn once when onUnhandledRequest is "warn"', async () => {
-		const fm = createFetchMock();
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		await fm.activate({ onUnhandledRequest: 'warn' });
+	// Each mode owns the listen() call, so msw-fetch-mock alone decides what is printed:
+	// MSW itself must not add warnings or errors ([AC-5]: MSW v3 renamed the option).
+	describe.each([
+		['standalone', () => createFetchMock()],
+		['new FetchMock(server)', () => new FetchMock(setupServer())],
+	] as const)('[AC-5] let-through requests (%s)', (_, create) => {
+		let warn: ReturnType<typeof vi.spyOn>;
+		let error: ReturnType<typeof vi.spyOn>;
 
-		try {
-			const error = await fetch(`${CLOSED_ORIGIN}/test`).catch((e: unknown) => e);
-			expect(error).toBeInstanceOf(Error);
-			expect((error as Error).message).not.toMatch(/request handler/i);
-			expect(causeCode(error)).toBe('ECONNREFUSED');
+		beforeEach(() => {
+			warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+			error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		});
+
+		afterEach(() => {
+			warn.mockRestore();
+			error.mockRestore();
+		});
+
+		async function fetchUnhandled(
+			options: Parameters<FetchMock['activate']>[0],
+			setup?: (fm: FetchMock) => void,
+		) {
+			const fm = create();
+			await fm.activate(options);
+			setup?.(fm);
+			try {
+				return await fetch(`${CLOSED_ORIGIN}/test`).catch((e: unknown) => e);
+			} finally {
+				await fm.deactivate();
+			}
+		}
+
+		it('"warn" lets the request through and warns exactly once', async () => {
+			const result = await fetchUnhandled({ onUnhandledRequest: 'warn' });
+
+			expect(result).toBeInstanceOf(Error);
+			expect((result as Error).message).not.toMatch(/request handler/i);
+			expect(causeCode(result)).toBe('ECONNREFUSED');
 			expect(warn).toHaveBeenCalledTimes(1);
+			expect(warn.mock.calls[0]?.[0]).toMatch(/without a matching request handler/);
 			expect(warn.mock.calls[0]?.[0]).toContain(`GET ${CLOSED_ORIGIN}/test`);
-		} finally {
-			warn.mockRestore();
-			fm.deactivate();
-		}
-	});
+			expect(error).not.toHaveBeenCalled();
+		});
 
-	it('should silently allow unhandled requests when onUnhandledRequest is "bypass"', async () => {
-		const fm = createFetchMock();
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		await fm.activate({ onUnhandledRequest: 'bypass' });
+		it('"bypass" lets the request through silently', async () => {
+			const result = await fetchUnhandled({ onUnhandledRequest: 'bypass' });
 
-		try {
-			const error = await fetch(`${CLOSED_ORIGIN}/test`).catch((e: unknown) => e);
-			expect(error).toBeInstanceOf(Error);
-			expect((error as Error).message).not.toMatch(/request handler/i);
-			expect(causeCode(error)).toBe('ECONNREFUSED');
+			expect(result).toBeInstanceOf(Error);
+			expect((result as Error).message).not.toMatch(/request handler/i);
+			expect(causeCode(result)).toBe('ECONNREFUSED');
 			expect(warn).not.toHaveBeenCalled();
-		} finally {
-			warn.mockRestore();
-			fm.deactivate();
-		}
+			expect(error).not.toHaveBeenCalled();
+		});
+
+		it('a host allowed by enableNetConnect gets through silently even in "error" mode', async () => {
+			const result = await fetchUnhandled({ onUnhandledRequest: 'error' }, (fm) =>
+				fm.enableNetConnect(CLOSED_HOST),
+			);
+
+			expect(result).toBeInstanceOf(Error);
+			expect((result as Error).message).not.toMatch(/request handler/i);
+			expect(causeCode(result)).toBe('ECONNREFUSED');
+			expect(warn).not.toHaveBeenCalled();
+			expect(error).not.toHaveBeenCalled();
+		});
 	});
 
 	it('should invoke custom callback for unhandled requests', async () => {
@@ -1282,21 +1339,6 @@ describe('onUnhandledRequest', () => {
 		}
 	});
 
-	it('should respect enableNetConnect even in error mode', async () => {
-		const fm = createFetchMock();
-		await fm.activate({ onUnhandledRequest: 'error' });
-		fm.enableNetConnect(CLOSED_HOST);
-
-		try {
-			const error = await fetch(`${CLOSED_ORIGIN}/test`).catch((e: unknown) => e);
-			expect(error).toBeInstanceOf(Error);
-			expect((error as Error).message).not.toMatch(/request handler/i);
-			expect(causeCode(error)).toBe('ECONNREFUSED');
-		} finally {
-			fm.deactivate();
-		}
-	});
-
 	it('should not call server.listen() for external server mode', async () => {
 		const externalServer = setupServer();
 		externalServer.listen();
@@ -1307,73 +1349,6 @@ describe('onUnhandledRequest', () => {
 			await expect(fm.activate({ onUnhandledRequest: 'warn' })).resolves.toBeUndefined();
 		} finally {
 			externalServer.close();
-		}
-	});
-
-	describe('[AC-5] no extra warnings from MSW itself', () => {
-		let warn: ReturnType<typeof vi.spyOn>;
-		let error: ReturnType<typeof vi.spyOn>;
-
-		beforeEach(() => {
-			warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-			error = vi.spyOn(console, 'error').mockImplementation(() => {});
-		});
-
-		afterEach(() => {
-			warn.mockRestore();
-			error.mockRestore();
-		});
-
-		// Each case owns the listen() call, so msw-fetch-mock alone decides what is printed.
-		const modes = [
-			['standalone', () => createFetchMock()],
-			['wrapped server', () => new FetchMock(setupServer())],
-		] as const;
-
-		for (const [label, create] of modes) {
-			it(`${label}: "bypass" prints nothing for an unhandled request`, async () => {
-				const fm = create();
-				await fm.activate({ onUnhandledRequest: 'bypass' });
-
-				try {
-					await fetch(`${CLOSED_ORIGIN}/test`).catch(() => null);
-
-					expect(warn).not.toHaveBeenCalled();
-					expect(error).not.toHaveBeenCalled();
-				} finally {
-					fm.deactivate();
-				}
-			});
-
-			it(`${label}: "warn" prints exactly one warning for an unhandled request`, async () => {
-				const fm = create();
-				await fm.activate({ onUnhandledRequest: 'warn' });
-
-				try {
-					await fetch(`${CLOSED_ORIGIN}/test`).catch(() => null);
-
-					expect(warn).toHaveBeenCalledTimes(1);
-					expect(warn.mock.calls[0]?.[0]).toMatch(/without a matching request handler/);
-					expect(error).not.toHaveBeenCalled();
-				} finally {
-					fm.deactivate();
-				}
-			});
-
-			it(`${label}: a host allowed by enableNetConnect prints nothing`, async () => {
-				const fm = create();
-				await fm.activate({ onUnhandledRequest: 'error' });
-				fm.enableNetConnect(CLOSED_HOST);
-
-				try {
-					await fetch(`${CLOSED_ORIGIN}/test`).catch(() => null);
-
-					expect(warn).not.toHaveBeenCalled();
-					expect(error).not.toHaveBeenCalled();
-				} finally {
-					fm.deactivate();
-				}
-			});
 		}
 	});
 });

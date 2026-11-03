@@ -8,14 +8,18 @@ TARBALL=""
 
 DEFAULT_SUITES=(jest-esm jest-cjs node-test node-cjs legacy-cjs native-esm native-cjs)
 ALL_SUITES=(jest-esm jest-cjs node-test node-cjs legacy-cjs native-esm native-cjs vitest-browser)
+# Suites that only run against MSW v1; skipped when --msw selects another major
+MSW_V1_ONLY=(legacy-cjs)
 
 # msw's postinstall rewrites a suite's tracked worker script (e.g. vitest-browser)
 restore_worker_scripts() {
   git -C "$PKG_DIR" checkout -- "$E2E_DIR/*/public/mockServiceWorker.js" 2>/dev/null || true
 }
 
-# `npm install --no-save <tarball> msw@x` does not fail on a peer conflict, so check
-# that the installed msw satisfies msw-fetch-mock's peerDependencies (npm's semver).
+# msw is an *optional* peer of msw-fetch-mock, so npm does not enforce its range
+# (`npm install --no-save <tarball> msw@x` succeeds even when x is outside it).
+# Check that the installed msw satisfies the peer range, using npm's bundled semver.
+NPM_GLOBAL_ROOT="$(npm root -g)"
 check_msw_peer() {
   node -e '
     const fs = require("node:fs");
@@ -33,7 +37,13 @@ check_msw_peer() {
       process.exit(1);
     }
     console.log(`peer ok: msw@${version} satisfies "${range}"`);
-  ' "$(npm root -g)"
+  ' "$NPM_GLOBAL_ROOT"
+}
+
+# Whether a suite depends on msw at all (native suites do not)
+uses_msw() {
+  node -e 'const p = require(process.argv[1]); process.exit(p.dependencies?.msw ? 0 : 1)' \
+    "$1/package.json"
 }
 
 cleanup() {
@@ -81,6 +91,19 @@ for suite in "${suites[@]}"; do
   fi
 done
 
+# With --msw=<major> other than 1, drop the MSW v1-only suites
+if [ -n "$msw_major" ] && [ "$msw_major" != "1" ]; then
+  selected=()
+  for suite in "${suites[@]}"; do
+    if [[ " ${MSW_V1_ONLY[*]} " == *" $suite "* ]]; then
+      echo "==> Skipping $suite (MSW v1 only)"
+    else
+      selected+=("$suite")
+    fi
+  done
+  suites=("${selected[@]}")
+fi
+
 echo "==> Building msw-fetch-mock..."
 (cd "$PKG_DIR" && npx tsup)
 
@@ -115,10 +138,15 @@ for suite in "${suites[@]}"; do
   # Clean install (a stale lockfile would pin the previous tarball), with
   # msw-fetch-mock taken from the tarball; --no-save leaves package.json as is.
   rm -rf "$suite_dir/node_modules" "$suite_dir/package-lock.json"
-  (cd "$suite_dir" && npm install --no-save "$TARBALL_PATH" ${msw_major:+"msw@^$msw_major"})
+  # --msw overrides the msw version only for suites that use msw at all.
+  msw_spec=()
+  if [ -n "$msw_major" ] && uses_msw "$suite_dir"; then
+    msw_spec=("msw@^$msw_major")
+  fi
+  (cd "$suite_dir" && npm install --no-save "$TARBALL_PATH" ${msw_spec[@]+"${msw_spec[@]}"})
 
   # Browser suites need the worker script of the installed msw version
-  if [ -n "$msw_major" ] && [ -f "$suite_dir/public/mockServiceWorker.js" ]; then
+  if [ ${#msw_spec[@]} -gt 0 ] && [ -f "$suite_dir/public/mockServiceWorker.js" ]; then
     (cd "$suite_dir" && npx msw init public --no-save)
   fi
 

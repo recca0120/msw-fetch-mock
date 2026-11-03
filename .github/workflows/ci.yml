@@ -154,7 +154,7 @@ jobs:
       - run: cd e2e/vitest-browser && npx playwright install --with-deps chromium
       - run: cd e2e/vitest-browser && npm test
 
-  # The e2e suites against MSW v3 (legacy-cjs is MSW v1 only). The script builds
+  # The e2e suites against MSW v3 (the script skips MSW v1-only suites). It builds
   # and packs the library, installs msw@^3, and checks msw-fetch-mock's peer range.
   e2e-msw3:
     runs-on: ubuntu-latest
@@ -166,4 +166,4 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install
-      - run: bash scripts/test-e2e.sh --msw=3 jest-esm jest-cjs node-test node-cjs native-esm native-cjs vitest-browser
+      - run: bash scripts/test-e2e.sh --all --msw=3

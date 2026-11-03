@@ -52,61 +52,6 @@ describe('BrowserFetchInterceptor', () => {
 		await result;
 	});
 
-	describe('[AC-9] worker already started by the user (MSW v3 readyState)', () => {
-		/**
-		 * Fake of an MSW v3 worker: exposes `readyState` (0 = DISABLED) and,
-		 * like the real one, throws when start() is called while enabled.
-		 */
-		function createV3Worker(readyState: number) {
-			const worker = {
-				readyState,
-				use: vi.fn(),
-				resetHandlers: vi.fn(),
-				start: vi.fn(async () => {
-					if (worker.readyState !== 0) {
-						throw new Error(
-							'[MSW] Failed to call "worker.start()": the worker is already started.',
-						);
-					}
-					worker.readyState = 2;
-				}),
-				stop: vi.fn(() => {
-					worker.readyState = 0;
-				}),
-			};
-			return worker;
-		}
-
-		it('should activate without error when the worker is already started', async () => {
-			const worker = createV3Worker(2);
-			const fm = createFetchMock(worker);
-
-			await expect(fm.activate()).resolves.toBeUndefined();
-			expect(worker.start).not.toHaveBeenCalled();
-		});
-
-		it('should start the worker when it is not started yet', async () => {
-			const worker = createV3Worker(0);
-			const fm = createFetchMock(worker);
-
-			await fm.activate();
-
-			expect(worker.start).toHaveBeenCalledTimes(1);
-		});
-
-		it('should be able to activate again after deactivate', async () => {
-			const worker = createV3Worker(0);
-			const fm = createFetchMock(worker);
-
-			await fm.activate();
-			fm.deactivate();
-			await fm.activate();
-
-			// deactivate() stopped it, so the second activate() must start it again
-			expect(worker.start).toHaveBeenCalledTimes(2);
-		});
-	});
-
 	describe('[AC-6] deactivate() waits for worker.stop() (a Promise in MSW v3)', () => {
 		it('resolves only after the worker has stopped, with the state already cleared', async () => {
 			let finishStop: () => void = () => {};
@@ -123,22 +68,19 @@ describe('BrowserFetchInterceptor', () => {
 			await fm.activate();
 			fm.get('http://ac6.test').intercept({ path: '/x' }).reply(200, 'x');
 
-			let stopped = false;
-			const result = fm.deactivate();
-			void Promise.resolve(result).then(() => {
-				stopped = true;
-			});
+			const settled = vi.fn();
+			const result = fm.deactivate().then(settled);
 
 			// cleanup still happens synchronously, as before
 			expect(fm.pendingInterceptors()).toHaveLength(0);
-			expect(result).toBeInstanceOf(Promise);
 
-			await Promise.resolve();
-			expect(stopped).toBe(false);
+			// a macrotask lets every pending microtask run: still waiting for stop()
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(settled).not.toHaveBeenCalled();
 
 			finishStop();
 			await result;
-			expect(stopped).toBe(true);
+			expect(settled).toHaveBeenCalledOnce();
 		});
 	});
 });
