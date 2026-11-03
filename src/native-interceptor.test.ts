@@ -137,7 +137,9 @@ describe('NativeFetchInterceptor', () => {
 			adapter.deactivate();
 		});
 
-		it('should call onUnhandledRequest when handler returns undefined', async () => {
+		// Like MSW: a handler that ran but returned nothing handled the request as a
+		// passthrough; FetchMock's catch-all has already applied the unhandled policy.
+		it('should pass through without calling onUnhandledRequest when a handler returns undefined', async () => {
 			const adapter = new NativeFetchInterceptor();
 			const onUnhandled = vi.fn();
 			const handler: NativeHandler = {
@@ -154,7 +156,7 @@ describe('NativeFetchInterceptor', () => {
 			adapter.use(handler);
 
 			await globalThis.fetch('http://example.com/test');
-			expect(onUnhandled).toHaveBeenCalled();
+			expect(onUnhandled).not.toHaveBeenCalled();
 			expect(network).toHaveBeenCalledTimes(1);
 
 			adapter.deactivate();
