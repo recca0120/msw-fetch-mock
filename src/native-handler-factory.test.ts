@@ -2,31 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { NativeHandlerFactory } from './native-handler-factory';
 
 describe('NativeHandlerFactory', () => {
-	describe('createHandler', () => {
-		it('should return a descriptor with method, urlPattern, and handlerFn', () => {
-			const handlerFn = async () => undefined;
-			const handler = NativeHandlerFactory.createHandler('GET', '/test', handlerFn);
-
-			expect(handler).toEqual({
-				method: 'GET',
-				urlPattern: '/test',
-				handlerFn,
-			});
-		});
-
-		it('should accept RegExp as urlPattern', () => {
-			const handlerFn = async () => undefined;
-			const pattern = /^https:\/\/example\.com/;
-			const handler = NativeHandlerFactory.createHandler('POST', pattern, handlerFn);
-
-			expect(handler).toEqual({
-				method: 'POST',
-				urlPattern: pattern,
-				handlerFn,
-			});
-		});
-	});
-
 	describe('buildResponse', () => {
 		it('should return a JSON Response with status 200', async () => {
 			const response = NativeHandlerFactory.buildResponse(200, { data: 1 });

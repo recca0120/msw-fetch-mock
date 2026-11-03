@@ -1,23 +1,7 @@
 import { HttpResponse, http } from 'msw';
-import { type HandlerFactory as HandlerFactoryType, type HttpMethod } from './types';
-
-const methods: Record<HttpMethod, typeof http.get> = {
-	GET: http.get,
-	POST: http.post,
-	PUT: http.put,
-	DELETE: http.delete,
-	PATCH: http.patch,
-};
+import { type HandlerFactory as HandlerFactoryType } from './types';
 
 export const HandlerFactory: HandlerFactoryType = {
-	/**
-	 * @deprecated Never called by FetchMock (all requests go through one catch-all
-	 * handler from `createCatchAllHandler`). Will be removed in 0.7.0.
-	 */
-	createHandler(method, urlPattern, handlerFn) {
-		return methods[method](urlPattern, async ({ request }) => handlerFn(request));
-	},
-
 	createCatchAllHandler(handlerFn) {
 		return http.all('*', async ({ request }) => handlerFn(request));
 	},

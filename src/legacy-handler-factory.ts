@@ -1,4 +1,4 @@
-import { type HandlerFactory, type HttpMethod } from './types';
+import { type HandlerFactory } from './types';
 
 /** Duck-typed MSW v1 request object */
 interface LegacyReq {
@@ -27,8 +27,8 @@ export type LegacyRestMethod = (
 	resolver: (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => unknown,
 ) => unknown;
 
-/** Duck-typed interface for MSW v1's `rest` namespace */
-export type LegacyRestApi = Record<Lowercase<HttpMethod> | 'all', LegacyRestMethod>;
+/** Duck-typed interface for MSW v1's `rest` namespace (only `rest.all` is used). */
+export type LegacyRestApi = { all: LegacyRestMethod };
 
 /** Convert MSW v1 request object to standard Request */
 function convertV1Request(req: LegacyReq): Request {
@@ -82,14 +82,6 @@ async function convertToV1Response(
  * @param rest - The `rest` object from `msw` v1 (e.g., `import { rest } from 'msw'`)
  */
 export function createLegacyHandlerFactory(rest: LegacyRestApi): HandlerFactory {
-	const methods: Record<HttpMethod, LegacyRestMethod> = {
-		GET: rest.get,
-		POST: rest.post,
-		PUT: rest.put,
-		DELETE: rest.delete,
-		PATCH: rest.patch,
-	};
-
 	const createResolver = (handlerFn: (request: Request) => Promise<Response | undefined>) => {
 		return async (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => {
 			const request = convertV1Request(req);
@@ -100,14 +92,6 @@ export function createLegacyHandlerFactory(rest: LegacyRestApi): HandlerFactory 
 	};
 
 	return {
-		/**
-		 * @deprecated Never called by FetchMock. To register a single MSW v1 route
-		 * yourself, use `rest.get(url, resolver)` etc. directly. Will be removed in 0.7.0.
-		 */
-		createHandler(method, urlPattern, handlerFn) {
-			return methods[method](urlPattern, createResolver(handlerFn));
-		},
-
 		buildResponse(status, body, headers) {
 			if (body === null || body === undefined) {
 				return new Response(null, { status, headers });
