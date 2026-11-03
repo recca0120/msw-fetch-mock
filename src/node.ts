@@ -12,9 +12,9 @@ FetchMock._defaultInterceptorFactory = () => new NodeFetchInterceptor();
 FetchMock._handlerFactory = HandlerFactory;
 
 export function createFetchMock(server?: SetupServerLike): FetchMock {
-	// Pass the handler factory explicitly: the statics above are process-wide and
-	// another entry imported later (e.g. /native) would overwrite them.
-	return new FetchMock(new NodeFetchInterceptor(server), HandlerFactory);
+  // Pass the handler factory explicitly: the statics above are process-wide and
+  // another entry imported later (e.g. /native) would overwrite them.
+  return new FetchMock(new NodeFetchInterceptor(server), HandlerFactory);
 }
 
 /** Pre-built singleton for quick standalone use (Cloudflare migration compatible). */

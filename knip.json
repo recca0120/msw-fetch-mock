@@ -1,9 +1,9 @@
 {
-	"$schema": "https://unpkg.com/knip@latest/schema.json",
-	"project": ["src/**/*.ts", "!src/**/*.test.ts", "!src/test-utils.ts", "!src/**/*.contract.ts"],
-	"ignoreExportsUsedInFile": true,
-	"vitest": {
-		"entry": ["src/**/*.test.ts"]
-	},
-	"ignoreDependencies": ["msw3"]
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "project": ["src/**/*.ts", "!src/**/*.test.ts", "!src/test-utils.ts", "!src/**/*.contract.ts"],
+  "ignoreExportsUsedInFile": true,
+  "vitest": {
+    "entry": ["src/**/*.test.ts"]
+  },
+  "ignoreDependencies": ["msw3"]
 }

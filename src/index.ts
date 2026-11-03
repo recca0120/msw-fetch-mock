@@ -6,7 +6,7 @@ import { registerDefaultInterceptor } from './register-default-interceptor';
 const detected = await registerDefaultInterceptor();
 
 export function createFetchMock(): FetchMock {
-	return new FetchMock(detected.createInterceptor(), detected.handlerFactory);
+  return new FetchMock(detected.createInterceptor(), detected.handlerFactory);
 }
 
 export const fetchMock: FetchMock = createFetchMock();

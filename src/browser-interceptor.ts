@@ -3,44 +3,44 @@ import { toMswListenOptions } from './msw-listen-options';
 import { type FetchInterceptor, type ResolvedActivateOptions, type SetupWorkerLike } from './types';
 
 export class BrowserFetchInterceptor implements FetchInterceptor {
-	private readonly worker: SetupWorkerLike;
-	private removeFetchOptions: () => void = () => {};
-	/** Whether activate() started the worker (so deactivate() should stop it). */
-	private startedByUs = false;
+  private readonly worker: SetupWorkerLike;
+  private removeFetchOptions: () => void = () => {};
+  /** Whether activate() started the worker (so deactivate() should stop it). */
+  private startedByUs = false;
 
-	constructor(worker: SetupWorkerLike) {
-		this.worker = worker;
-	}
+  constructor(worker: SetupWorkerLike) {
+    this.worker = worker;
+  }
 
-	use(...handlers: Array<unknown>): void {
-		this.worker.use(...handlers);
-	}
+  use(...handlers: Array<unknown>): void {
+    this.worker.use(...handlers);
+  }
 
-	resetHandlers(...handlers: Array<unknown>): void {
-		this.worker.resetHandlers(...handlers);
-	}
+  resetHandlers(...handlers: Array<unknown>): void {
+    this.worker.resetHandlers(...handlers);
+  }
 
-	listHandlers(): ReadonlyArray<unknown> | undefined {
-		return this.worker.listHandlers?.();
-	}
+  listHandlers(): ReadonlyArray<unknown> | undefined {
+    return this.worker.listHandlers?.();
+  }
 
-	async activate(options: ResolvedActivateOptions): Promise<void> {
-		// MSW v3 throws when start() is called on an already started worker (v2
-		// only warned), e.g. one the user started themselves. v3 exposes
-		// `readyState` (0 = disabled); v2 has none (undefined), so both mean "start it".
-		if (!this.worker.readyState) {
-			await this.worker.start(toMswListenOptions(options.onUnhandledRequest));
-			this.startedByUs = true;
-		}
-		this.removeFetchOptions = installFetchOptions(options);
-	}
+  async activate(options: ResolvedActivateOptions): Promise<void> {
+    // MSW v3 throws when start() is called on an already started worker (v2
+    // only warned), e.g. one the user started themselves. v3 exposes
+    // `readyState` (0 = disabled); v2 has none (undefined), so both mean "start it".
+    if (!this.worker.readyState) {
+      await this.worker.start(toMswListenOptions(options.onUnhandledRequest));
+      this.startedByUs = true;
+    }
+    this.removeFetchOptions = installFetchOptions(options);
+  }
 
-	/** Stops the worker only if activate() started it; a worker the user started keeps running. */
-	deactivate(): void | Promise<void> {
-		this.removeFetchOptions();
-		this.removeFetchOptions = () => {};
-		if (!this.startedByUs) return;
-		this.startedByUs = false;
-		return this.worker.stop();
-	}
+  /** Stops the worker only if activate() started it; a worker the user started keeps running. */
+  deactivate(): void | Promise<void> {
+    this.removeFetchOptions();
+    this.removeFetchOptions = () => {};
+    if (!this.startedByUs) return;
+    this.startedByUs = false;
+    return this.worker.stop();
+  }
 }

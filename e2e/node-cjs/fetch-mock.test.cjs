@@ -3,7 +3,7 @@ const { createFetchMock } = require('msw-fetch-mock/node');
 const { defineScenarios } = require('../shared/scenarios.cjs');
 
 defineScenarios({
-	label: 'node-cjs integration (require)',
-	runner: { describe, it, before, after, afterEach },
-	createFetchMock: () => createFetchMock(),
+  label: 'node-cjs integration (require)',
+  runner: { describe, it, before, after, afterEach },
+  createFetchMock: () => createFetchMock(),
 });

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-	createLegacyHandlerFactory,
-	type LegacyRestApi,
-	type LegacyRestMethod,
+  createLegacyHandlerFactory,
+  type LegacyRestApi,
+  type LegacyRestMethod,
 } from './legacy-handler-factory';
 
 /* ---------- MSW legacy (v1) API mocks ---------- */
@@ -10,306 +10,306 @@ import {
 type V1Resolver = Parameters<LegacyRestMethod>[1];
 
 function createMockRestApi(): LegacyRestApi & { _resolvers: Map<string, V1Resolver> } {
-	const resolvers = new Map<string, V1Resolver>();
+  const resolvers = new Map<string, V1Resolver>();
 
-	return {
-		all: (url: string | RegExp, resolver: V1Resolver) => {
-			const key = `ALL ${url}`;
-			resolvers.set(key, resolver);
-			return { key, url };
-		},
-		_resolvers: resolvers,
-	};
+  return {
+    all: (url: string | RegExp, resolver: V1Resolver) => {
+      const key = `ALL ${url}`;
+      resolvers.set(key, resolver);
+      return { key, url };
+    },
+    _resolvers: resolvers,
+  };
 }
 
 /** Registers `handlerFn` as the catch-all and returns the MSW v1 resolver it installed. */
 function registerCatchAll(
-	restApi: ReturnType<typeof createMockRestApi>,
-	handlerFn: (request: Request) => Promise<Response | undefined>,
+  restApi: ReturnType<typeof createMockRestApi>,
+  handlerFn: (request: Request) => Promise<Response | undefined>,
 ): V1Resolver {
-	createLegacyHandlerFactory(restApi).createCatchAllHandler(handlerFn);
-	return restApi._resolvers.get('ALL *')!;
+  createLegacyHandlerFactory(restApi).createCatchAllHandler(handlerFn);
+  return restApi._resolvers.get('ALL *')!;
 }
 
 function createMockV1Request(options: {
-	url: string;
-	method: string;
-	body?: unknown;
-	headers?: Record<string, string>;
+  url: string;
+  method: string;
+  body?: unknown;
+  headers?: Record<string, string>;
 }) {
-	return {
-		url: new URL(options.url),
-		method: options.method,
-		body: options.body ?? null,
-		headers: {
-			all: () => options.headers ?? {},
-		},
-	};
+  return {
+    url: new URL(options.url),
+    method: options.method,
+    body: options.body ?? null,
+    headers: {
+      all: () => options.headers ?? {},
+    },
+  };
 }
 
 function createMockV1Res() {
-	const collected: unknown[] = [];
+  const collected: unknown[] = [];
 
-	const res = Object.assign(
-		(...transformers: unknown[]) => {
-			collected.push(...transformers);
-			return { _type: 'response', transformers: collected };
-		},
-		{ networkError: (msg: string) => ({ _type: 'networkError', message: msg }) },
-	);
+  const res = Object.assign(
+    (...transformers: unknown[]) => {
+      collected.push(...transformers);
+      return { _type: 'response', transformers: collected };
+    },
+    { networkError: (msg: string) => ({ _type: 'networkError', message: msg }) },
+  );
 
-	return { res, collected };
+  return { res, collected };
 }
 
 function createMockV1Ctx() {
-	return {
-		status: (code: number) => ({ _type: 'status', value: code }),
-		json: (data: unknown) => ({ _type: 'json', value: data }),
-		body: (text: string) => ({ _type: 'body', value: text }),
-		set: (name: string, value: string) => ({ _type: 'header', name, value }),
-	};
+  return {
+    status: (code: number) => ({ _type: 'status', value: code }),
+    json: (data: unknown) => ({ _type: 'json', value: data }),
+    body: (text: string) => ({ _type: 'body', value: text }),
+    set: (name: string, value: string) => ({ _type: 'header', name, value }),
+  };
 }
 
 /* ---------- Tests ---------- */
 
 describe('legacyHandlerFactory', () => {
-	describe('buildResponse', () => {
-		it('should create JSON response with correct status and body', async () => {
-			const factory = createLegacyHandlerFactory(createMockRestApi());
-			const response = factory.buildResponse(200, { ok: true });
+  describe('buildResponse', () => {
+    it('should create JSON response with correct status and body', async () => {
+      const factory = createLegacyHandlerFactory(createMockRestApi());
+      const response = factory.buildResponse(200, { ok: true });
 
-			expect(response.status).toBe(200);
-			expect(await response.json()).toEqual({ ok: true });
-		});
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true });
+    });
 
-		it('should create empty response for null body', () => {
-			const factory = createLegacyHandlerFactory(createMockRestApi());
-			const response = factory.buildResponse(204, null);
+    it('should create empty response for null body', () => {
+      const factory = createLegacyHandlerFactory(createMockRestApi());
+      const response = factory.buildResponse(204, null);
 
-			expect(response.status).toBe(204);
-		});
+      expect(response.status).toBe(204);
+    });
 
-		it('should create empty response for undefined body', () => {
-			const factory = createLegacyHandlerFactory(createMockRestApi());
-			const response = factory.buildResponse(204, undefined);
+    it('should create empty response for undefined body', () => {
+      const factory = createLegacyHandlerFactory(createMockRestApi());
+      const response = factory.buildResponse(204, undefined);
 
-			expect(response.status).toBe(204);
-		});
+      expect(response.status).toBe(204);
+    });
 
-		it('should include custom headers', () => {
-			const factory = createLegacyHandlerFactory(createMockRestApi());
-			const headers = new Headers({ 'X-Custom': 'test' });
-			const response = factory.buildResponse(200, { ok: true }, headers);
+    it('should include custom headers', () => {
+      const factory = createLegacyHandlerFactory(createMockRestApi());
+      const headers = new Headers({ 'X-Custom': 'test' });
+      const response = factory.buildResponse(200, { ok: true }, headers);
 
-			expect(response.headers.get('X-Custom')).toBe('test');
-		});
+      expect(response.headers.get('X-Custom')).toBe('test');
+    });
 
-		it('should return string body as-is without JSON serialization', async () => {
-			const factory = createLegacyHandlerFactory(createMockRestApi());
-			const response = factory.buildResponse(200, 'hello world');
+    it('should return string body as-is without JSON serialization', async () => {
+      const factory = createLegacyHandlerFactory(createMockRestApi());
+      const response = factory.buildResponse(200, 'hello world');
 
-			expect(await response.text()).toBe('hello world');
-		});
+      expect(await response.text()).toBe('hello world');
+    });
 
-		it('should not double-serialize a JSON string', async () => {
-			const factory = createLegacyHandlerFactory(createMockRestApi());
-			const jsonString = JSON.stringify({ key: 'value' });
-			const response = factory.buildResponse(200, jsonString);
+    it('should not double-serialize a JSON string', async () => {
+      const factory = createLegacyHandlerFactory(createMockRestApi());
+      const jsonString = JSON.stringify({ key: 'value' });
+      const response = factory.buildResponse(200, jsonString);
 
-			expect(await response.text()).toBe(jsonString);
-		});
+      expect(await response.text()).toBe(jsonString);
+    });
 
-		it('should set content-type to application/json for JSON body', () => {
-			const factory = createLegacyHandlerFactory(createMockRestApi());
-			const response = factory.buildResponse(200, { ok: true });
+    it('should set content-type to application/json for JSON body', () => {
+      const factory = createLegacyHandlerFactory(createMockRestApi());
+      const response = factory.buildResponse(200, { ok: true });
 
-			expect(response.headers.get('content-type')).toBe('application/json');
-		});
-	});
+      expect(response.headers.get('content-type')).toBe('application/json');
+    });
+  });
 
-	describe('buildErrorResponse', () => {
-		it('should create a network error response', () => {
-			const factory = createLegacyHandlerFactory(createMockRestApi());
-			const response = factory.buildErrorResponse();
+  describe('buildErrorResponse', () => {
+    it('should create a network error response', () => {
+      const factory = createLegacyHandlerFactory(createMockRestApi());
+      const response = factory.buildErrorResponse();
 
-			expect(response.type).toBe('error');
-		});
-	});
+      expect(response.type).toBe('error');
+    });
+  });
 
-	describe('createCatchAllHandler', () => {
-		it('should register one MSW v1 handler for every request via rest.all("*")', () => {
-			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
+  describe('createCatchAllHandler', () => {
+    it('should register one MSW v1 handler for every request via rest.all("*")', () => {
+      const restApi = createMockRestApi();
+      const factory = createLegacyHandlerFactory(restApi);
 
-			factory.createCatchAllHandler(vi.fn().mockResolvedValue(undefined));
+      factory.createCatchAllHandler(vi.fn().mockResolvedValue(undefined));
 
-			expect([...restApi._resolvers.keys()]).toEqual(['ALL *']);
-		});
+      expect([...restApi._resolvers.keys()]).toEqual(['ALL *']);
+    });
 
-		it('should convert legacy request to standard Request and call handlerFn', async () => {
-			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
+    it('should convert legacy request to standard Request and call handlerFn', async () => {
+      const restApi = createMockRestApi();
+      const factory = createLegacyHandlerFactory(restApi);
 
-			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			const resolver = registerCatchAll(restApi, handlerFn);
-			const req = createMockV1Request({
-				url: 'http://localhost/api/data',
-				method: 'POST',
-				body: { key: 'value' },
-				headers: { 'content-type': 'application/json' },
-			});
-			const { res } = createMockV1Res();
-			const ctx = createMockV1Ctx();
+      const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
+      const resolver = registerCatchAll(restApi, handlerFn);
+      const req = createMockV1Request({
+        url: 'http://localhost/api/data',
+        method: 'POST',
+        body: { key: 'value' },
+        headers: { 'content-type': 'application/json' },
+      });
+      const { res } = createMockV1Res();
+      const ctx = createMockV1Ctx();
 
-			await resolver(req, res, ctx);
+      await resolver(req, res, ctx);
 
-			expect(handlerFn).toHaveBeenCalledWith(expect.any(Request));
-			const passedRequest = handlerFn.mock.calls[0][0] as Request;
-			expect(passedRequest.method).toBe('POST');
-			expect(passedRequest.url).toBe('http://localhost/api/data');
-		});
+      expect(handlerFn).toHaveBeenCalledWith(expect.any(Request));
+      const passedRequest = handlerFn.mock.calls[0][0] as Request;
+      expect(passedRequest.method).toBe('POST');
+      expect(passedRequest.url).toBe('http://localhost/api/data');
+    });
 
-		it('should pass request body for POST requests', async () => {
-			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
+    it('should pass request body for POST requests', async () => {
+      const restApi = createMockRestApi();
+      const factory = createLegacyHandlerFactory(restApi);
 
-			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			const resolver = registerCatchAll(restApi, handlerFn);
-			const req = createMockV1Request({
-				url: 'http://localhost/api/data',
-				method: 'POST',
-				body: { key: 'value' },
-			});
-			const { res } = createMockV1Res();
-			const ctx = createMockV1Ctx();
+      const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
+      const resolver = registerCatchAll(restApi, handlerFn);
+      const req = createMockV1Request({
+        url: 'http://localhost/api/data',
+        method: 'POST',
+        body: { key: 'value' },
+      });
+      const { res } = createMockV1Res();
+      const ctx = createMockV1Ctx();
 
-			await resolver(req, res, ctx);
+      await resolver(req, res, ctx);
 
-			const passedRequest = handlerFn.mock.calls[0][0] as Request;
-			expect(await passedRequest.text()).toBe('{"key":"value"}');
-		});
+      const passedRequest = handlerFn.mock.calls[0][0] as Request;
+      expect(await passedRequest.text()).toBe('{"key":"value"}');
+    });
 
-		it('should pass string body as-is for POST requests', async () => {
-			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
+    it('should pass string body as-is for POST requests', async () => {
+      const restApi = createMockRestApi();
+      const factory = createLegacyHandlerFactory(restApi);
 
-			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			const resolver = registerCatchAll(restApi, handlerFn);
-			const req = createMockV1Request({
-				url: 'http://localhost/api/data',
-				method: 'POST',
-				body: 'raw text body',
-			});
-			const { res } = createMockV1Res();
-			const ctx = createMockV1Ctx();
+      const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
+      const resolver = registerCatchAll(restApi, handlerFn);
+      const req = createMockV1Request({
+        url: 'http://localhost/api/data',
+        method: 'POST',
+        body: 'raw text body',
+      });
+      const { res } = createMockV1Res();
+      const ctx = createMockV1Ctx();
 
-			await resolver(req, res, ctx);
+      await resolver(req, res, ctx);
 
-			const passedRequest = handlerFn.mock.calls[0][0] as Request;
-			expect(await passedRequest.text()).toBe('raw text body');
-		});
+      const passedRequest = handlerFn.mock.calls[0][0] as Request;
+      expect(await passedRequest.text()).toBe('raw text body');
+    });
 
-		it('should not include body for GET requests', async () => {
-			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
+    it('should not include body for GET requests', async () => {
+      const restApi = createMockRestApi();
+      const factory = createLegacyHandlerFactory(restApi);
 
-			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			const resolver = registerCatchAll(restApi, handlerFn);
-			const req = createMockV1Request({
-				url: 'http://localhost/api/data',
-				method: 'GET',
-			});
-			const { res } = createMockV1Res();
-			const ctx = createMockV1Ctx();
+      const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
+      const resolver = registerCatchAll(restApi, handlerFn);
+      const req = createMockV1Request({
+        url: 'http://localhost/api/data',
+        method: 'GET',
+      });
+      const { res } = createMockV1Res();
+      const ctx = createMockV1Ctx();
 
-			await resolver(req, res, ctx);
+      await resolver(req, res, ctx);
 
-			const passedRequest = handlerFn.mock.calls[0][0] as Request;
-			expect(await passedRequest.text()).toBe('');
-		});
+      const passedRequest = handlerFn.mock.calls[0][0] as Request;
+      expect(await passedRequest.text()).toBe('');
+    });
 
-		it('should convert response to legacy res(ctx...) format', async () => {
-			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
+    it('should convert response to legacy res(ctx...) format', async () => {
+      const restApi = createMockRestApi();
+      const factory = createLegacyHandlerFactory(restApi);
 
-			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			const resolver = registerCatchAll(restApi, handlerFn);
-			const req = createMockV1Request({ url: 'http://localhost/api/data', method: 'GET' });
-			const { res, collected } = createMockV1Res();
-			const ctx = createMockV1Ctx();
+      const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
+      const resolver = registerCatchAll(restApi, handlerFn);
+      const req = createMockV1Request({ url: 'http://localhost/api/data', method: 'GET' });
+      const { res, collected } = createMockV1Res();
+      const ctx = createMockV1Ctx();
 
-			const result = await resolver(req, res, ctx);
+      const result = await resolver(req, res, ctx);
 
-			expect(result).toBeDefined();
-			expect(collected).toContainEqual({ _type: 'status', value: 200 });
-			expect(collected).toContainEqual({ _type: 'body', value: '{"ok":true}' });
-		});
+      expect(result).toBeDefined();
+      expect(collected).toContainEqual({ _type: 'status', value: 200 });
+      expect(collected).toContainEqual({ _type: 'body', value: '{"ok":true}' });
+    });
 
-		it('should copy response headers to legacy format', async () => {
-			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
+    it('should copy response headers to legacy format', async () => {
+      const restApi = createMockRestApi();
+      const factory = createLegacyHandlerFactory(restApi);
 
-			const headers = new Headers({ 'X-Custom': 'test-value' });
-			const handlerFn = vi
-				.fn()
-				.mockResolvedValue(factory.buildResponse(200, { ok: true }, headers));
-			const resolver = registerCatchAll(restApi, handlerFn);
-			const req = createMockV1Request({ url: 'http://localhost/api/data', method: 'GET' });
-			const { res, collected } = createMockV1Res();
-			const ctx = createMockV1Ctx();
+      const headers = new Headers({ 'X-Custom': 'test-value' });
+      const handlerFn = vi
+        .fn()
+        .mockResolvedValue(factory.buildResponse(200, { ok: true }, headers));
+      const resolver = registerCatchAll(restApi, handlerFn);
+      const req = createMockV1Request({ url: 'http://localhost/api/data', method: 'GET' });
+      const { res, collected } = createMockV1Res();
+      const ctx = createMockV1Ctx();
 
-			await resolver(req, res, ctx);
+      await resolver(req, res, ctx);
 
-			expect(collected).toContainEqual({ _type: 'header', name: 'x-custom', value: 'test-value' });
-		});
+      expect(collected).toContainEqual({ _type: 'header', name: 'x-custom', value: 'test-value' });
+    });
 
-		it('should return undefined for passthrough when handlerFn returns undefined', async () => {
-			const restApi = createMockRestApi();
+    it('should return undefined for passthrough when handlerFn returns undefined', async () => {
+      const restApi = createMockRestApi();
 
-			const handlerFn = vi.fn().mockResolvedValue(undefined);
-			const resolver = registerCatchAll(restApi, handlerFn);
-			const req = createMockV1Request({ url: 'http://localhost/api/data', method: 'GET' });
-			const { res } = createMockV1Res();
-			const ctx = createMockV1Ctx();
+      const handlerFn = vi.fn().mockResolvedValue(undefined);
+      const resolver = registerCatchAll(restApi, handlerFn);
+      const req = createMockV1Request({ url: 'http://localhost/api/data', method: 'GET' });
+      const { res } = createMockV1Res();
+      const ctx = createMockV1Ctx();
 
-			const result = await resolver(req, res, ctx);
+      const result = await resolver(req, res, ctx);
 
-			expect(result).toBeUndefined();
-		});
+      expect(result).toBeUndefined();
+    });
 
-		it('should call res.networkError for error responses', async () => {
-			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
+    it('should call res.networkError for error responses', async () => {
+      const restApi = createMockRestApi();
+      const factory = createLegacyHandlerFactory(restApi);
 
-			const handlerFn = vi.fn().mockResolvedValue(factory.buildErrorResponse());
-			const resolver = registerCatchAll(restApi, handlerFn);
-			const req = createMockV1Request({ url: 'http://localhost/api/fail', method: 'GET' });
-			const { res } = createMockV1Res();
-			const ctx = createMockV1Ctx();
+      const handlerFn = vi.fn().mockResolvedValue(factory.buildErrorResponse());
+      const resolver = registerCatchAll(restApi, handlerFn);
+      const req = createMockV1Request({ url: 'http://localhost/api/fail', method: 'GET' });
+      const { res } = createMockV1Res();
+      const ctx = createMockV1Ctx();
 
-			const result = await resolver(req, res, ctx);
+      const result = await resolver(req, res, ctx);
 
-			expect(result).toEqual({ _type: 'networkError', message: 'Failed to fetch' });
-		});
+      expect(result).toEqual({ _type: 'networkError', message: 'Failed to fetch' });
+    });
 
-		it('should pass legacy request headers to standard Request', async () => {
-			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
+    it('should pass legacy request headers to standard Request', async () => {
+      const restApi = createMockRestApi();
+      const factory = createLegacyHandlerFactory(restApi);
 
-			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			const resolver = registerCatchAll(restApi, handlerFn);
-			const req = createMockV1Request({
-				url: 'http://localhost/api/data',
-				method: 'GET',
-				headers: { authorization: 'Bearer token-123' },
-			});
-			const { res } = createMockV1Res();
-			const ctx = createMockV1Ctx();
+      const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
+      const resolver = registerCatchAll(restApi, handlerFn);
+      const req = createMockV1Request({
+        url: 'http://localhost/api/data',
+        method: 'GET',
+        headers: { authorization: 'Bearer token-123' },
+      });
+      const { res } = createMockV1Res();
+      const ctx = createMockV1Ctx();
 
-			await resolver(req, res, ctx);
+      await resolver(req, res, ctx);
 
-			const passedRequest = handlerFn.mock.calls[0][0] as Request;
-			expect(passedRequest.headers.get('authorization')).toBe('Bearer token-123');
-		});
-	});
+      const passedRequest = handlerFn.mock.calls[0][0] as Request;
+      expect(passedRequest.headers.get('authorization')).toBe('Bearer token-123');
+    });
+  });
 });

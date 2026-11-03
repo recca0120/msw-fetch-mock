@@ -1,12 +1,12 @@
 {
-	"extends": "./tsconfig.json",
-	"compilerOptions": {
-		"noEmit": true,
-		"declaration": false,
-		"declarationMap": false,
-		"isolatedDeclarations": false,
-		"types": ["node", "vitest/globals"]
-	},
-	"include": ["src"],
-	"exclude": []
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "isolatedDeclarations": false,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src"],
+  "exclude": []
 }
