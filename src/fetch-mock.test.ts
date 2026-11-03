@@ -1,10 +1,10 @@
 import { HttpResponse, http } from 'msw';
 import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FetchMock } from './fetch-mock';
 import { createFetchMock, fetchMock as singletonFetchMock } from './node';
 import { NodeFetchInterceptor } from './node-interceptor';
-import { CLOSED_HOST, CLOSED_ORIGIN, causeCode } from './test-utils';
+import { CLOSED_HOST, CLOSED_ORIGIN, causeCode, useFetchMock } from './test-utils';
 import { type FetchInterceptor, type SetupServerLike } from './types';
 
 const API_BASE = 'http://localhost:8787';
@@ -41,19 +41,7 @@ function trackTimers(ms: number) {
 }
 
 describe('FetchMock', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	describe('intercept + reply', () => {
 		it('should intercept GET request', async () => {
@@ -314,18 +302,7 @@ describe('FetchMock', () => {
 });
 
 describe('query matching', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should match exact query params', async () => {
 		fetchMock
@@ -439,16 +416,8 @@ describe('query matching', () => {
 });
 
 describe('times', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	// some tests intentionally leave interceptors pending; reset so order does not matter
-	afterEach(() => fetchMock.reset());
-	afterAll(() => fetchMock.deactivate());
+	// some tests intentionally leave interceptors pending
+	const fetchMock = useFetchMock(createFetchMock, { verifyNoPending: false });
 
 	it('should match interceptor exactly N times', async () => {
 		fetchMock
@@ -479,16 +448,8 @@ describe('times', () => {
 });
 
 describe('persist', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	// some tests intentionally leave interceptors pending; reset so order does not matter
-	afterEach(() => fetchMock.reset());
-	afterAll(() => fetchMock.deactivate());
+	// some tests intentionally leave interceptors pending
+	const fetchMock = useFetchMock(createFetchMock, { verifyNoPending: false });
 
 	it('should match indefinitely', async () => {
 		fetchMock
@@ -507,16 +468,8 @@ describe('persist', () => {
 });
 
 describe('pendingInterceptors', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	// some tests intentionally leave interceptors pending; reset so order does not matter
-	afterEach(() => fetchMock.reset());
-	afterAll(() => fetchMock.deactivate());
+	// some tests intentionally leave interceptors pending
+	const fetchMock = useFetchMock(createFetchMock, { verifyNoPending: false });
 
 	it('should return empty array when no interceptors', () => {
 		expect(fetchMock.pendingInterceptors()).toEqual([]);
@@ -696,19 +649,7 @@ describe('reset', () => {
 });
 
 describe('call history', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should record GET request properties', async () => {
 		fetchMock
@@ -925,18 +866,7 @@ describe('enableNetConnect', () => {
 });
 
 describe('replyWithError', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should make fetch reject with an error', async () => {
 		fetchMock
@@ -949,18 +879,7 @@ describe('replyWithError', () => {
 });
 
 describe('streaming body', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should stream response body correctly when reply body is a ReadableStream', async () => {
 		const chunks = ['hello', ' ', 'world'];
@@ -1004,20 +923,9 @@ describe('streaming body', () => {
 });
 
 describe('delay', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		// restore first, so a failed fake-timer test cannot leak fake time into the next one
-		vi.useRealTimers();
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
+	// runs before useFetchMock's check: a failed fake-timer test must not leak fake time
+	afterEach(() => vi.useRealTimers());
 
 	it('should delay the response by at least the specified ms', async () => {
 		vi.useFakeTimers();
@@ -1136,19 +1044,9 @@ describe('delay', () => {
 });
 
 describe('retry scenarios', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		vi.useRealTimers();
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
+	// runs before useFetchMock's check: a failed fake-timer test must not leak fake time
+	afterEach(() => vi.useRealTimers());
 
 	it('should return 503 on first call and 200 on second call (retry scenario)', async () => {
 		fetchMock
@@ -1533,18 +1431,7 @@ describe('consumed interceptor', () => {
 });
 
 describe('defaultReplyHeaders', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should add default headers to all replies', async () => {
 		fetchMock.defaultReplyHeaders({ 'X-Request-Id': 'abc-123' });
@@ -1602,18 +1489,7 @@ describe('defaultReplyHeaders', () => {
 });
 
 describe('get(origin) with RegExp', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should accept RegExp as origin', async () => {
 		fetchMock
@@ -1629,18 +1505,7 @@ describe('get(origin) with RegExp', () => {
 });
 
 describe('get(origin) with function', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should accept function as origin', async () => {
 		fetchMock
@@ -1656,18 +1521,7 @@ describe('get(origin) with function', () => {
 });
 
 describe('reply(callback) single parameter form', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should accept single callback returning { statusCode, data }', async () => {
 		fetchMock
@@ -1690,18 +1544,7 @@ describe('reply(callback) single parameter form', () => {
 });
 
 describe('clearAllCallHistory', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should be an alias for clearCallHistory()', async () => {
 		fetchMock
@@ -1719,20 +1562,9 @@ describe('clearAllCallHistory', () => {
 });
 
 describe('enableCallHistory / disableCallHistory', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		// reset() does not restore call recording, so re-enable it even if a test failed
-		fetchMock.enableCallHistory();
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
+	// reset() does not restore call recording, so re-enable it even if a test failed
+	afterEach(() => fetchMock.enableCallHistory());
 
 	it('should record calls by default', async () => {
 		fetchMock
@@ -1774,18 +1606,7 @@ describe('enableCallHistory / disableCallHistory', () => {
 });
 
 describe('replyContentLength', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should auto-add Content-Length header', async () => {
 		const body = { message: 'hello' };
@@ -1926,19 +1747,7 @@ describe('[BUG-3] documented activate() options in MSW (node) mode', () => {
 });
 
 describe('parallel request race condition', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should not let parallel requests match the same one-time handler', async () => {
 		fetchMock
@@ -1965,19 +1774,7 @@ describe('parallel request race condition', () => {
 });
 
 describe('string body serialization', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should return string body as-is without double serialization', async () => {
 		fetchMock
