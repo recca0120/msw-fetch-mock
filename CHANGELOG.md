@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-11-03
+
+### Bug Fixes
+
+- **`new FetchMock(otherFetchMock)` now throws a clear error.** Before, another FetchMock instance was accepted as a `FetchInterceptor`, because it has `activate()` and `deactivate()` methods, and the new instance then drove the other one. Pass a `setupServer`, `setupWorker` or `FetchInterceptor` instead.
+
+### Internal
+
+- **Dependencies:** GitHub Actions (artifact v7/v8, `pnpm/action-setup` v6, `action-gh-release` v3), biome 2.6 and knip 6.44. Biome's Markdown and YAML formatting is not enabled yet.
+- **Unit tests:**
+  - The suite lifecycle is shared through a `useFetchMock()` helper.
+  - The MSW and native modes run one shared contract suite, instead of two copies that had started to drift apart.
+- **e2e tests:** the seven Node suites run one shared set of scenarios, `e2e/shared/scenarios.cjs`, and each suite plugs in its own runner and assertion style.
+
 ## [0.7.0] - 2026-11-03
 
 See the [upgrade guide](docs/upgrade-0.7.md) for what to change for MSW v3, v2 and v1.
