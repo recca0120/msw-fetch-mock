@@ -40,6 +40,16 @@ export type {
 	ReplyOptions,
 } from './types';
 
+/**
+ * UTF-8 byte length of a reply body as it is sent: strings as-is, other values as JSON.
+ * Returns undefined when there is no body or its length is unknown (a stream).
+ */
+function byteLengthOf(body: unknown): number | undefined {
+	if (body === null || body === undefined || body instanceof ReadableStream) return undefined;
+	const text = typeof body === 'string' ? body : JSON.stringify(body);
+	return new TextEncoder().encode(text).byteLength;
+}
+
 /** Wraps a user-provided server without managing its lifecycle. */
 function wrapServer(server: SetupServerLike): FetchInterceptor {
 	return {
@@ -106,8 +116,9 @@ export class FetchMock {
 		if (replyOptions?.headers) {
 			Object.assign(mergedHeaders, replyOptions.headers);
 		}
-		if (addContentLength && responseBody !== null && responseBody !== undefined) {
-			mergedHeaders['Content-Length'] = String(JSON.stringify(responseBody).length);
+		const contentLength = addContentLength ? byteLengthOf(responseBody) : undefined;
+		if (contentLength !== undefined) {
+			mergedHeaders['Content-Length'] = String(contentLength);
 		}
 		const headers = Object.keys(mergedHeaders).length > 0 ? new Headers(mergedHeaders) : undefined;
 		return this.handlerFactory.buildResponse(status, responseBody, headers);

@@ -310,6 +310,25 @@ describe('FetchMock (native adapter)', () => {
 	});
 });
 
+describe('documented options (native) — control group for BUG-2', () => {
+	afterEach(() => vi.useRealTimers());
+
+	it('[BUG-2] should set Content-Length to the byte length of a string body', async () => {
+		const fm = createFetchMock();
+		await fm.activate();
+		try {
+			fm.get(API_BASE).intercept({ path: '/data' }).reply(200, 'hello').replyContentLength();
+
+			const response = await fetch(`${API_BASE}/data`);
+
+			expect(await response.text()).toBe('hello');
+			expect(response.headers.get('Content-Length')).toBe('5'); // 5 ASCII chars = 5 bytes
+		} finally {
+			fm.deactivate();
+		}
+	});
+});
+
 describe('singleton export (native)', () => {
 	it('should export fetchMock as a FetchMock instance', () => {
 		expect(singletonFetchMock).toBeInstanceOf(FetchMock);
