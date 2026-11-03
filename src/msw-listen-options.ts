@@ -2,7 +2,7 @@ import { type OnUnhandledRequestCallback } from './types';
 
 /** Minimal shape of an MSW v3 network frame passed to `onUnhandledFrame`. */
 interface UnhandledFrameArgs {
-	frame: { protocol?: string; data?: { request?: unknown } };
+	frame: { data?: { request?: unknown } };
 	defaults: { warn(): void; error(): void };
 }
 

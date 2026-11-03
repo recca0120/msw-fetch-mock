@@ -43,7 +43,7 @@ const wrappedFetches = new WeakMap<typeof globalThis.fetch, typeof globalThis.fe
 /** Strips any fetch-options wrappers installed by this module, e.g. to inspect MSW's patch. */
 export function unwrapFetch(fetchFn: typeof globalThis.fetch): typeof globalThis.fetch {
 	let current = fetchFn;
-	for (let inner = wrappedFetches.get(current); inner; inner = wrappedFetches.get(current)) {
+	for (let inner = wrappedFetches.get(current); inner; inner = wrappedFetches.get(inner)) {
 		current = inner;
 	}
 	return current;

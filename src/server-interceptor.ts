@@ -3,7 +3,7 @@ import { toMswListenOptions } from './msw-listen-options';
 import { type FetchInterceptor, type ResolvedActivateOptions, type SetupServerLike } from './types';
 
 /**
- * Adapts an MSW server (`setupServer()` of MSW v1/v2) to FetchInterceptor.
+ * Adapts an MSW server (`setupServer()` of MSW v1, v2 or v3) to FetchInterceptor.
  *
  * With `manageLifecycle`, activate()/deactivate() also call the server's
  * listen()/close(); without it, the server's owner starts and stops it.

@@ -82,15 +82,6 @@ async function convertToV1Response(
  * @param rest - The `rest` object from `msw` v1 (e.g., `import { rest } from 'msw'`)
  */
 export function createLegacyHandlerFactory(rest: LegacyRestApi): HandlerFactory {
-	const createResolver = (handlerFn: (request: Request) => Promise<Response | undefined>) => {
-		return async (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => {
-			const request = convertV1Request(req);
-			const response = await handlerFn(request);
-			if (!response) return undefined; // passthrough
-			return convertToV1Response(response, res, ctx);
-		};
-	};
-
 	return {
 		buildResponse(status, body, headers) {
 			if (body === null || body === undefined) {
@@ -110,7 +101,11 @@ export function createLegacyHandlerFactory(rest: LegacyRestApi): HandlerFactory 
 		},
 
 		createCatchAllHandler(handlerFn) {
-			return rest.all('*', createResolver(handlerFn));
+			return rest.all('*', async (req: LegacyReq, res: LegacyRes, ctx: LegacyCtx) => {
+				const response = await handlerFn(convertV1Request(req));
+				if (!response) return undefined; // passthrough
+				return convertToV1Response(response, res, ctx);
+			});
 		},
 
 		buildErrorResponse() {

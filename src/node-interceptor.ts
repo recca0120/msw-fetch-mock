@@ -4,7 +4,7 @@ import { ServerFetchInterceptor } from './server-interceptor';
 import { type FetchInterceptor, type ResolvedActivateOptions, type SetupServerLike } from './types';
 
 /**
- * MSW v2 Node interceptor.
+ * MSW v2/v3 Node interceptor.
  *
  * - `new NodeFetchInterceptor()`: owns a `setupServer()` it creates on activate()
  *   and closes on deactivate().
@@ -64,9 +64,9 @@ function assertNoOtherMswServer(): void {
 		typeof globalThis.fetch === 'function' ? unwrapFetch(globalThis.fetch) : undefined;
 
 	// MSW v2: Symbols on the patched fetch ("isPatchedModule") and on globalThis ("fetch").
-	const v2FetchPatched =
-		fetchFn !== undefined &&
-		Object.getOwnPropertySymbols(fetchFn).some((s) => s.description === 'isPatchedModule');
+	const v2FetchPatched = Object.getOwnPropertySymbols(fetchFn ?? {}).some(
+		(s) => s.description === 'isPatchedModule',
+	);
 	const v2InterceptorActive = Object.getOwnPropertySymbols(globalThis).some(
 		(s) => s.description === 'fetch',
 	);
@@ -74,7 +74,7 @@ function assertNoOtherMswServer(): void {
 	// MSW v3: interceptor state is module-private; the only observable signal is that
 	// fetch was replaced by an anonymous arrow function (native fetch is named "fetch").
 	// Trade-off: a user-assigned anonymous globalThis.fetch also counts as "active".
-	const v3FetchPatched = fetchFn !== undefined && fetchFn.name === '';
+	const v3FetchPatched = fetchFn?.name === '';
 
 	if (v2FetchPatched || v2InterceptorActive || v3FetchPatched) {
 		throw new Error(

@@ -25,9 +25,8 @@ export class BrowserFetchInterceptor implements FetchInterceptor {
 	async activate(options: ResolvedActivateOptions): Promise<void> {
 		// MSW v3 throws when start() is called on an already started worker (v2
 		// only warned), e.g. one the user started themselves. v3 exposes
-		// `readyState` (0 = disabled); v2 has no such property.
-		const alreadyStarted = this.worker.readyState !== undefined && this.worker.readyState !== 0;
-		if (!alreadyStarted) {
+		// `readyState` (0 = disabled); v2 has none (undefined), so both mean "start it".
+		if (!this.worker.readyState) {
 			await this.worker.start(toMswListenOptions(options.onUnhandledRequest));
 		}
 		this.removeFetchOptions = installFetchOptions(options);
