@@ -16,7 +16,8 @@
       "!**/pnpm-lock.yaml",
       "!**/*.md",
       "!**/*.yml",
-      "!**/*.yaml"
+      "!**/*.yaml",
+      "!**/mockServiceWorker.js"
     ],
     "ignoreUnknown": true
   },
