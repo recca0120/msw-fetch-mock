@@ -9,7 +9,7 @@ pre-push:
   parallel: true
   commands:
     typecheck:
-      run: npx tsc --noEmit
+      run: pnpm typecheck
     knip:
       run: npx knip
     test:

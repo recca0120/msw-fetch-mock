@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createLegacyHandlerFactory, type LegacyRestApi } from './legacy-handler-factory';
+import {
+	createLegacyHandlerFactory,
+	type LegacyRestApi,
+	type LegacyRestMethod,
+} from './legacy-handler-factory';
 
 /* ---------- MSW legacy (v1) API mocks ---------- */
 
-type V1Resolver = (...args: unknown[]) => unknown;
+type V1Resolver = Parameters<LegacyRestMethod>[1];
 
 function createMockRestApi(): LegacyRestApi & { _resolvers: Map<string, V1Resolver> } {
 	const resolvers = new Map<string, V1Resolver>();
@@ -20,6 +24,7 @@ function createMockRestApi(): LegacyRestApi & { _resolvers: Map<string, V1Resolv
 		put: createMethod('PUT'),
 		delete: createMethod('DELETE'),
 		patch: createMethod('PATCH'),
+		all: createMethod('ALL'),
 		_resolvers: resolvers,
 	};
 }

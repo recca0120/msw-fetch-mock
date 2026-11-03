@@ -390,7 +390,7 @@ describe('MockCallHistory', () => {
 			const history = new MockCallHistory();
 			history.record(createLog({ method: 'POST', path: '/posts', body: '{"x":1}' }));
 
-			const map = history.lastCall()?.toMap();
+			const map = history.lastCall()!.toMap();
 
 			expect(map).toBeInstanceOf(Map);
 			expect(map.get('method')).toBe('POST');

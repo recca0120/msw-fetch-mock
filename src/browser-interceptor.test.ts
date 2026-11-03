@@ -13,6 +13,9 @@ function createStubWorker(): SetupWorkerLike {
 
 const noopCallback: ResolvedActivateOptions = {
 	onUnhandledRequest: () => {},
+	// disabled, so no fetch-options wrapper is installed
+	timeout: 0,
+	forceConnectionClose: false,
 };
 
 describe('BrowserFetchInterceptor', () => {

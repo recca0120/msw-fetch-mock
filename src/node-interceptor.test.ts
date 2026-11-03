@@ -15,6 +15,9 @@ function createStubServer(): SetupServerLike {
 
 const noopCallback: ResolvedActivateOptions = {
 	onUnhandledRequest: () => {},
+	// disabled, so no fetch-options wrapper is installed
+	timeout: 0,
+	forceConnectionClose: false,
 };
 
 describe('NodeFetchInterceptor', () => {
@@ -63,7 +66,7 @@ describe('NodeFetchInterceptor', () => {
 			const adapter = new NodeFetchInterceptor();
 			const callback = vi.fn();
 
-			adapter.activate({ onUnhandledRequest: callback });
+			adapter.activate({ ...noopCallback, onUnhandledRequest: callback });
 			try {
 				// no handlers installed, so the request is unhandled and reaches the callback
 				await fetch(`${CLOSED_ORIGIN}/unhandled`).catch(() => null);
