@@ -13,7 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The unhandled-request policy is passed to MSW under both `onUnhandledRequest` (v1/v2) and `onUnhandledFrame` (v3).
   - In browser mode, a worker you already started yourself is not started again (MSW v3 throws on a second `start()`).
   - The duplicate-server guard ("Another MSW server is already active") also detects MSW v3.
-- **`deactivate()` now returns a `Promise<void>`.** It settles once the interceptor has fully stopped (MSW v3's `worker.stop()` is async). Cleanup still happens synchronously, so code that does not await it behaves as before.
+- **`deactivate()` now returns a `Promise<void>`.** It settles once the interceptor has fully stopped (MSW v3's `worker.stop()` is async). Cleanup still happens synchronously, so code that does not await it behaves as before. If `worker.stop()` fails, the error reaches only callers who await `deactivate()`. Callers who don't await it get no unhandled rejection.
+
+### Bug Fixes
+
+- **Browser mode:** a worker you started yourself is no longer stopped by `deactivate()`. fetchMock only stops a worker it started, the same way it treats an external server. fetchMock's catch-all handler stays installed until you reset the worker's handlers. This applies to MSW v3, where `readyState` tells fetchMock the worker is already running. MSW v2 workers are started and stopped as before.
 
 ### ⚠️ Breaking Changes
 
