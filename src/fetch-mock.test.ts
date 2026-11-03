@@ -1,3 +1,5 @@
+import { createServer } from 'node:net';
+import { HttpResponse, http } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FetchMock } from './fetch-mock';
@@ -7,6 +9,26 @@ import { type FetchInterceptor, type SetupServerLike, type SetupWorkerLike } fro
 
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
+
+/**
+ * A local port that is guaranteed to be closed: bind to an ephemeral port, then release it.
+ * Requests let through to the network fail fast with ECONNREFUSED — no external network.
+ */
+async function getClosedPort(): Promise<number> {
+	const server = createServer();
+	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+	const { port } = server.address() as { port: number };
+	await new Promise<void>((resolve) => server.close(() => resolve()));
+	return port;
+}
+
+const CLOSED_HOST = `127.0.0.1:${await getClosedPort()}`;
+const CLOSED_ORIGIN = `http://${CLOSED_HOST}`;
+
+/** The error cause code, proving the request was let through to the network. */
+function causeCode(error: unknown): string | undefined {
+	return (error as { cause?: { code?: string } }).cause?.code;
+}
 
 describe('FetchMock', () => {
 	const fetchMock = createFetchMock();
@@ -1256,6 +1278,92 @@ describe('onUnhandledRequest', () => {
 			await expect(fm.activate({ onUnhandledRequest: 'warn' })).resolves.toBeUndefined();
 		} finally {
 			externalServer.close();
+		}
+	});
+});
+
+describe('user calls server.resetHandlers() on a server passed to fetchMock', () => {
+	// MSW's recommended setup calls `server.resetHandlers()` in afterEach. That also
+	// removes fetchMock's catch-all handler; fetchMock must recover on its next use.
+	const modes = [
+		[
+			'createFetchMock(server)',
+			() => {
+				const server = setupServer();
+				server.listen();
+				return { server, fm: createFetchMock(server), close: () => server.close() };
+			},
+		],
+		[
+			'new FetchMock(server)',
+			() => {
+				const server = setupServer();
+				const fm = new FetchMock(server);
+				return { server, fm, close: () => fm.deactivate() };
+			},
+		],
+	] as const;
+
+	for (const [label, setup] of modes) {
+		describe(label, () => {
+			it('registered intercepts still respond', async () => {
+				const { server, fm, close } = setup();
+				await fm.activate({ onUnhandledRequest: 'error' });
+
+				try {
+					// test 1 … then afterEach:
+					server.resetHandlers();
+
+					// test 2 registers an intercept
+					fm.get(API_BASE).intercept({ path: '/after-reset' }).reply(200, 'mocked');
+					const response = await fetch(`${API_BASE}/after-reset`);
+
+					expect(response.status).toBe(200);
+					expect(await response.text()).toBe('mocked');
+				} finally {
+					close();
+				}
+			});
+
+			it('"error" still blocks unhandled requests before they reach the network', async () => {
+				const { server, fm, close } = setup();
+				await fm.activate({ onUnhandledRequest: 'error' });
+
+				try {
+					server.resetHandlers();
+					fm.get(API_BASE).intercept({ path: '/unused' }).reply(200, 'mocked').persist();
+
+					const error = await fetch(`${CLOSED_ORIGIN}/test`).catch((e: unknown) => e);
+
+					expect(error).toBeInstanceOf(Error);
+					expect(causeCode(error)).not.toBe('ECONNREFUSED');
+				} finally {
+					close();
+				}
+			});
+		});
+	}
+
+	// Existing behavior to preserve: once fetchMock is deactivated and the user resets
+	// their server, the user's own handlers work exactly as if fetchMock was never there.
+	it("createFetchMock(server): after deactivate() + server.resetHandlers(), the user's handlers respond", async () => {
+		const server = setupServer(http.get(`${API_BASE}/user-route`, () => HttpResponse.text('user')));
+		server.listen({ onUnhandledRequest: 'bypass' });
+		const fm = createFetchMock(server);
+		await fm.activate({ onUnhandledRequest: 'error' });
+
+		try {
+			fm.deactivate();
+			server.resetHandlers();
+
+			const response = await fetch(`${API_BASE}/user-route`);
+			expect(await response.text()).toBe('user');
+
+			// …and unmatched requests follow the user's own listen() options again
+			const error = await fetch(`${CLOSED_ORIGIN}/test`).catch((e: unknown) => e);
+			expect(causeCode(error)).toBe('ECONNREFUSED');
+		} finally {
+			server.close();
 		}
 	});
 });

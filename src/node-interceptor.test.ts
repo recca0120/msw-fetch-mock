@@ -1,5 +1,6 @@
 import { setupServer } from 'msw/node';
 import { describe, expect, it, vi } from 'vitest';
+import { createFetchMock } from './node';
 import { NodeFetchInterceptor } from './node-interceptor';
 import { type ResolvedActivateOptions, type SetupServerLike } from './types';
 
@@ -55,6 +56,18 @@ describe('NodeFetchInterceptor', () => {
 
 			expect(server.close).not.toHaveBeenCalled();
 		});
+	});
+
+	it('should install the catch-all only once when the server has no listHandlers()', async () => {
+		const server = createStubServer();
+		const fm = createFetchMock(server);
+		await fm.activate();
+
+		fm.get('http://a.test').intercept({ path: '/1' }).reply(200, '');
+		fm.get('http://a.test').intercept({ path: '/2' }).reply(200, '');
+
+		// activate() installs it once; registering intercepts must not add duplicates
+		expect(server.use).toHaveBeenCalledTimes(1);
 	});
 
 	describe('standalone (owns server)', () => {

@@ -45,6 +45,7 @@ function wrapServer(server: SetupServerLike): FetchInterceptor {
 	return {
 		use: (...handlers: Array<unknown>) => server.use(...handlers),
 		resetHandlers: (...handlers: Array<unknown>) => server.resetHandlers(...handlers),
+		listHandlers: () => server.listHandlers?.(),
 		activate(options: ResolvedActivateOptions) {
 			server.listen({ onUnhandledRequest: options.onUnhandledRequest });
 		},
@@ -120,6 +121,7 @@ export class FetchMock {
 	private _defaultReplyHeaders: Record<string, string> = {};
 	private _callHistoryEnabled = true;
 	private catchAllInstalled = false;
+	private catchAllHandler: unknown;
 	private _onUnhandledRequest?: (
 		request: Request,
 		print: { warning(): void; error(): void },
@@ -194,10 +196,8 @@ export class FetchMock {
 	 * Adding or consuming interceptors only mutates in-memory data structures,
 	 * so no additional interceptor.use() calls are needed.
 	 */
-	private ensureCatchAllInstalled(): void {
-		if (this.catchAllInstalled) return;
-
-		const catchAllHandler = this.handlerFactory.createCatchAllHandler(async (request: Request) => {
+	private createCatchAllHandler(): unknown {
+		return this.handlerFactory.createCatchAllHandler(async (request: Request) => {
 			// Iterate handlers in FIFO order (insertion order of Map)
 			for (const [pending, handlerFn] of this.handlerFns) {
 				if (pending.consumed && !pending.persist) continue;
@@ -229,10 +229,26 @@ export class FetchMock {
 			// Allow passthrough for allowed hosts
 			return undefined;
 		});
+	}
 
-		this.interceptor.resetHandlers();
-		this.interceptor.use(catchAllHandler);
-		this.catchAllInstalled = true;
+	private ensureCatchAllInstalled(): void {
+		if (!this.catchAllInstalled) {
+			this.catchAllHandler = this.createCatchAllHandler();
+			this.interceptor.resetHandlers();
+			this.interceptor.use(this.catchAllHandler);
+			this.catchAllInstalled = true;
+			return;
+		}
+
+		// Installed, but possibly removed since — e.g. the user called
+		// `server.resetHandlers()` on a server passed to fetchMock (MSW's recommended
+		// afterEach), which drops all runtime handlers including ours. Re-add it
+		// without resetting, so handlers the user added after their reset are kept.
+		// Interceptors that cannot list handlers keep the previous behavior.
+		const handlers = this.interceptor.listHandlers?.();
+		if (handlers && !handlers.includes(this.catchAllHandler)) {
+			this.interceptor.use(this.catchAllHandler);
+		}
 	}
 
 	/**

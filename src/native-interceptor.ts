@@ -88,4 +88,8 @@ export class NativeFetchInterceptor implements FetchInterceptor {
 	resetHandlers(...handlers: unknown[]): void {
 		this.handlers = handlers as NativeHandler[];
 	}
+
+	listHandlers(): ReadonlyArray<unknown> {
+		return this.handlers;
+	}
 }
