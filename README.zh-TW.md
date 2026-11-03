@@ -15,7 +15,8 @@
 ## 系統需求
 
 - **Node.js** >= 18
-- **MSW** ^1.0.0（透過 `/legacy`）或 ^2.12.7 — 使用 `/native` 時**可選**
+- **MSW** ^1.0.0（透過 `/legacy`）、^2.12.7 或 ^3.0.0 — 使用 `/native` 時**可選**
+  - MSW v3 本身需要 Node.js >= 22.12
 
 ## 安裝
 
@@ -172,9 +173,9 @@ fetchMock.activate({
 
 | 路徑                     | 環境                          | MSW 版本 |
 | ------------------------ | ----------------------------- | -------- |
-| `msw-fetch-mock`         | Node.js（自動偵測 MSW，fallback 至 native） | v2（可選） |
-| `msw-fetch-mock/node`    | Node.js                       | v2       |
-| `msw-fetch-mock/browser` | 瀏覽器                        | v2       |
+| `msw-fetch-mock`         | Node.js（自動偵測 MSW，fallback 至 native） | v2 / v3（可選） |
+| `msw-fetch-mock/node`    | Node.js                       | v2 / v3  |
+| `msw-fetch-mock/browser` | 瀏覽器                        | v2 / v3  |
 | `msw-fetch-mock/native`  | 任何環境（無 MSW）            | 不需要   |
 | `msw-fetch-mock/legacy`  | Node.js（MSW v1）             | v1       |
 
@@ -190,7 +191,7 @@ fetchMock.activate({
 - Node：`createFetchMock(server?)` — 可選擇性傳入現有的 MSW `SetupServer`
 - 瀏覽器：`createFetchMock(worker)` — 傳入 MSW `SetupWorker`（必要）
 - 原生：`createFetchMock()` — 無需參數，無 MSW 依賴
-- Legacy：`createFetchMock(rest, server?)` — 傳入 MSW v1 的 `rest` 物件
+- Legacy：`createFetchMock(rest, server)` — 傳入 MSW v1 的 `rest` 物件和 server
 
 ### `new FetchMock(interceptor?)`
 

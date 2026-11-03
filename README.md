@@ -15,7 +15,8 @@ Supports **Node.js** (`msw/node`), **Browser** (`msw/browser`), and **Native** (
 ## Requirements
 
 - **Node.js** >= 18
-- **MSW** ^1.0.0 (via `/legacy`) or ^2.12.7 — **optional** when using `/native`
+- **MSW** ^1.0.0 (via `/legacy`), ^2.12.7 or ^3.0.0 — **optional** when using `/native`
+  - MSW v3 itself requires Node.js >= 22.12
 
 ## Install
 
@@ -172,9 +173,9 @@ fetchMock.activate({
 
 | Path                     | Environment                  | MSW version  |
 | ------------------------ | ---------------------------- | ------------ |
-| `msw-fetch-mock`         | Node.js (auto-detects MSW, falls back to native) | v2 (optional) |
-| `msw-fetch-mock/node`    | Node.js                      | v2           |
-| `msw-fetch-mock/browser` | Browser                      | v2           |
+| `msw-fetch-mock`         | Node.js (auto-detects MSW, falls back to native) | v2 / v3 (optional) |
+| `msw-fetch-mock/node`    | Node.js                      | v2 / v3      |
+| `msw-fetch-mock/browser` | Browser                      | v2 / v3      |
 | `msw-fetch-mock/native`  | Any (no MSW)                 | not required |
 | `msw-fetch-mock/legacy`  | Node.js (MSW v1)             | v1           |
 
@@ -190,7 +191,7 @@ Factory function that creates a `FetchMock` with the appropriate interceptor.
 - Node: `createFetchMock(server?)` — optionally pass an existing MSW `SetupServer`
 - Browser: `createFetchMock(worker)` — pass an MSW `SetupWorker` (required)
 - Native: `createFetchMock()` — no arguments, no MSW dependency
-- Legacy: `createFetchMock(rest, server?)` — pass MSW v1 `rest` object
+- Legacy: `createFetchMock(rest, server)` — pass MSW v1 `rest` object and server
 
 ### `new FetchMock(interceptor?)`
 
