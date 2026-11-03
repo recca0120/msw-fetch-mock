@@ -465,61 +465,50 @@ export class FetchMock {
 					timesInvoked: 0,
 					persist: false,
 				};
+				// Registers how to respond and returns the chain to configure it.
+				const register = (
+					respond: (bodyText: string | null) => Promise<Response>,
+					contentLengthRef?: { enabled: boolean },
+				): MockReplyChain => {
+					const delayRef = { ms: 0 };
+					this.registerHandler(
+						pending,
+						this.createMatchingHandler(pending, origin, options, delayRef, respond),
+					);
+					return this.buildChain(pending, delayRef, contentLengthRef, pool);
+				};
+
 				return {
 					reply: (
 						statusOrCallback: number | SingleReplyCallback,
 						bodyOrCallback?: unknown | ReplyCallback,
 						replyOptions?: ReplyOptions,
 					): MockReplyChain => {
-						const delayRef = { ms: 0 };
 						const contentLengthRef = { enabled: false };
-
-						const respond = async (bodyText: string | null): Promise<Response> => {
-							if (typeof statusOrCallback === 'function') {
-								const result = await statusOrCallback({ body: bodyText });
-								return this.buildResponse(
-									result.statusCode,
-									result.data,
-									result.responseOptions,
-									this._defaultReplyHeaders,
-									contentLengthRef.enabled,
-								);
-							}
-
-							const responseBody =
-								typeof bodyOrCallback === 'function'
-									? await (bodyOrCallback as ReplyCallback)({ body: bodyText })
-									: bodyOrCallback;
-
+						return register(async (bodyText) => {
+							const { statusCode, data, responseOptions } =
+								typeof statusOrCallback === 'function'
+									? await statusOrCallback({ body: bodyText })
+									: {
+											statusCode: statusOrCallback,
+											data:
+												typeof bodyOrCallback === 'function'
+													? await (bodyOrCallback as ReplyCallback)({ body: bodyText })
+													: bodyOrCallback,
+											responseOptions: replyOptions,
+										};
 							return this.buildResponse(
-								statusOrCallback,
-								responseBody,
-								replyOptions,
+								statusCode,
+								data,
+								responseOptions,
 								this._defaultReplyHeaders,
 								contentLengthRef.enabled,
 							);
-						};
-
-						this.registerHandler(
-							pending,
-							this.createMatchingHandler(pending, origin, options, delayRef, respond),
-						);
-
-						return this.buildChain(pending, delayRef, contentLengthRef, pool);
+						}, contentLengthRef);
 					},
 
-					replyWithError: (): MockReplyChain => {
-						const delayRef = { ms: 0 };
-
-						this.registerHandler(
-							pending,
-							this.createMatchingHandler(pending, origin, options, delayRef, async () => {
-								return this.handlerFactory.buildErrorResponse();
-							}),
-						);
-
-						return this.buildChain(pending, delayRef, undefined, pool);
-					},
+					replyWithError: (): MockReplyChain =>
+						register(async () => this.handlerFactory.buildErrorResponse()),
 				};
 			},
 		};
