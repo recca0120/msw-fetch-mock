@@ -988,69 +988,83 @@ describe('delay', () => {
 
 	it('should delay the response by at least the specified ms', async () => {
 		vi.useFakeTimers();
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/slow', method: 'GET' })
-			.reply(200, { ok: true })
-			.delay(100);
+		try {
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/slow', method: 'GET' })
+				.reply(200, { ok: true })
+				.delay(100);
 
-		let settled = false;
-		const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow`).finally(() => {
-			settled = true;
-		});
+			let settled = false;
+			const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow`).finally(() => {
+				settled = true;
+			});
 
-		// 1ms before the delay elapses: no response yet
-		await vi.advanceTimersByTimeAsync(99);
-		expect(settled).toBe(false);
+			// 1ms before the delay elapses: no response yet
+			await vi.advanceTimersByTimeAsync(99);
+			expect(settled).toBe(false);
 
-		// delay elapsed: the reply is delivered
-		await vi.advanceTimersByTimeAsync(1);
-		const response = await fetchPromise;
-		expect(response.status).toBe(200);
-		expect(await response.json()).toEqual({ ok: true });
+			// delay elapsed: the reply is delivered
+			await vi.advanceTimersByTimeAsync(1);
+			const response = await fetchPromise;
+			expect(response.status).toBe(200);
+			expect(await response.json()).toEqual({ ok: true });
+		} finally {
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
+		}
 	});
 
 	it('should clear the delay timer when request is aborted (no lingering timers)', async () => {
 		vi.useFakeTimers();
+		try {
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/abort-timer-cleanup', method: 'GET' })
+				.reply(200, { ok: true })
+				.delay(1000);
 
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/abort-timer-cleanup', method: 'GET' })
-			.reply(200, { ok: true })
-			.delay(1000);
+			const controller = new AbortController();
+			const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/abort-timer-cleanup`, {
+				signal: controller.signal,
+			}).catch(() => {});
 
-		const controller = new AbortController();
-		const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/abort-timer-cleanup`, {
-			signal: controller.signal,
-		}).catch(() => {});
+			controller.abort();
+			await vi.advanceTimersByTimeAsync(0);
+			await fetchPromise;
 
-		controller.abort();
-		await vi.advanceTimersByTimeAsync(0);
-		await fetchPromise;
-
-		// timer should be cleared — no lingering fake timers
-		expect(vi.getTimerCount()).toBe(0);
+			// timer should be cleared — no lingering fake timers
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
+		}
 	});
 
 	it('should reject with an error named AbortError when aborted during the delay', async () => {
 		vi.useFakeTimers();
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/slow-abort-name', method: 'GET' })
-			.reply(200, { ok: true })
-			.delay(500);
+		try {
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/slow-abort-name', method: 'GET' })
+				.reply(200, { ok: true })
+				.delay(500);
 
-		const controller = new AbortController();
-		const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow-abort-name`, {
-			signal: controller.signal,
-		}).catch((e: unknown) => e);
+			const controller = new AbortController();
+			const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow-abort-name`, {
+				signal: controller.signal,
+			}).catch((e: unknown) => e);
 
-		// abort 50ms into the 500ms delay
-		await vi.advanceTimersByTimeAsync(50);
-		controller.abort();
+			// abort 50ms into the 500ms delay
+			await vi.advanceTimersByTimeAsync(50);
+			controller.abort();
 
-		const error = await fetchPromise;
-		expect((error as Error).name).toBe('AbortError');
+			const error = await fetchPromise;
+			expect((error as Error).name).toBe('AbortError');
+		} finally {
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
+		}
 	});
 });
 
@@ -1090,31 +1104,33 @@ describe('retry scenarios', () => {
 
 	it('should handle retry with delay using fake timers', async () => {
 		vi.useFakeTimers();
+		try {
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/retry-delay', method: 'GET' })
+				.reply(503)
+				.times(1)
+				.delay(500);
 
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/retry-delay', method: 'GET' })
-			.reply(503)
-			.times(1)
-			.delay(500);
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/retry-delay', method: 'GET' })
+				.reply(200, { ok: true })
+				.persist();
 
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/retry-delay', method: 'GET' })
-			.reply(200, { ok: true })
-			.persist();
+			const firstPromise = fetch(`${API_BASE}/${API_PREFIX}/retry-delay`);
+			await vi.advanceTimersByTimeAsync(500);
+			const first = await firstPromise;
+			expect(first.status).toBe(503);
 
-		const firstPromise = fetch(`${API_BASE}/${API_PREFIX}/retry-delay`);
-		await vi.advanceTimersByTimeAsync(500);
-		const first = await firstPromise;
-		expect(first.status).toBe(503);
-
-		const secondPromise = fetch(`${API_BASE}/${API_PREFIX}/retry-delay`);
-		await vi.advanceTimersByTimeAsync(500);
-		const second = await secondPromise;
-		expect(second.status).toBe(200);
-
-		vi.useRealTimers();
+			const secondPromise = fetch(`${API_BASE}/${API_PREFIX}/retry-delay`);
+			await vi.advanceTimersByTimeAsync(500);
+			const second = await secondPromise;
+			expect(second.status).toBe(200);
+		} finally {
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
+		}
 	});
 });
 
@@ -1705,25 +1721,30 @@ describe('[BUG-3] documented activate() options in MSW (node) mode', () => {
 
 	it('timeout: a reply delayed past the timeout rejects with TimeoutError', async () => {
 		vi.useFakeTimers();
-		const fm = createFetchMock();
-		await fm.activate({ timeout: 100 });
 		try {
-			fm.get(API_BASE).intercept({ path: '/slow' }).reply(200, 'late').delay(1000);
+			const fm = createFetchMock();
+			await fm.activate({ timeout: 100 });
+			try {
+				fm.get(API_BASE).intercept({ path: '/slow' }).reply(200, 'late').delay(1000);
 
-			let settled = false;
-			const result = fetch(`${API_BASE}/slow`).then(
-				() => 'resolved',
-				(e: unknown) => (e as Error).name,
-			);
-			result.finally(() => {
-				settled = true;
-			});
+				let settled = false;
+				const result = fetch(`${API_BASE}/slow`).then(
+					() => 'resolved',
+					(e: unknown) => (e as Error).name,
+				);
+				result.finally(() => {
+					settled = true;
+				});
 
-			await vi.advanceTimersByTimeAsync(100);
-			expect(settled).toBe(true);
-			expect(await result).toBe('TimeoutError');
+				await vi.advanceTimersByTimeAsync(100);
+				expect(settled).toBe(true);
+				expect(await result).toBe('TimeoutError');
+			} finally {
+				fm.deactivate();
+			}
 		} finally {
-			fm.deactivate();
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
 		}
 	});
 

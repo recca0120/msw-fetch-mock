@@ -330,25 +330,30 @@ describe('documented options (native) — control group for BUG-2 / BUG-3', () =
 
 	it('[BUG-3] timeout: a reply delayed past the timeout rejects with TimeoutError', async () => {
 		vi.useFakeTimers();
-		const fm = createFetchMock();
-		await fm.activate({ timeout: 100 });
 		try {
-			fm.get(API_BASE).intercept({ path: '/slow' }).reply(200, 'late').delay(1000);
+			const fm = createFetchMock();
+			await fm.activate({ timeout: 100 });
+			try {
+				fm.get(API_BASE).intercept({ path: '/slow' }).reply(200, 'late').delay(1000);
 
-			let settled = false;
-			const result = fetch(`${API_BASE}/slow`).then(
-				() => 'resolved',
-				(e: unknown) => (e as Error).name,
-			);
-			result.finally(() => {
-				settled = true;
-			});
+				let settled = false;
+				const result = fetch(`${API_BASE}/slow`).then(
+					() => 'resolved',
+					(e: unknown) => (e as Error).name,
+				);
+				result.finally(() => {
+					settled = true;
+				});
 
-			await vi.advanceTimersByTimeAsync(100);
-			expect(settled).toBe(true);
-			expect(await result).toBe('TimeoutError');
+				await vi.advanceTimersByTimeAsync(100);
+				expect(settled).toBe(true);
+				expect(await result).toBe('TimeoutError');
+			} finally {
+				fm.deactivate();
+			}
 		} finally {
-			fm.deactivate();
+			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+			vi.useRealTimers();
 		}
 	});
 

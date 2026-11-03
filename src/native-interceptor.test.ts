@@ -212,61 +212,76 @@ describe('NativeFetchInterceptor', () => {
 
 		it('should abort request when timeout is reached', async () => {
 			vi.useFakeTimers();
-			const adapter = new NativeFetchInterceptor();
-			adapter.activate({ ...noopOptions, timeout: 100 });
-			adapter.use(neverResolves);
+			try {
+				const adapter = new NativeFetchInterceptor();
+				adapter.activate({ ...noopOptions, timeout: 100 });
+				adapter.use(neverResolves);
 
-			const state = track(globalThis.fetch('http://example.com/slow'));
+				const state = track(globalThis.fetch('http://example.com/slow'));
 
-			await vi.advanceTimersByTimeAsync(99);
-			expect(state.settled).toBe(false);
+				await vi.advanceTimersByTimeAsync(99);
+				expect(state.settled).toBe(false);
 
-			await vi.advanceTimersByTimeAsync(1);
-			expect(state.settled).toBe(true);
-			expect((state.error as Error).name).toBe('TimeoutError');
+				await vi.advanceTimersByTimeAsync(1);
+				expect(state.settled).toBe(true);
+				expect((state.error as Error).name).toBe('TimeoutError');
 
-			adapter.deactivate();
+				adapter.deactivate();
+			} finally {
+				// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+				vi.useRealTimers();
+			}
 		});
 
 		it('should not abort when timeout is 0 (disabled)', async () => {
 			vi.useFakeTimers();
-			const adapter = new NativeFetchInterceptor();
-			adapter.activate({ ...noopOptions, timeout: 0 });
-			adapter.use(neverResolves, respondsOk);
+			try {
+				const adapter = new NativeFetchInterceptor();
+				adapter.activate({ ...noopOptions, timeout: 0 });
+				adapter.use(neverResolves, respondsOk);
 
-			// a fast request responds normally…
-			const response = await globalThis.fetch('http://example.com/fast');
-			expect(response.status).toBe(200);
+				// a fast request responds normally…
+				const response = await globalThis.fetch('http://example.com/fast');
+				expect(response.status).toBe(200);
 
-			// …and a slow one is never cut off
-			const state = track(globalThis.fetch('http://example.com/slow'));
-			await vi.advanceTimersByTimeAsync(60_000);
-			expect(state.settled).toBe(false);
+				// …and a slow one is never cut off
+				const state = track(globalThis.fetch('http://example.com/slow'));
+				await vi.advanceTimersByTimeAsync(60_000);
+				expect(state.settled).toBe(false);
 
-			adapter.deactivate();
+				adapter.deactivate();
+			} finally {
+				// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+				vi.useRealTimers();
+			}
 		});
 
 		it('should respect user-provided signal over timeout', async () => {
 			vi.useFakeTimers();
-			const adapter = new NativeFetchInterceptor();
-			adapter.activate({ ...noopOptions, timeout: 100 });
-			adapter.use(neverResolves, respondsOk);
-			const userController = new AbortController();
+			try {
+				const adapter = new NativeFetchInterceptor();
+				adapter.activate({ ...noopOptions, timeout: 100 });
+				adapter.use(neverResolves, respondsOk);
+				const userController = new AbortController();
 
-			// User provides their own signal - the request still responds normally…
-			const response = await globalThis.fetch('http://example.com/fast', {
-				signal: userController.signal,
-			});
-			expect(response.status).toBe(200);
+				// User provides their own signal - the request still responds normally…
+				const response = await globalThis.fetch('http://example.com/fast', {
+					signal: userController.signal,
+				});
+				expect(response.status).toBe(200);
 
-			// …and the 100ms timeout does not apply
-			const state = track(
-				globalThis.fetch('http://example.com/slow', { signal: userController.signal }),
-			);
-			await vi.advanceTimersByTimeAsync(1_000);
-			expect(state.settled).toBe(false);
+				// …and the 100ms timeout does not apply
+				const state = track(
+					globalThis.fetch('http://example.com/slow', { signal: userController.signal }),
+				);
+				await vi.advanceTimersByTimeAsync(1_000);
+				expect(state.settled).toBe(false);
 
-			adapter.deactivate();
+				adapter.deactivate();
+			} finally {
+				// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
+				vi.useRealTimers();
+			}
 		});
 	});
 
