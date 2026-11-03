@@ -7,6 +7,10 @@ export interface NativeHandler {
 }
 
 export const NativeHandlerFactory: HandlerFactory = {
+	/**
+	 * @deprecated Never called by FetchMock, and the native interceptor ignores the
+	 * handler's method and URL pattern. Will be removed in 0.7.0.
+	 */
 	createHandler(method, urlPattern, handlerFn): NativeHandler {
 		return { method, urlPattern, handlerFn };
 	},

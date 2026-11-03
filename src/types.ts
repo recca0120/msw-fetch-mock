@@ -117,6 +117,10 @@ export interface FetchInterceptor {
 
 /** Pluggable factory for MSW-version-specific handler and response creation */
 export interface HandlerFactory {
+	/**
+	 * @deprecated Never called by FetchMock (all requests go through one catch-all
+	 * handler from `createCatchAllHandler`). Will be removed in 0.7.0.
+	 */
 	createHandler(
 		method: HttpMethod,
 		urlPattern: string | RegExp,
