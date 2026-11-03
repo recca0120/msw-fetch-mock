@@ -269,6 +269,7 @@ fetchMock.reset(); // 清除攔截器 + 呼叫歷史 + handlers
 
 ## 文件
 
+- [升級到 0.7](docs/upgrade-0.7.zh-TW.md) — 使用 MSW v3、v2、v1 時需要調整的地方
 - [API 參考](docs/api.zh-TW.md) — 完整的 API 細節、匹配選項、回應回呼
 - [Cloudflare Workers 遷移指南](docs/cloudflare-migration.zh-TW.md) — 從 `cloudflare:test` fetchMock 遷移
 - [MSW v1 Legacy 指南](docs/msw-v1-legacy.zh-TW.md) — 搭配 MSW v1 使用 msw-fetch-mock

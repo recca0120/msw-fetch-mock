@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.0] - 2026-11-03
 
+See the [upgrade guide](docs/upgrade-0.7.md) for what to change for MSW v3, v2 and v1.
+
 ### Features
 
 - **MSW v3 support.** The `msw` peer range is now `^1.0.0 || ^2.12.7 || ^3.0.0`. MSW v3 itself requires Node.js >= 22.12. What changed to support it:

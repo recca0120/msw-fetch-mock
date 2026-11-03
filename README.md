@@ -269,6 +269,7 @@ E2E tests run on every CI push across these environments:
 
 ## Documentation
 
+- [Upgrading to 0.7](docs/upgrade-0.7.md) — what to change for MSW v3, v2 and v1
 - [API Reference](docs/api.md) — full API details, matching options, reply callbacks
 - [Cloudflare Workers Migration](docs/cloudflare-migration.md) — migrating from `cloudflare:test` fetchMock
 - [MSW v1 Legacy Guide](docs/msw-v1-legacy.md) — using msw-fetch-mock with MSW v1
