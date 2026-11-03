@@ -180,6 +180,26 @@ describe('legacy-cjs integration (MSW v1)', () => {
 		});
 	});
 
+	describe('[BUG-1] streaming body', () => {
+		it('should stream response body when reply body is a ReadableStream', async () => {
+			const chunks = ['hello', ' ', 'world'];
+			const stream = new ReadableStream({
+				start(controller) {
+					for (const chunk of chunks) {
+						controller.enqueue(new TextEncoder().encode(chunk));
+					}
+					controller.close();
+				},
+			});
+
+			fetchMock.get(API_BASE).intercept({ path: '/stream', method: 'GET' }).reply(200, stream);
+
+			const response = await fetch(`${API_BASE}/stream`);
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe('hello world');
+		});
+	});
+
 	describe('activate returns promise', () => {
 		it('should return Promise<void> from activate()', async () => {
 			const fm2 = createFetchMock(rest, setupServer());

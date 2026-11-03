@@ -108,6 +108,11 @@ export function createLegacyHandlerFactory(rest: LegacyRestApi): HandlerFactory 
 			if (body === null || body === undefined) {
 				return new Response(null, { status, headers });
 			}
+			// Passed through like the v2 and native factories; convertToV1Response
+			// reads it to text, since MSW v1 responses cannot stream.
+			if (body instanceof ReadableStream) {
+				return new Response(body, { status, headers });
+			}
 			if (typeof body === 'string') {
 				return new Response(body, { status, headers });
 			}
