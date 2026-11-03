@@ -52,6 +52,13 @@ export class FetchMock {
 		input?: SetupServerLike | SetupWorkerLike | FetchInterceptor,
 		handlerFactory?: HandlerFactory,
 	) {
+		if (input instanceof FetchMock) {
+			// It has activate()/deactivate(), so it would otherwise pass as a FetchInterceptor.
+			throw new Error(
+				'Invalid argument: got a FetchMock instance; expected a setupServer, setupWorker, ' +
+					'or FetchInterceptor instance.',
+			);
+		}
 		this.interceptor = resolveInterceptor(input, FetchMock._defaultInterceptorFactory);
 		this._instanceHandlerFactory = handlerFactory;
 		this.registry = new InterceptorRegistry({

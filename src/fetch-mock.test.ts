@@ -2098,6 +2098,15 @@ describe('constructor auto-detection', () => {
 		it('should throw for an object that matches no known type', () => {
 			expect(() => new FetchMock({} as never)).toThrow(/invalid/i);
 		});
+
+		it('should throw for another FetchMock instance instead of treating it as an interceptor', () => {
+			// A FetchMock has activate()/deactivate(), so it used to pass as a FetchInterceptor.
+			const other = new FetchMock(setupServer());
+
+			expect(() => new FetchMock(other as never)).toThrow(
+				/FetchMock instance.*setupServer.*setupWorker.*FetchInterceptor/s,
+			);
+		});
 	});
 
 	describe('no args (standalone Node)', () => {
