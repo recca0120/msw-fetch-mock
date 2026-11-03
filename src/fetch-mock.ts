@@ -136,7 +136,7 @@ export class FetchMock {
 	private handlerFns: Map<PendingInterceptor, MatchingHandler> = new Map();
 	private _defaultReplyHeaders: Record<string, string> = {};
 	private _callHistoryEnabled = true;
-	private catchAllInstalled = false;
+	/** The installed catch-all handler; undefined until (re)installed by activate(). */
 	private catchAllHandler: unknown;
 	private _onUnhandledRequest?: OnUnhandledRequestCallback;
 
@@ -179,7 +179,7 @@ export class FetchMock {
 		// the first fetch.  In browser environments `worker.use()` must finish
 		// before the Service Worker can match requests — doing it once here
 		// (behind the already-awaited `activate`) avoids per-test race conditions.
-		this.catchAllInstalled = false;
+		this.catchAllHandler = undefined;
 		this.ensureCatchAllInstalled();
 	}
 
@@ -221,9 +221,7 @@ export class FetchMock {
 			};
 
 			// Iterate handlers in FIFO order (insertion order of Map)
-			for (const [pending, handlerFn] of this.handlerFns) {
-				if (pending.consumed && !pending.persist) continue;
-
+			for (const handlerFn of this.handlerFns.values()) {
 				const response = await handlerFn(request, readBody);
 				if (response !== undefined) return response;
 			}
@@ -253,11 +251,10 @@ export class FetchMock {
 	}
 
 	private ensureCatchAllInstalled(): void {
-		if (!this.catchAllInstalled) {
+		if (this.catchAllHandler === undefined) {
 			this.catchAllHandler = this.createCatchAllHandler();
 			this.interceptor.resetHandlers();
 			this.interceptor.use(this.catchAllHandler);
-			this.catchAllInstalled = true;
 			return;
 		}
 
@@ -306,7 +303,7 @@ export class FetchMock {
 	deactivate(): void {
 		this.handlerFns.clear();
 		this._calls.clear();
-		this.catchAllInstalled = false;
+		this.catchAllHandler = undefined;
 		this.interceptor.deactivate();
 	}
 
@@ -369,17 +366,10 @@ export class FetchMock {
 		// Claim this interceptor synchronously before any async work
 		// to prevent parallel requests from matching the same handler.
 		pending.timesInvoked++;
-		if (!pending.persist && pending.timesInvoked >= pending.times) {
-			pending.consumed = true;
-		}
 
 		const bodyText = await readBody();
 		if (!matchBody(bodyText, options.body)) {
-			// Rollback: body didn't match after all
-			pending.timesInvoked--;
-			if (pending.consumed && !pending.persist) {
-				pending.consumed = false;
-			}
+			pending.timesInvoked--; // rollback: body didn't match after all
 			return;
 		}
 
@@ -433,12 +423,10 @@ export class FetchMock {
 		const chain: MockReplyChain = {
 			times(n: number) {
 				pending.times = n;
-				pending.consumed = false;
 				return chain;
 			},
 			persist() {
 				pending.persist = true;
-				pending.consumed = false;
 				return chain;
 			},
 			delay(ms: number) {
