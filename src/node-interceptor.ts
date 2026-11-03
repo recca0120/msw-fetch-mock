@@ -19,6 +19,10 @@ export class NodeFetchInterceptor implements FetchInterceptor {
 		this.server?.resetHandlers(...handlers);
 	}
 
+	listHandlers(): ReadonlyArray<unknown> | undefined {
+		return this.server?.listHandlers?.();
+	}
+
 	activate(options: ResolvedActivateOptions): void {
 		if (!this.ownsServer) return;
 

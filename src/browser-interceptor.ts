@@ -15,6 +15,10 @@ export class BrowserFetchInterceptor implements FetchInterceptor {
 		this.worker.resetHandlers(...handlers);
 	}
 
+	listHandlers(): ReadonlyArray<unknown> | undefined {
+		return this.worker.listHandlers?.();
+	}
+
 	async activate(options: ResolvedActivateOptions): Promise<void> {
 		await this.worker.start({
 			onUnhandledRequest: options.onUnhandledRequest,

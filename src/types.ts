@@ -90,6 +90,7 @@ export interface SetupServerLike {
 	resetHandlers(...handlers: Array<unknown>): void;
 	listen(options?: Record<string, unknown>): void;
 	close(): void;
+	listHandlers?(): ReadonlyArray<unknown>;
 }
 
 /** Structural type for MSW's setupWorker return type */
@@ -98,6 +99,7 @@ export interface SetupWorkerLike {
 	resetHandlers(...handlers: Array<unknown>): void;
 	start(options?: Record<string, unknown>): Promise<void>;
 	stop(): void;
+	listHandlers?(): ReadonlyArray<unknown>;
 }
 
 /** Environment-agnostic interceptor interface for fetch mocking */
@@ -106,6 +108,11 @@ export interface FetchInterceptor {
 	resetHandlers(...handlers: Array<unknown>): void;
 	activate(options: ResolvedActivateOptions): void | Promise<void>;
 	deactivate(): void;
+	/**
+	 * Currently installed handlers; used to detect a removed catch-all.
+	 * Return `undefined` (or omit) when the underlying server/worker cannot list them.
+	 */
+	listHandlers?(): ReadonlyArray<unknown> | undefined;
 }
 
 /** Pluggable factory for MSW-version-specific handler and response creation */

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-11-03
+
+### Bug Fixes
+
+- When a server is passed to fetchMock (`createFetchMock(server)` or `new FetchMock(server)`), calling `server.resetHandlers()` — e.g. MSW's recommended `afterEach(() => server.resetHandlers())` — removed fetchMock's internal catch-all handler. Afterwards, registered intercepts stopped matching and `onUnhandledRequest: 'error'` no longer blocked requests, so requests reached the real network. fetchMock now re-installs the catch-all on its next use (e.g. `fetchMock.get(...).intercept(...)`), keeping any handlers you added after the reset. No other behavior changes.
+
+### Known limitations
+
+- If `server.resetHandlers()` is called and a request is made **without any fetchMock call in between**, the catch-all cannot be restored yet, and unmatched requests follow MSW's own unhandled-request handling instead of fetchMock's `onUnhandledRequest`. Prefer `fetchMock.reset()` for cleanup between tests.
+
 ## [0.5.0] - 2026-03-14
 
 ### Bug Fixes
