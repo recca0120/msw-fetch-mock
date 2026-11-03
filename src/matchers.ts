@@ -1,9 +1,9 @@
-import { type MockCallHistory } from './mock-call-history';
 import {
 	type BodyMatcher,
 	type HeaderValueMatcher,
 	type PathMatcher,
 	type PendingInterceptor,
+	type StringMatcher,
 } from './types';
 
 /**
@@ -41,16 +41,13 @@ export function isPending(p: PendingInterceptor): boolean {
 }
 
 /** Human-readable form of a string / RegExp / function matcher (for pendingInterceptors()). */
-export function describeMatcher(matcher: string | RegExp | ((value: string) => boolean)): string {
+export function describeMatcher(matcher: StringMatcher): string {
 	if (typeof matcher === 'string') return matcher;
 	if (typeof matcher === 'function') return '<function>';
 	return matcher.toString();
 }
 
-export function matchesValue(
-	value: string,
-	matcher: string | RegExp | ((v: string) => boolean),
-): boolean {
+export function matchesValue(value: string, matcher: StringMatcher): boolean {
 	if (typeof matcher === 'string') return value === matcher;
 	if (matcher instanceof RegExp) return matcher.test(value);
 	return matcher(value);
@@ -122,26 +119,4 @@ export function matchHeaders(
 export function matchBody(bodyText: string | null, bodyMatcher?: BodyMatcher): boolean {
 	if (!bodyMatcher) return true;
 	return matchesValue(bodyText ?? '', bodyMatcher);
-}
-
-export function recordCall(
-	callHistory: MockCallHistory,
-	request: Request,
-	bodyText: string | null,
-): void {
-	const url = urlOf(request);
-	callHistory.record({
-		body: bodyText,
-		method: request.method,
-		// lowercased keys; for repeated keys the last value wins (same as iterating)
-		headers: Object.fromEntries(request.headers),
-		fullUrl: url.origin + url.pathname + url.search,
-		origin: url.origin,
-		path: url.pathname,
-		searchParams: Object.fromEntries(url.searchParams),
-		protocol: url.protocol,
-		host: url.host,
-		port: url.port,
-		hash: url.hash,
-	});
 }

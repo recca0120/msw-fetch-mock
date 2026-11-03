@@ -17,9 +17,10 @@ import {
 	type ReplyCallback,
 	type ReplyOptions,
 	type SingleReplyCallback,
+	type StringMatcher,
 } from './types';
 
-type OriginMatcher = string | RegExp | ((origin: string) => boolean);
+type OriginMatcher = StringMatcher;
 
 /**
  * Tries to answer a request for one interceptor; resolves undefined when it does not match.

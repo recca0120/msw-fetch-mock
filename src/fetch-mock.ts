@@ -1,7 +1,7 @@
 import { InterceptorRegistry } from './interceptor-registry';
-import { matchesValue, recordCall, urlOf } from './matchers';
+import { matchesValue, urlOf } from './matchers';
 import { formatUnhandledRequestWarning } from './messages';
-import { MockCallHistory } from './mock-call-history';
+import { MockCallHistory, recordCall } from './mock-call-history';
 import { resolveInterceptor } from './resolve-interceptor';
 import {
 	type ActivateOptions,

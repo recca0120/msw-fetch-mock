@@ -3,6 +3,7 @@ import {
 	MockCallHistory,
 	type MockCallHistoryLog,
 	type MockCallHistoryLogData,
+	recordCall,
 } from './mock-call-history';
 
 function createLog(overrides: Partial<MockCallHistoryLogData> = {}): MockCallHistoryLogData {
@@ -514,5 +515,39 @@ describe('MockCallHistory', () => {
 
 			expect(history.filterCallsByFullUrl(/posts/)).toHaveLength(1);
 		});
+	});
+});
+
+describe('recordCall', () => {
+	it('should record request details into call history', () => {
+		const history = new MockCallHistory();
+		const request = new Request('http://localhost:3000/api/users?page=1#section', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: '{"key":"value"}',
+		});
+
+		recordCall(history, request, '{"key":"value"}');
+
+		expect(history.length).toBe(1);
+		const call = history.firstCall()!;
+		expect(call.body).toBe('{"key":"value"}');
+		expect(call.method).toBe('POST');
+		expect(call.path).toBe('/api/users');
+		expect(call.origin).toBe('http://localhost:3000');
+		expect(call.host).toBe('localhost:3000');
+		expect(call.protocol).toBe('http:');
+		expect(call.port).toBe('3000');
+		expect(call.searchParams).toEqual({ page: '1' });
+		expect(call.headers['content-type']).toBe('application/json');
+	});
+
+	it('should record null body', () => {
+		const history = new MockCallHistory();
+		const request = new Request('http://localhost/api');
+
+		recordCall(history, request, null);
+
+		expect(history.firstCall()?.body).toBeNull();
 	});
 });

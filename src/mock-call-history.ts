@@ -1,3 +1,5 @@
+import { urlOf } from './matchers';
+
 export interface MockCallHistoryLogData {
 	body: string | null;
 	method: string;
@@ -250,4 +252,27 @@ export class MockCallHistory {
 	filterCallsByFullUrl(filter: string | RegExp): MockCallHistoryLog[] {
 		return this.filterBy('fullUrl', filter);
 	}
+}
+
+/** Records a matched request (with its body text) in `callHistory`. */
+export function recordCall(
+	callHistory: MockCallHistory,
+	request: Request,
+	bodyText: string | null,
+): void {
+	const url = urlOf(request);
+	callHistory.record({
+		body: bodyText,
+		method: request.method,
+		// lowercased keys; for repeated keys the last value wins (same as iterating)
+		headers: Object.fromEntries(request.headers),
+		fullUrl: url.origin + url.pathname + url.search,
+		origin: url.origin,
+		path: url.pathname,
+		searchParams: Object.fromEntries(url.searchParams),
+		protocol: url.protocol,
+		host: url.host,
+		port: url.port,
+		hash: url.hash,
+	});
 }
