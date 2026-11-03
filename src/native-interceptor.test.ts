@@ -290,7 +290,7 @@ describe('NativeFetchInterceptor', () => {
 	describe('forceConnectionClose', () => {
 		it('should add Connection: close header when enabled', async () => {
 			const adapter = new NativeFetchInterceptor();
-			let capturedRequest: Request | null = null;
+			let capturedRequest = null as Request | null; // assigned in the handler
 			const handler: NativeHandler = {
 				method: 'GET',
 				urlPattern: '/test',
@@ -315,7 +315,7 @@ describe('NativeFetchInterceptor', () => {
 
 		it('should not add Connection header when disabled', async () => {
 			const adapter = new NativeFetchInterceptor();
-			let capturedRequest: Request | null = null;
+			let capturedRequest = null as Request | null; // assigned in the handler
 			const handler: NativeHandler = {
 				method: 'GET',
 				urlPattern: '/test',

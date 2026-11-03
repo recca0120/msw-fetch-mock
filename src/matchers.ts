@@ -1,10 +1,39 @@
-import { type MockCallHistory } from './mock-call-history';
 import {
 	type BodyMatcher,
 	type HeaderValueMatcher,
 	type PathMatcher,
 	type PendingInterceptor,
+	type StringMatcher,
 } from './types';
+
+/**
+ * Parsed URL of a request, memoized per Request object: every interceptor tried for
+ * one request (and the call recording) reads the same parse. A WeakMap, so an entry
+ * goes away with its request.
+ */
+const requestUrls = new WeakMap<Request, URL>();
+export function urlOf(request: Request): URL {
+	let url = requestUrls.get(request);
+	if (!url) {
+		url = new URL(request.url);
+		requestUrls.set(request, url);
+	}
+	return url;
+}
+
+/**
+ * Parsed origin of a string-origin interceptor. Only successful parses are cached,
+ * so an invalid origin still throws when a request is matched against it, as before.
+ */
+const originUrls = new Map<string, URL>();
+function originUrlOf(origin: string): URL {
+	let url = originUrls.get(origin);
+	if (!url) {
+		url = new URL(origin);
+		originUrls.set(origin, url);
+	}
+	return url;
+}
 
 export function isPending(p: PendingInterceptor): boolean {
 	if (p.persist) return p.timesInvoked === 0;
@@ -12,16 +41,13 @@ export function isPending(p: PendingInterceptor): boolean {
 }
 
 /** Human-readable form of a string / RegExp / function matcher (for pendingInterceptors()). */
-export function describeMatcher(matcher: string | RegExp | ((value: string) => boolean)): string {
+export function describeMatcher(matcher: StringMatcher): string {
 	if (typeof matcher === 'string') return matcher;
 	if (typeof matcher === 'function') return '<function>';
 	return matcher.toString();
 }
 
-export function matchesValue(
-	value: string,
-	matcher: string | RegExp | ((v: string) => boolean),
-): boolean {
+export function matchesValue(value: string, matcher: StringMatcher): boolean {
 	if (typeof matcher === 'string') return value === matcher;
 	if (matcher instanceof RegExp) return matcher.test(value);
 	return matcher(value);
@@ -45,8 +71,8 @@ function matchStringPathWithQuery(
 }
 
 export function matchPath(request: Request, origin: string, pathMatcher: PathMatcher): boolean {
-	const url = new URL(request.url);
-	const originUrl = new URL(origin);
+	const url = urlOf(request);
+	const originUrl = originUrlOf(origin);
 
 	if (url.origin !== originUrl.origin) return false;
 
@@ -71,7 +97,7 @@ export function matchPath(request: Request, origin: string, pathMatcher: PathMat
 
 export function matchQuery(request: Request, query?: Record<string, string>): boolean {
 	if (!query) return true;
-	const url = new URL(request.url);
+	const url = urlOf(request);
 	for (const [key, value] of Object.entries(query)) {
 		if (url.searchParams.get(key) !== value) return false;
 	}
@@ -93,26 +119,4 @@ export function matchHeaders(
 export function matchBody(bodyText: string | null, bodyMatcher?: BodyMatcher): boolean {
 	if (!bodyMatcher) return true;
 	return matchesValue(bodyText ?? '', bodyMatcher);
-}
-
-export function recordCall(
-	callHistory: MockCallHistory,
-	request: Request,
-	bodyText: string | null,
-): void {
-	const url = new URL(request.url);
-	callHistory.record({
-		body: bodyText,
-		method: request.method,
-		// lowercased keys; for repeated keys the last value wins (same as iterating)
-		headers: Object.fromEntries(request.headers),
-		fullUrl: url.origin + url.pathname + url.search,
-		origin: url.origin,
-		path: url.pathname,
-		searchParams: Object.fromEntries(url.searchParams),
-		protocol: url.protocol,
-		host: url.host,
-		port: url.port,
-		hash: url.hash,
-	});
 }

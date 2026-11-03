@@ -1,7 +1,7 @@
 import { InterceptorRegistry } from './interceptor-registry';
-import { matchesValue, recordCall } from './matchers';
+import { matchesValue, urlOf } from './matchers';
 import { formatUnhandledRequestWarning } from './messages';
-import { MockCallHistory } from './mock-call-history';
+import { MockCallHistory, recordCall } from './mock-call-history';
 import { resolveInterceptor } from './resolve-interceptor';
 import {
 	type ActivateOptions,
@@ -140,7 +140,7 @@ export class FetchMock {
 	private isNetConnectAllowed(request: Request): boolean {
 		const allowed = this.netConnectAllowed;
 		if (typeof allowed === 'boolean') return allowed;
-		return matchesValue(new URL(request.url).host, allowed);
+		return matchesValue(urlOf(request).host, allowed);
 	}
 
 	/**

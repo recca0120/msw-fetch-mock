@@ -1,7 +1,9 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-export type PathMatcher = string | RegExp | ((path: string) => boolean);
-export type HeaderValueMatcher = string | RegExp | ((value: string) => boolean);
-export type BodyMatcher = string | RegExp | ((body: string) => boolean);
+/** Matches a string exactly, by RegExp, or with a predicate. */
+export type StringMatcher = string | RegExp | ((value: string) => boolean);
+export type PathMatcher = StringMatcher;
+export type HeaderValueMatcher = StringMatcher;
+export type BodyMatcher = StringMatcher;
 
 export interface InterceptOptions {
 	path: PathMatcher;
@@ -56,7 +58,7 @@ export interface PendingInterceptor {
 	persist: boolean;
 }
 
-export type NetConnectMatcher = true | false | string | RegExp | ((host: string) => boolean);
+export type NetConnectMatcher = boolean | StringMatcher;
 
 export type PrintAPI = { warning(): void; error(): void };
 export type OnUnhandledRequestCallback = (request: Request, print: PrintAPI) => void;

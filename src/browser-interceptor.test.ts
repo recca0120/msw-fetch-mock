@@ -13,19 +13,12 @@ function createStubWorker(): SetupWorkerLike {
 
 const noopCallback: ResolvedActivateOptions = {
 	onUnhandledRequest: () => {},
+	// disabled, so no fetch-options wrapper is installed
+	timeout: 0,
+	forceConnectionClose: false,
 };
 
 describe('BrowserFetchInterceptor', () => {
-	it('should delegate use() to worker', () => {
-		const worker = createStubWorker();
-		const adapter = new BrowserFetchInterceptor(worker);
-		const handler = { id: 'handler-1' };
-
-		adapter.use(handler);
-
-		expect(worker.use).toHaveBeenCalledWith(handler);
-	});
-
 	it('should delegate resetHandlers() to worker', () => {
 		const worker = createStubWorker();
 		const adapter = new BrowserFetchInterceptor(worker);
@@ -55,14 +48,5 @@ describe('BrowserFetchInterceptor', () => {
 
 		expect(result).toBeInstanceOf(Promise);
 		await result;
-	});
-
-	it('should call worker.stop() on deactivate', () => {
-		const worker = createStubWorker();
-		const adapter = new BrowserFetchInterceptor(worker);
-
-		adapter.deactivate();
-
-		expect(worker.stop).toHaveBeenCalled();
 	});
 });

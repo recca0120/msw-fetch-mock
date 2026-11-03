@@ -6,6 +6,7 @@ import {
 	matchHeaders,
 	matchPath,
 	matchQuery,
+	urlOf,
 } from './matchers';
 import {
 	type InterceptOptions,
@@ -16,9 +17,10 @@ import {
 	type ReplyCallback,
 	type ReplyOptions,
 	type SingleReplyCallback,
+	type StringMatcher,
 } from './types';
 
-type OriginMatcher = string | RegExp | ((origin: string) => boolean);
+type OriginMatcher = StringMatcher;
 
 /**
  * Tries to answer a request for one interceptor; resolves undefined when it does not match.
@@ -258,7 +260,7 @@ function matchOriginAndPath(
 	}
 
 	// RegExp / function origin: match the origin, then the path on its own.
-	const url = new URL(request.url);
+	const url = urlOf(request);
 	if (!matchesValue(url.origin, origin)) return false;
 
 	if (typeof path === 'string') {

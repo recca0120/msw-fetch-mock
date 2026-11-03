@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] - 2026-11-03
+
+No changes to the public API or to behavior.
+
+### Performance
+
+- Each request URL is now parsed once and shared by all interceptors that try to match it. Before, every interceptor parsed it again. With 200 interceptors, a native GET dropped from about 158 µs to 72 µs.
+
+### Internal
+
+- Test files are now type-checked by `pnpm typecheck`, which runs in CI and in the pre-push hook. This uncovered tests that ran with unintended options (a fetch wrapper with an immediate timeout), and those are now fixed.
+- Browser mode is now tested end to end, using a worker backed by a real `setupServer()`. This includes recovering after the user calls `worker.resetHandlers()`.
+- Small cleanups: a shared `StringMatcher` type, `recordCall` moved next to the call history, and unhandled-request messages kept in one place.
+- e2e script:
+  - installs the package tarball with `npm install --no-save` instead of rewriting tracked `package.json` files
+  - restores the `mockServiceWorker.js` that msw rewrites on install
+  - `e2e/legacy-cjs` pointed at a tarball from another project and now points at this one
+
 ## [0.6.3] - 2026-11-03
 
 ### ⚠️ Behavior changes

@@ -6,7 +6,7 @@
 	},
 	"dependencies": {
 		"msw": "^1.3.1",
-		"msw-fetch-mock": "/Users/recca0120/WebstormProjects/threads-api/packages/msw-fetch-mock/msw-fetch-mock-0.3.2.tgz"
+		"msw-fetch-mock": "file:../../"
 	},
 	"devDependencies": {
 		"@jest/globals": "^29.7.0",

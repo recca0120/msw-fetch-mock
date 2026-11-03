@@ -1,5 +1,5 @@
 import { withConnectionClose, withTimeout } from './fetch-options';
-import { formatUnhandledRequestWarning } from './messages';
+import { formatUnhandledRequestError, formatUnhandledRequestWarning } from './messages';
 import { type NativeHandler } from './native-handler-factory';
 import { type FetchInterceptor, type ResolvedActivateOptions } from './types';
 
@@ -52,10 +52,7 @@ export class NativeFetchInterceptor implements FetchInterceptor {
 				console.warn(formatUnhandledRequestWarning(request.method, request.url));
 			},
 			error: () => {
-				throw new TypeError(
-					`[msw-fetch-mock] Cannot bypass a request when using the "error" strategy for the "onUnhandledRequest" option.\n\n` +
-						`  \u2022 ${request.method} ${request.url}\n`,
-				);
+				throw new TypeError(formatUnhandledRequestError(request.method, request.url));
 			},
 		});
 
