@@ -1,4 +1,6 @@
 import { createServer } from 'node:net';
+import { afterAll, afterEach, beforeAll } from 'vitest';
+import { type FetchMock } from './fetch-mock';
 
 /**
  * Shared helpers for the test suites (not part of the published package).
@@ -27,4 +29,38 @@ export const CLOSED_ORIGIN = `http://${CLOSED_HOST}`;
  */
 export function causeCode(error: unknown): string | undefined {
 	return (error as { cause?: { code?: string } }).cause?.code;
+}
+
+/**
+ * The common suite lifecycle: one activated fetchMock per describe block, with net connect
+ * disabled, verified and reset after each test and deactivated at the end.
+ *
+ * Pass the entry point's factory (e.g. createFetchMock from './node'): importing an entry
+ * here would set process-wide defaults for every test file that uses these helpers.
+ * Register describe-specific afterEach hooks after calling this; Vitest runs them first.
+ */
+export function useFetchMock(
+	createFetchMock: () => FetchMock,
+	options: { verifyNoPending?: boolean } = {},
+): FetchMock {
+	const { verifyNoPending = true } = options;
+	const fetchMock = createFetchMock();
+
+	beforeAll(async () => {
+		await fetchMock.activate();
+		fetchMock.disableNetConnect();
+	});
+
+	afterEach(() => {
+		try {
+			if (verifyNoPending) fetchMock.assertNoPendingInterceptors();
+		} finally {
+			// reset even when the check fails, so one test cannot break the next
+			fetchMock.reset();
+		}
+	});
+
+	afterAll(() => fetchMock.deactivate());
+
+	return fetchMock;
 }

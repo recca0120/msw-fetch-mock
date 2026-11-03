@@ -1,10 +1,11 @@
 import { HttpResponse, http } from 'msw';
 import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FetchMock } from './fetch-mock';
+import { describeFetchMockContract } from './fetch-mock.contract';
 import { createFetchMock, fetchMock as singletonFetchMock } from './node';
 import { NodeFetchInterceptor } from './node-interceptor';
-import { CLOSED_HOST, CLOSED_ORIGIN, causeCode } from './test-utils';
+import { CLOSED_HOST, CLOSED_ORIGIN, causeCode, useFetchMock } from './test-utils';
 import { type FetchInterceptor, type SetupServerLike } from './types';
 
 const API_BASE = 'http://localhost:8787';
@@ -40,122 +41,10 @@ function trackTimers(ms: number) {
 	};
 }
 
+describeFetchMockContract('MSW node', createFetchMock);
+
 describe('FetchMock', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-
-	afterAll(() => fetchMock.deactivate());
-
-	describe('intercept + reply', () => {
-		it('should intercept GET request', async () => {
-			fetchMock
-				.get(`${API_BASE}/${API_PREFIX}`)
-				.intercept({ path: '/posts', method: 'GET' })
-				.reply(200, { posts: [{ id: '1' }] });
-
-			const response = await fetch(`${API_BASE}/${API_PREFIX}/posts`);
-			const data = await response.json();
-
-			expect(response.status).toBe(200);
-			expect(data).toEqual({ posts: [{ id: '1' }] });
-		});
-
-		it('should intercept POST request', async () => {
-			fetchMock
-				.get(`${API_BASE}/${API_PREFIX}`)
-				.intercept({ path: '/posts', method: 'POST' })
-				.reply(201, { id: 'new-post' });
-
-			const response = await fetch(`${API_BASE}/${API_PREFIX}/posts`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ content: 'Hello' }),
-			});
-
-			expect(response.status).toBe(201);
-			expect(await response.json()).toEqual({ id: 'new-post' });
-		});
-
-		it('should intercept PUT request', async () => {
-			fetchMock
-				.get(`${API_BASE}/${API_PREFIX}`)
-				.intercept({ path: '/posts/1', method: 'PUT' })
-				.reply(200, { id: '1', content: 'updated' });
-
-			const response = await fetch(`${API_BASE}/${API_PREFIX}/posts/1`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ content: 'updated' }),
-			});
-
-			expect(response.status).toBe(200);
-		});
-
-		it('should intercept DELETE request', async () => {
-			fetchMock
-				.get(`${API_BASE}/${API_PREFIX}`)
-				.intercept({ path: '/posts/1', method: 'DELETE' })
-				.reply(204, null);
-
-			const response = await fetch(`${API_BASE}/${API_PREFIX}/posts/1`, {
-				method: 'DELETE',
-			});
-
-			expect(response.status).toBe(204);
-		});
-
-		it('should intercept PATCH request', async () => {
-			fetchMock
-				.get(`${API_BASE}/${API_PREFIX}`)
-				.intercept({ path: '/posts/1', method: 'PATCH' })
-				.reply(200, { patched: true });
-
-			const response = await fetch(`${API_BASE}/${API_PREFIX}/posts/1`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ content: 'patched' }),
-			});
-
-			expect(response.status).toBe(200);
-			expect(await response.json()).toEqual({ patched: true });
-		});
-
-		it('should correctly match method when multiple interceptors for same path', async () => {
-			// Setup GET interceptor
-			fetchMock
-				.get(`${API_BASE}/${API_PREFIX}`)
-				.intercept({ path: '/posts', method: 'GET' })
-				.reply(200, { type: 'get' });
-
-			// Setup POST interceptor for the same path
-			fetchMock
-				.get(`${API_BASE}/${API_PREFIX}`)
-				.intercept({ path: '/posts', method: 'POST' })
-				.reply(201, { type: 'post' });
-
-			// Make GET request - should match GET interceptor
-			const getResponse = await fetch(`${API_BASE}/${API_PREFIX}/posts`);
-			expect(getResponse.status).toBe(200);
-			expect(await getResponse.json()).toEqual({ type: 'get' });
-
-			// Make POST request - should match POST interceptor
-			const postResponse = await fetch(`${API_BASE}/${API_PREFIX}/posts`, {
-				method: 'POST',
-				body: JSON.stringify({ content: 'test' }),
-			});
-			expect(postResponse.status).toBe(201);
-			expect(await postResponse.json()).toEqual({ type: 'post' });
-		});
-	});
+	const fetchMock = useFetchMock(createFetchMock);
 
 	describe('external origin', () => {
 		it('should intercept requests to a different origin', async () => {
@@ -190,20 +79,6 @@ describe('FetchMock', () => {
 			expect(response.status).toBe(200);
 			// the callback receives the raw request body and its return value becomes the JSON reply
 			expect(await response.json()).toEqual({ echoed: '{"content":"Hello"}' });
-		});
-	});
-
-	describe('reply with headers', () => {
-		it('should set response headers', async () => {
-			fetchMock
-				.get(`${API_BASE}/${API_PREFIX}`)
-				.intercept({ path: '/data', method: 'GET' })
-				.reply(200, { value: 1 }, { headers: { 'X-Custom': 'test' } });
-
-			const response = await fetch(`${API_BASE}/${API_PREFIX}/data`);
-
-			expect(response.headers.get('X-Custom')).toBe('test');
-			expect(await response.json()).toEqual({ value: 1 });
 		});
 	});
 
@@ -314,18 +189,7 @@ describe('FetchMock', () => {
 });
 
 describe('query matching', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should match exact query params', async () => {
 		fetchMock
@@ -439,31 +303,8 @@ describe('query matching', () => {
 });
 
 describe('times', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	// some tests intentionally leave interceptors pending; reset so order does not matter
-	afterEach(() => fetchMock.reset());
-	afterAll(() => fetchMock.deactivate());
-
-	it('should match interceptor exactly N times', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/health', method: 'GET' })
-			.reply(200, { ok: true })
-			.times(3);
-
-		for (let i = 0; i < 3; i++) {
-			const response = await fetch(`${API_BASE}/${API_PREFIX}/health`);
-			expect(response.status).toBe(200);
-		}
-
-		fetchMock.assertNoPendingInterceptors();
-	});
+	// some tests intentionally leave interceptors pending
+	const fetchMock = useFetchMock(createFetchMock, { verifyNoPending: false });
 
 	it('should be pending when not all times consumed', async () => {
 		fetchMock
@@ -478,45 +319,9 @@ describe('times', () => {
 	});
 });
 
-describe('persist', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	// some tests intentionally leave interceptors pending; reset so order does not matter
-	afterEach(() => fetchMock.reset());
-	afterAll(() => fetchMock.deactivate());
-
-	it('should match indefinitely', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/health', method: 'GET' })
-			.reply(200, { ok: true })
-			.persist();
-
-		for (let i = 0; i < 5; i++) {
-			const response = await fetch(`${API_BASE}/${API_PREFIX}/health`);
-			expect(response.status).toBe(200);
-		}
-
-		fetchMock.assertNoPendingInterceptors();
-	});
-});
-
 describe('pendingInterceptors', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	// some tests intentionally leave interceptors pending; reset so order does not matter
-	afterEach(() => fetchMock.reset());
-	afterAll(() => fetchMock.deactivate());
+	// some tests intentionally leave interceptors pending
+	const fetchMock = useFetchMock(createFetchMock, { verifyNoPending: false });
 
 	it('should return empty array when no interceptors', () => {
 		expect(fetchMock.pendingInterceptors()).toEqual([]);
@@ -617,15 +422,6 @@ describe('assertNoPendingInterceptors', () => {
 
 		expect(() => fetchMock.assertNoPendingInterceptors()).not.toThrow();
 	});
-
-	it('should throw when interceptors are not consumed', () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/unused', method: 'GET' })
-			.reply(200, { data: 'never fetched' });
-
-		expect(() => fetchMock.assertNoPendingInterceptors()).toThrow(/pending interceptor/i);
-	});
 });
 
 describe('reset', () => {
@@ -696,54 +492,7 @@ describe('reset', () => {
 });
 
 describe('call history', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-
-	afterAll(() => fetchMock.deactivate());
-
-	it('should record GET request properties', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/posts', method: 'GET' })
-			.reply(200, { posts: [] });
-
-		await fetch(`${API_BASE}/${API_PREFIX}/posts`);
-
-		const call = fetchMock.calls.lastCall()!;
-		expect(call.method).toBe('GET');
-		expect(call.path).toBe('/api/posts');
-		expect(call.fullUrl).toBe(`${API_BASE}/${API_PREFIX}/posts`);
-		expect(call.origin).toBe(API_BASE);
-		expect(call.protocol).toBe('http:');
-		expect(call.host).toBe('localhost:8787');
-		expect(call.port).toBe('8787');
-	});
-
-	it('should record POST request body', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/posts', method: 'POST' })
-			.reply(201, { id: '1' });
-
-		await fetch(`${API_BASE}/${API_PREFIX}/posts`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ text: 'Hello' }),
-		});
-
-		const call = fetchMock.calls.lastCall()!;
-		expect(call.body).toBe('{"text":"Hello"}');
-		expect(call.json()).toEqual({ text: 'Hello' });
-	});
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should record request headers', async () => {
 		fetchMock
@@ -924,43 +673,8 @@ describe('enableNetConnect', () => {
 	);
 });
 
-describe('replyWithError', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
-
-	it('should make fetch reject with an error', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/fail', method: 'GET' })
-			.replyWithError(new Error('network failure'));
-
-		await expect(fetch(`${API_BASE}/${API_PREFIX}/fail`)).rejects.toThrow();
-	});
-});
-
 describe('streaming body', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should stream response body correctly when reply body is a ReadableStream', async () => {
 		const chunks = ['hello', ' ', 'world'];
@@ -1004,49 +718,9 @@ describe('streaming body', () => {
 });
 
 describe('delay', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		// restore first, so a failed fake-timer test cannot leak fake time into the next one
-		vi.useRealTimers();
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
-
-	it('should delay the response by at least the specified ms', async () => {
-		vi.useFakeTimers();
-		try {
-			fetchMock
-				.get(`${API_BASE}/${API_PREFIX}`)
-				.intercept({ path: '/slow', method: 'GET' })
-				.reply(200, { ok: true })
-				.delay(100);
-
-			let settled = false;
-			const fetchPromise = fetch(`${API_BASE}/${API_PREFIX}/slow`).finally(() => {
-				settled = true;
-			});
-
-			// 1ms before the delay elapses: no response yet
-			await vi.advanceTimersByTimeAsync(99);
-			expect(settled).toBe(false);
-
-			// delay elapsed: the reply is delivered
-			await vi.advanceTimersByTimeAsync(1);
-			const response = await fetchPromise;
-			expect(response.status).toBe(200);
-			expect(await response.json()).toEqual({ ok: true });
-		} finally {
-			// restore inside the test: on Node 18, fake timers left on until afterEach stall the runner
-			vi.useRealTimers();
-		}
-	});
+	const fetchMock = useFetchMock(createFetchMock);
+	// runs before useFetchMock's check: a failed fake-timer test must not leak fake time
+	afterEach(() => vi.useRealTimers());
 
 	it('[AC-4] should clear the delay timer when request is aborted (no lingering timers)', async () => {
 		vi.useFakeTimers();
@@ -1136,19 +810,9 @@ describe('delay', () => {
 });
 
 describe('retry scenarios', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		vi.useRealTimers();
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
+	// runs before useFetchMock's check: a failed fake-timer test must not leak fake time
+	afterEach(() => vi.useRealTimers());
 
 	it('should return 503 on first call and 200 on second call (retry scenario)', async () => {
 		fetchMock
@@ -1533,18 +1197,7 @@ describe('consumed interceptor', () => {
 });
 
 describe('defaultReplyHeaders', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should add default headers to all replies', async () => {
 		fetchMock.defaultReplyHeaders({ 'X-Request-Id': 'abc-123' });
@@ -1602,18 +1255,7 @@ describe('defaultReplyHeaders', () => {
 });
 
 describe('get(origin) with RegExp', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should accept RegExp as origin', async () => {
 		fetchMock
@@ -1629,18 +1271,7 @@ describe('get(origin) with RegExp', () => {
 });
 
 describe('get(origin) with function', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should accept function as origin', async () => {
 		fetchMock
@@ -1655,53 +1286,8 @@ describe('get(origin) with function', () => {
 	});
 });
 
-describe('reply(callback) single parameter form', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
-
-	it('should accept single callback returning { statusCode, data }', async () => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/echo', method: 'POST' })
-			.reply((req) => {
-				const body = req.body ? JSON.parse(req.body) : null;
-				return { statusCode: 201, data: { echo: body } };
-			});
-
-		const response = await fetch(`${API_BASE}/${API_PREFIX}/echo`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ msg: 'hello' }),
-		});
-
-		expect(response.status).toBe(201);
-		expect(await response.json()).toEqual({ echo: { msg: 'hello' } });
-	});
-});
-
 describe('clearAllCallHistory', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should be an alias for clearCallHistory()', async () => {
 		fetchMock
@@ -1719,20 +1305,9 @@ describe('clearAllCallHistory', () => {
 });
 
 describe('enableCallHistory / disableCallHistory', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		// reset() does not restore call recording, so re-enable it even if a test failed
-		fetchMock.enableCallHistory();
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
+	// reset() does not restore call recording, so re-enable it even if a test failed
+	afterEach(() => fetchMock.enableCallHistory());
 
 	it('should record calls by default', async () => {
 		fetchMock
@@ -1774,18 +1349,7 @@ describe('enableCallHistory / disableCallHistory', () => {
 });
 
 describe('replyContentLength', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should auto-add Content-Length header', async () => {
 		const body = { message: 'hello' };
@@ -1926,19 +1490,7 @@ describe('[BUG-3] documented activate() options in MSW (node) mode', () => {
 });
 
 describe('parallel request race condition', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should not let parallel requests match the same one-time handler', async () => {
 		fetchMock
@@ -1965,19 +1517,7 @@ describe('parallel request race condition', () => {
 });
 
 describe('string body serialization', () => {
-	const fetchMock = createFetchMock();
-
-	beforeAll(async () => {
-		await fetchMock.activate();
-		fetchMock.disableNetConnect();
-	});
-
-	afterEach(() => {
-		fetchMock.assertNoPendingInterceptors();
-		fetchMock.reset();
-	});
-
-	afterAll(() => fetchMock.deactivate());
+	const fetchMock = useFetchMock(createFetchMock);
 
 	it('should return string body as-is without double serialization', async () => {
 		fetchMock
@@ -2097,6 +1637,15 @@ describe('constructor auto-detection', () => {
 	describe('invalid input', () => {
 		it('should throw for an object that matches no known type', () => {
 			expect(() => new FetchMock({} as never)).toThrow(/invalid/i);
+		});
+
+		it('should throw for another FetchMock instance instead of treating it as an interceptor', () => {
+			// A FetchMock has activate()/deactivate(), so it used to pass as a FetchInterceptor.
+			const other = new FetchMock(setupServer());
+
+			expect(() => new FetchMock(other as never)).toThrow(
+				/FetchMock instance.*setupServer.*setupWorker.*FetchInterceptor/s,
+			);
 		});
 	});
 
