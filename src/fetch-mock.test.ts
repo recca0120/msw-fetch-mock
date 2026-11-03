@@ -910,15 +910,18 @@ describe('enableNetConnect', () => {
 		['with a host string', CLOSED_HOST],
 		['with a RegExp', /^127\.0\.0\.1:/],
 		['with a function', (host: string) => host.startsWith('127.0.0.1')],
-	] as const)('should let matching requests reach the network when enableNetConnect() is called %s', async (_, matcher) => {
-		fetchMock.disableNetConnect();
-		fetchMock.enableNetConnect(matcher);
+	] as const)(
+		'should let matching requests reach the network when enableNetConnect() is called %s',
+		async (_, matcher) => {
+			fetchMock.disableNetConnect();
+			fetchMock.enableNetConnect(matcher);
 
-		const error = await fetchClosedOrigin();
-		expect(error).toBeInstanceOf(Error);
-		expect((error as Error).message).not.toMatch(/request handler/i);
-		expect(causeCode(error)).toBe('ECONNREFUSED');
-	});
+			const error = await fetchClosedOrigin();
+			expect(error).toBeInstanceOf(Error);
+			expect((error as Error).message).not.toMatch(/request handler/i);
+			expect(causeCode(error)).toBe('ECONNREFUSED');
+		},
+	);
 });
 
 describe('replyWithError', () => {
@@ -1805,19 +1808,22 @@ describe('replyContentLength', () => {
 		['an ASCII string', 'hello', 5], // 5 ASCII chars = 5 bytes, sent as-is (no JSON quotes)
 		['a non-ASCII string', 'héllo', 6], // "é" is 2 bytes in UTF-8
 		['a non-ASCII object', { name: 'é' }, 13], // '{"name":"é"}' = 12 chars, 13 bytes
-	] as const)('[BUG-2] should set Content-Length to the byte length of %s body', async (_, body, bytes) => {
-		fetchMock
-			.get(`${API_BASE}/${API_PREFIX}`)
-			.intercept({ path: '/data', method: 'GET' })
-			.reply(200, body)
-			.replyContentLength();
+	] as const)(
+		'[BUG-2] should set Content-Length to the byte length of %s body',
+		async (_, body, bytes) => {
+			fetchMock
+				.get(`${API_BASE}/${API_PREFIX}`)
+				.intercept({ path: '/data', method: 'GET' })
+				.reply(200, body)
+				.replyContentLength();
 
-		const response = await fetch(`${API_BASE}/${API_PREFIX}/data`);
-		const sent = new Uint8Array(await response.arrayBuffer());
+			const response = await fetch(`${API_BASE}/${API_PREFIX}/data`);
+			const sent = new Uint8Array(await response.arrayBuffer());
 
-		expect(sent.byteLength).toBe(bytes);
-		expect(response.headers.get('Content-Length')).toBe(String(bytes));
-	});
+			expect(sent.byteLength).toBe(bytes);
+			expect(response.headers.get('Content-Length')).toBe(String(bytes));
+		},
+	);
 
 	it('[BUG-2] should not set Content-Length for a ReadableStream body (length unknown)', async () => {
 		const stream = new ReadableStream({

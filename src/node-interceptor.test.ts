@@ -72,7 +72,7 @@ describe('NodeFetchInterceptor', () => {
 				await fetch(`${CLOSED_ORIGIN}/unhandled`).catch(() => null);
 
 				expect(callback).toHaveBeenCalledTimes(1);
-				expect((callback.mock.calls[0]?.[0] as Request).url).toBe(`${CLOSED_ORIGIN}/unhandled`);
+				expect((callback.mock.calls[0]![0] as Request).url).toBe(`${CLOSED_ORIGIN}/unhandled`);
 			} finally {
 				adapter.deactivate();
 			}
