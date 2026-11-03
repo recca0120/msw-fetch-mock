@@ -100,6 +100,10 @@ export function createLegacyHandlerFactory(rest: LegacyRestApi): HandlerFactory 
 	};
 
 	return {
+		/**
+		 * @deprecated Never called by FetchMock. To register a single MSW v1 route
+		 * yourself, use `rest.get(url, resolver)` etc. directly. Will be removed in 0.7.0.
+		 */
 		createHandler(method, urlPattern, handlerFn) {
 			return methods[method](urlPattern, createResolver(handlerFn));
 		},

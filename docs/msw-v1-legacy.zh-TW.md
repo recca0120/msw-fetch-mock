@@ -44,7 +44,7 @@ it('模擬 GET 請求', async () => {
 | -------------------------------------------- | ---------------------------------------------- |
 | `import { fetchMock } from 'msw-fetch-mock'` | 無單例 — 必須使用 `createFetchMock`            |
 | `import { createFetchMock } from '.../node'` | `import { createFetchMock } from '.../legacy'` |
-| `createFetchMock(server?)`                   | `createFetchMock(rest, server?)`               |
+| `createFetchMock(server?)`                   | `createFetchMock(rest, server)`               |
 | `import { http } from 'msw'`                 | `import { rest } from 'msw'`                   |
 
 ## 主要差異
@@ -52,7 +52,7 @@ it('模擬 GET 請求', async () => {
 | 面向             | MSW v2                                    | MSW v1（Legacy）                  |
 | ---------------- | ----------------------------------------- | --------------------------------- |
 | 匯入             | `msw-fetch-mock` 或 `msw-fetch-mock/node` | `msw-fetch-mock/legacy`           |
-| 工廠函式         | `createFetchMock(server?)`                | `createFetchMock(rest, server?)`  |
+| 工廠函式         | `createFetchMock(server?)`                | `createFetchMock(rest, server)`  |
 | 單例             | `fetchMock` 預建實例                      | 不提供 — 使用 `createFetchMock`   |
 | Handler 內部實作 | 使用 `http.*` + `HttpResponse`            | 使用 `rest.*` + `(req, res, ctx)` |
 | MSW 版本         | `msw@^2.12.7`                             | `msw@^1.0.0`                      |
@@ -63,7 +63,7 @@ it('模擬 GET 請求', async () => {
 
 | 匯出                             | 類型 | 說明                                |
 | -------------------------------- | ---- | ----------------------------------- |
-| `createFetchMock(rest, server?)` | 函式 | 建立適用於 MSW v1 的 FetchMock 實例 |
+| `createFetchMock(rest, server)` | 函式 | 建立適用於 MSW v1 的 FetchMock 實例 |
 | `FetchMock`                      | 類別 | 核心模擬類別（與 v2 相同）          |
 | `createLegacyHandlerFactory`     | 函式 | 低階：建立 v1 相容的 handler 工廠   |
 | `LegacyRestApi`                  | 型別 | MSW v1 的 `rest` 物件型別           |

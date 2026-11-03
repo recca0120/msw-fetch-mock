@@ -79,9 +79,11 @@ A pre-built singleton is also available:
 import { fetchMock } from 'msw-fetch-mock/native';
 ```
 
-## `createFetchMock(rest, server?)` (Legacy)
+## `createFetchMock(rest, server)` (Legacy)
 
 Creates a `FetchMock` for MSW v1 environments. See [MSW v1 Legacy Guide](msw-v1-legacy.md).
+
+`server` is required (an MSW v1 `setupServer()` instance); calling it without one throws.
 
 ```typescript
 import { rest } from 'msw';

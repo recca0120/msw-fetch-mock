@@ -1,6 +1,7 @@
 import { FetchMock } from './fetch-mock';
 import { NativeHandlerFactory } from './native-handler-factory';
 import { NativeFetchInterceptor } from './native-interceptor';
+import { type FetchInterceptor, type HandlerFactory } from './types';
 
 type InterceptorLoader = () => Promise<{
 	HandlerFactory: typeof import('./handler-factory').HandlerFactory;
@@ -17,15 +18,32 @@ const mswInterceptorLoader: InterceptorLoader = async () => {
 	return { HandlerFactory, NodeFetchInterceptor };
 };
 
+interface DetectedEnvironment {
+	createInterceptor: () => FetchInterceptor;
+	handlerFactory: HandlerFactory;
+}
+
+/**
+ * Detects MSW (falls back to native fetch patching), registers it as the
+ * process-wide default for `new FetchMock()`, and returns it.
+ */
 export async function registerDefaultInterceptor(
 	loader: InterceptorLoader = mswInterceptorLoader,
-): Promise<void> {
+): Promise<DetectedEnvironment> {
+	let detected: DetectedEnvironment;
 	try {
 		const { HandlerFactory, NodeFetchInterceptor } = await loader();
-		FetchMock._defaultInterceptorFactory = () => new NodeFetchInterceptor();
-		FetchMock._handlerFactory = HandlerFactory;
+		detected = {
+			createInterceptor: () => new NodeFetchInterceptor(),
+			handlerFactory: HandlerFactory,
+		};
 	} catch {
-		FetchMock._defaultInterceptorFactory = () => new NativeFetchInterceptor();
-		FetchMock._handlerFactory = NativeHandlerFactory;
+		detected = {
+			createInterceptor: () => new NativeFetchInterceptor(),
+			handlerFactory: NativeHandlerFactory,
+		};
 	}
+	FetchMock._defaultInterceptorFactory = detected.createInterceptor;
+	FetchMock._handlerFactory = detected.handlerFactory;
+	return detected;
 }

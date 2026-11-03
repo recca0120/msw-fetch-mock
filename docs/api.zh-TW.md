@@ -79,9 +79,11 @@ beforeAll(async () => {
 import { fetchMock } from 'msw-fetch-mock/native';
 ```
 
-## `createFetchMock(rest, server?)`（Legacy）
+## `createFetchMock(rest, server)`（Legacy）
 
 建立適用於 MSW v1 環境的 `FetchMock`。詳見 [MSW v1 Legacy 指南](msw-v1-legacy.zh-TW.md)。
+
+`server` 為必填（MSW v1 的 `setupServer()` 實例），沒有傳入會丟出錯誤。
 
 ```typescript
 import { rest } from 'msw';
