@@ -6,6 +6,35 @@ import {
 	type PendingInterceptor,
 } from './types';
 
+/**
+ * Parsed URL of a request, memoized per Request object: every interceptor tried for
+ * one request (and the call recording) reads the same parse. A WeakMap, so an entry
+ * goes away with its request.
+ */
+const requestUrls = new WeakMap<Request, URL>();
+export function urlOf(request: Request): URL {
+	let url = requestUrls.get(request);
+	if (!url) {
+		url = new URL(request.url);
+		requestUrls.set(request, url);
+	}
+	return url;
+}
+
+/**
+ * Parsed origin of a string-origin interceptor. Only successful parses are cached,
+ * so an invalid origin still throws when a request is matched against it, as before.
+ */
+const originUrls = new Map<string, URL>();
+function originUrlOf(origin: string): URL {
+	let url = originUrls.get(origin);
+	if (!url) {
+		url = new URL(origin);
+		originUrls.set(origin, url);
+	}
+	return url;
+}
+
 export function isPending(p: PendingInterceptor): boolean {
 	if (p.persist) return p.timesInvoked === 0;
 	return p.timesInvoked < p.times;
@@ -45,8 +74,8 @@ function matchStringPathWithQuery(
 }
 
 export function matchPath(request: Request, origin: string, pathMatcher: PathMatcher): boolean {
-	const url = new URL(request.url);
-	const originUrl = new URL(origin);
+	const url = urlOf(request);
+	const originUrl = originUrlOf(origin);
 
 	if (url.origin !== originUrl.origin) return false;
 
@@ -71,7 +100,7 @@ export function matchPath(request: Request, origin: string, pathMatcher: PathMat
 
 export function matchQuery(request: Request, query?: Record<string, string>): boolean {
 	if (!query) return true;
-	const url = new URL(request.url);
+	const url = urlOf(request);
 	for (const [key, value] of Object.entries(query)) {
 		if (url.searchParams.get(key) !== value) return false;
 	}
@@ -100,7 +129,7 @@ export function recordCall(
 	request: Request,
 	bodyText: string | null,
 ): void {
-	const url = new URL(request.url);
+	const url = urlOf(request);
 	callHistory.record({
 		body: bodyText,
 		method: request.method,
