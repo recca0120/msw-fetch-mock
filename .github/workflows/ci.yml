@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -38,7 +38,7 @@ jobs:
         node-version: [18, 20, 22, 23]
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
@@ -50,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -58,7 +58,7 @@ jobs:
       - run: pnpm install
       - run: pnpm build
       - run: npm pack && mv msw-fetch-mock-*.tgz msw-fetch-mock.tgz
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: package-tarball
           path: msw-fetch-mock.tgz
@@ -71,7 +71,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: package-tarball
           path: .
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: package-tarball
           path: .
@@ -101,7 +101,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 20
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: package-tarball
           path: .
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 20
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: package-tarball
           path: .
@@ -131,7 +131,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: package-tarball
           path: .
@@ -146,7 +146,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: package-tarball
           path: .
@@ -160,7 +160,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 22

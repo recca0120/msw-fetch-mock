@@ -1,7 +1,6 @@
 {
 	"$schema": "https://unpkg.com/knip@latest/schema.json",
 	"project": ["src/**/*.ts", "!src/**/*.test.ts", "!src/test-utils.ts"],
-	"ignoreBinaries": ["playwright"],
 	"ignoreExportsUsedInFile": true,
 	"vitest": {
 		"entry": ["src/**/*.test.ts"]
