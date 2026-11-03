@@ -1,4 +1,3 @@
-import { BrowserFetchInterceptor } from './browser-interceptor';
 import {
 	describeMatcher,
 	isPending,
@@ -11,7 +10,7 @@ import {
 } from './matchers';
 import { formatUnhandledRequestWarning } from './messages';
 import { MockCallHistory } from './mock-call-history';
-import { isFetchInterceptor, isSetupServerLike, isSetupWorkerLike } from './type-guards';
+import { resolveInterceptor } from './resolve-interceptor';
 import {
 	type ActivateOptions,
 	type FetchInterceptor,
@@ -25,7 +24,6 @@ import {
 	type PendingInterceptor,
 	type ReplyCallback,
 	type ReplyOptions,
-	type ResolvedActivateOptions,
 	type SetupServerLike,
 	type SetupWorkerLike,
 	type SingleReplyCallback,
@@ -40,8 +38,6 @@ type MatchingHandler = (
 	readBody: () => Promise<string | null>,
 ) => Promise<Response | undefined>;
 
-import { installFetchOptions } from './fetch-options';
-
 /**
  * UTF-8 byte length of a reply body as it is sent: strings as-is, other values as JSON.
  * Returns undefined when there is no body or its length is unknown (a stream).
@@ -50,46 +46,6 @@ function byteLengthOf(body: unknown): number | undefined {
 	if (body === null || body === undefined || body instanceof ReadableStream) return undefined;
 	const text = typeof body === 'string' ? body : JSON.stringify(body);
 	return new TextEncoder().encode(text).byteLength;
-}
-
-/** Wraps a user-provided server without managing its lifecycle. */
-function wrapServer(server: SetupServerLike): FetchInterceptor {
-	let removeFetchOptions: () => void = () => {};
-	return {
-		use: (...handlers: Array<unknown>) => server.use(...handlers),
-		resetHandlers: (...handlers: Array<unknown>) => server.resetHandlers(...handlers),
-		listHandlers: () => server.listHandlers?.(),
-		activate(options: ResolvedActivateOptions) {
-			server.listen({ onUnhandledRequest: options.onUnhandledRequest });
-			removeFetchOptions = installFetchOptions(options);
-		},
-		deactivate() {
-			removeFetchOptions();
-			removeFetchOptions = () => {};
-			server.close();
-		},
-	};
-}
-
-function resolveInterceptor(
-	input?: SetupServerLike | SetupWorkerLike | FetchInterceptor,
-): FetchInterceptor {
-	if (!input) {
-		if (!FetchMock._defaultInterceptorFactory) {
-			throw new Error(
-				'FetchMock requires a server, worker, or interceptor argument. ' +
-					'Use createFetchMock() from msw-fetch-mock/node or msw-fetch-mock/browser, ' +
-					'or pass a setupServer/setupWorker instance directly.',
-			);
-		}
-		return FetchMock._defaultInterceptorFactory();
-	}
-	if (isFetchInterceptor(input)) return input;
-	if (isSetupServerLike(input)) return wrapServer(input);
-	if (isSetupWorkerLike(input)) return new BrowserFetchInterceptor(input);
-	throw new Error(
-		'Invalid argument: expected a setupServer, setupWorker, or FetchInterceptor instance.',
-	);
 }
 
 export class FetchMock {
@@ -148,7 +104,7 @@ export class FetchMock {
 		input?: SetupServerLike | SetupWorkerLike | FetchInterceptor,
 		handlerFactory?: HandlerFactory,
 	) {
-		this.interceptor = resolveInterceptor(input);
+		this.interceptor = resolveInterceptor(input, FetchMock._defaultInterceptorFactory);
 		this._instanceHandlerFactory = handlerFactory;
 	}
 

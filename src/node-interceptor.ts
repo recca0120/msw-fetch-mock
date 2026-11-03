@@ -1,69 +1,72 @@
 import { setupServer } from 'msw/node';
-import { installFetchOptions } from './fetch-options';
+import { ServerFetchInterceptor } from './server-interceptor';
 import { type FetchInterceptor, type ResolvedActivateOptions, type SetupServerLike } from './types';
 
-/** MSW interceptor that owns and manages its own `setupServer` lifecycle. */
+/**
+ * MSW v2 Node interceptor.
+ *
+ * - `new NodeFetchInterceptor()`: owns a `setupServer()` it creates on activate()
+ *   and closes on deactivate().
+ * - `new NodeFetchInterceptor(server)`: uses the given server; its owner starts
+ *   and stops it.
+ */
 export class NodeFetchInterceptor implements FetchInterceptor {
-	private server: SetupServerLike | null;
 	private readonly ownsServer: boolean;
-	private removeFetchOptions: () => void = () => {};
+	private current: ServerFetchInterceptor | null;
 
 	constructor(externalServer?: SetupServerLike) {
-		this.server = externalServer ?? null;
 		this.ownsServer = !externalServer;
+		this.current = externalServer
+			? new ServerFetchInterceptor(externalServer, { manageLifecycle: false })
+			: null;
 	}
 
 	use(...handlers: Array<unknown>): void {
-		this.server?.use(...handlers);
+		this.current?.use(...handlers);
 	}
 
 	resetHandlers(...handlers: Array<unknown>): void {
-		this.server?.resetHandlers(...handlers);
+		this.current?.resetHandlers(...handlers);
 	}
 
 	listHandlers(): ReadonlyArray<unknown> | undefined {
-		return this.server?.listHandlers?.();
+		return this.current?.listHandlers();
 	}
 
 	activate(options: ResolvedActivateOptions): void {
-		if (!this.ownsServer) {
-			this.removeFetchOptions = installFetchOptions(options);
-			return;
+		if (this.ownsServer) {
+			assertNoOtherMswServer();
+			this.current = new ServerFetchInterceptor(setupServer(), { manageLifecycle: true });
 		}
-
-		// MSW v2 silently reuses interceptors when a second server calls listen().
-		// We detect this via @mswjs/interceptors internal Symbols on globalThis.fetch
-		// ("isPatchedModule") and globalThis ("fetch"). If these internals change
-		// in a future MSW release, the guard fails open (no crash, just shared state).
-		// See node-interceptor.test.ts "should throw when another MSW server is already active".
-		const isFetchPatched =
-			typeof globalThis.fetch === 'function' &&
-			Object.getOwnPropertySymbols(globalThis.fetch).some(
-				(s) => s.description === 'isPatchedModule',
-			);
-		const isInterceptorActive = Object.getOwnPropertySymbols(globalThis).some(
-			(s) => s.description === 'fetch',
-		);
-		if (isFetchPatched || isInterceptorActive) {
-			throw new Error(
-				'Another MSW server is already active. ' +
-					'Pass your existing server to new FetchMock(server) instead.',
-			);
-		}
-
-		this.server = setupServer();
-		(this.server as ReturnType<typeof setupServer>).listen({
-			onUnhandledRequest: options.onUnhandledRequest,
-		});
-		this.removeFetchOptions = installFetchOptions(options);
+		this.current?.activate(options);
 	}
 
 	deactivate(): void {
-		this.removeFetchOptions();
-		this.removeFetchOptions = () => {};
+		this.current?.deactivate();
 		if (this.ownsServer) {
-			this.server?.close();
-			this.server = null;
+			this.current = null;
 		}
+	}
+}
+
+/**
+ * MSW v2 silently reuses interceptors when a second server calls listen().
+ * We detect this via @mswjs/interceptors internal Symbols on globalThis.fetch
+ * ("isPatchedModule") and globalThis ("fetch"). If these internals change
+ * in a future MSW release, the guard fails open (no crash, just shared state).
+ * See node-interceptor.test.ts "should throw when another MSW server is already active".
+ */
+function assertNoOtherMswServer(): void {
+	const isFetchPatched =
+		typeof globalThis.fetch === 'function' &&
+		Object.getOwnPropertySymbols(globalThis.fetch).some((s) => s.description === 'isPatchedModule');
+	const isInterceptorActive = Object.getOwnPropertySymbols(globalThis).some(
+		(s) => s.description === 'fetch',
+	);
+	if (isFetchPatched || isInterceptorActive) {
+		throw new Error(
+			'Another MSW server is already active. ' +
+				'Pass your existing server to new FetchMock(server) instead.',
+		);
 	}
 }
