@@ -97,10 +97,13 @@ export interface SetupServerLike {
 
 /** Structural type for MSW's setupWorker return type */
 export interface SetupWorkerLike {
+	/** MSW v3+ only: 0 = disabled (not started). */
+	readonly readyState?: number;
 	use(...handlers: Array<unknown>): void;
 	resetHandlers(...handlers: Array<unknown>): void;
 	start(options?: Record<string, unknown>): Promise<void>;
-	stop(): void;
+	/** MSW v3 returns a Promise that settles once in-flight requests are done. */
+	stop(): void | Promise<void>;
 	listHandlers?(): ReadonlyArray<unknown>;
 }
 
@@ -109,7 +112,7 @@ export interface FetchInterceptor {
 	use(...handlers: Array<unknown>): void;
 	resetHandlers(...handlers: Array<unknown>): void;
 	activate(options: ResolvedActivateOptions): void | Promise<void>;
-	deactivate(): void;
+	deactivate(): void | Promise<void>;
 	/**
 	 * Currently installed handlers; used to detect a removed catch-all.
 	 * Return `undefined` (or omit) when the underlying server/worker cannot list them.
@@ -119,15 +122,6 @@ export interface FetchInterceptor {
 
 /** Pluggable factory for MSW-version-specific handler and response creation */
 export interface HandlerFactory {
-	/**
-	 * @deprecated Never called by FetchMock (all requests go through one catch-all
-	 * handler from `createCatchAllHandler`). Will be removed in 0.7.0.
-	 */
-	createHandler(
-		method: HttpMethod,
-		urlPattern: string | RegExp,
-		handlerFn: (request: Request) => Promise<Response | undefined>,
-	): unknown;
 	createCatchAllHandler(handlerFn: (request: Request) => Promise<Response | undefined>): unknown;
 	buildResponse(status: number, body: unknown, headers?: Headers): Response;
 	buildErrorResponse(): Response;

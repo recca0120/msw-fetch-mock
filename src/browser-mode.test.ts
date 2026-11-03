@@ -9,21 +9,35 @@ import { type SetupWorkerLike } from './types';
 /**
  * A worker backed by a real MSW `setupServer()`, so browser mode can be exercised
  * end to end in Node: start() → listen(), stop() → close(), handlers delegated.
- * Like a real MSW v2 worker, a second start() while started does nothing.
+ *
+ * By default it follows MSW v2's worker contract: a second start() while started
+ * does nothing. With `{ v3: true }` it follows MSW v3's: it exposes `readyState`
+ * (0 = disabled), start() throws when already started, and stop() is async.
  */
-function createServerBackedWorker() {
+function createServerBackedWorker(options: { v3?: boolean } = {}) {
 	const server = setupServer();
 	let started = false;
 	const worker = {
-		async start(options?: Record<string, unknown>) {
-			if (started) return;
-			server.listen(options as Parameters<typeof server.listen>[0]);
+		get readyState(): number | undefined {
+			if (!options.v3) return undefined;
+			return started ? 1 : 0;
+		},
+		async start(listenOptions?: Record<string, unknown>) {
+			if (started) {
+				if (options.v3) {
+					throw new Error('[MSW] Failed to call "worker.start()": the worker is already started.');
+				}
+				return;
+			}
+			server.listen(listenOptions as Parameters<typeof server.listen>[0]);
 			started = true;
 		},
-		stop() {
-			if (!started) return;
-			server.close();
-			started = false;
+		stop(): void | Promise<void> {
+			if (started) {
+				server.close();
+				started = false;
+			}
+			return options.v3 ? Promise.resolve() : undefined;
 		},
 		use: (...handlers: unknown[]) => server.use(...(handlers as Parameters<typeof server.use>)),
 		resetHandlers: (...handlers: unknown[]) =>
@@ -103,5 +117,53 @@ describe.each([
 		// the worker was stopped, so the request now really reaches the (closed) port
 		const error = await fetch(`${CLOSED_ORIGIN}/after`).catch((e: unknown) => e);
 		expect(causeCode(error)).toBe('ECONNREFUSED');
+	});
+});
+
+describe('[AC-9] a worker the user already started (MSW v3)', () => {
+	it('activate() succeeds and registered intercepts are answered', async () => {
+		const worker = createServerBackedWorker({ v3: true });
+		await worker.start(); // the user's own setup
+		const fm = createFetchMock(worker);
+
+		await expect(fm.activate()).resolves.toBeUndefined();
+		try {
+			fm.get(ORIGIN).intercept({ path: '/ping' }).reply(200, 'pong');
+
+			expect(await (await fetch(`${ORIGIN}/ping`)).text()).toBe('pong');
+		} finally {
+			await fm.deactivate();
+		}
+	});
+
+	it('deactivate() leaves the worker running, since fetchMock did not start it', async () => {
+		const worker = createServerBackedWorker({ v3: true });
+		await worker.start(); // the user's own setup
+		const fm = createFetchMock(worker);
+		await fm.activate({ onUnhandledRequest: 'bypass' });
+
+		await fm.deactivate();
+
+		expect(worker.readyState).toBe(1);
+		// like an external server: once the user resets, their own handlers answer
+		worker.resetHandlers(http.get(`${ORIGIN}/user`, () => HttpResponse.text('user handler')));
+		expect(await (await fetch(`${ORIGIN}/user`)).text()).toBe('user handler');
+		worker.stop();
+	});
+
+	it('can be activated again after deactivate()', async () => {
+		const worker = createServerBackedWorker({ v3: true });
+		const fm = createFetchMock(worker);
+		await fm.activate();
+		await fm.deactivate();
+
+		await fm.activate();
+		try {
+			fm.get(ORIGIN).intercept({ path: '/again' }).reply(200, 'again');
+
+			expect(await (await fetch(`${ORIGIN}/again`)).text()).toBe('again');
+		} finally {
+			await fm.deactivate();
+		}
 	});
 });

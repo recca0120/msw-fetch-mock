@@ -37,6 +37,18 @@ export function withTimeout<T>(
 	return Promise.race([fn(), timeoutPromise]).finally(() => clearTimeout(timeoutId));
 }
 
+/** Our fetch wrappers → the fetch each one wraps (see unwrapFetch). */
+const wrappedFetches = new WeakMap<typeof globalThis.fetch, typeof globalThis.fetch>();
+
+/** Strips any fetch-options wrappers installed by this module, e.g. to inspect MSW's patch. */
+export function unwrapFetch(fetchFn: typeof globalThis.fetch): typeof globalThis.fetch {
+	let current = fetchFn;
+	for (let inner = wrappedFetches.get(current); inner; inner = wrappedFetches.get(inner)) {
+		current = inner;
+	}
+	return current;
+}
+
 /**
  * Applies `timeout` and `forceConnectionClose` to every `fetch()` call by wrapping
  * the current `globalThis.fetch` (e.g. the one MSW installed on `listen()`).
@@ -51,6 +63,7 @@ export function installFetchOptions(options: FetchOptions): () => void {
 		const nextInit = forceConnectionClose ? withConnectionClose(input, init) : init;
 		return withTimeout(() => wrappedFetch(input, nextInit), timeout, init?.signal);
 	};
+	wrappedFetches.set(fetchWithOptions, wrappedFetch);
 	globalThis.fetch = fetchWithOptions;
 
 	return () => {

@@ -126,9 +126,11 @@ const fetchMock = new FetchMock(new NativeFetchInterceptor());
 
 ```typescript
 await fetchMock.activate(options?); // 開始攔截（非同步 — 瀏覽器需要 worker.start()）
-fetchMock.deactivate();             // 停止攔截
+await fetchMock.deactivate();       // 停止攔截
 ```
 
+> `deactivate()` 回傳 `Promise<void>`，會在 interceptor 完全停止後 resolve（MSW v3 的 `worker.stop()` 是非同步的）。清理動作是同步完成的，所以不 await 也照樣能用。
+>
 > `activate()` 回傳 `Promise<void>`。在 Node.js 中，promise 會同步解析。在瀏覽器中，會等待 Service Worker 啟動。Vitest 和 Jest 原生支援非同步的 `beforeAll`。
 >
 > **衝突偵測（僅 Node）：** 在獨立模式下，`activate()` 會檢查 `globalThis.fetch` 是否已被 MSW 修補。若是，會拋出錯誤，引導你使用 `createFetchMock(server)` 來共用現有 server。

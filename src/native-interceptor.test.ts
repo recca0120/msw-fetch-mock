@@ -57,7 +57,7 @@ describe('NativeFetchInterceptor', () => {
 		it('should register a handler that can match requests', async () => {
 			const adapter = new NativeFetchInterceptor();
 			const handlerFn = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
-			const handler: NativeHandler = { method: 'GET', urlPattern: '/test', handlerFn };
+			const handler: NativeHandler = { handlerFn };
 
 			adapter.activate(noopOptions);
 			adapter.use(handler);
@@ -75,8 +75,8 @@ describe('NativeFetchInterceptor', () => {
 			const adapter = new NativeFetchInterceptor();
 			const oldFn = vi.fn().mockResolvedValue(new Response('old'));
 			const newFn = vi.fn().mockResolvedValue(new Response('new'));
-			const oldHandler: NativeHandler = { method: 'GET', urlPattern: '/test', handlerFn: oldFn };
-			const newHandler: NativeHandler = { method: 'GET', urlPattern: '/test', handlerFn: newFn };
+			const oldHandler: NativeHandler = { handlerFn: oldFn };
+			const newHandler: NativeHandler = { handlerFn: newFn };
 
 			adapter.activate(noopOptions);
 			adapter.use(oldHandler);
@@ -93,8 +93,6 @@ describe('NativeFetchInterceptor', () => {
 			const adapter = new NativeFetchInterceptor();
 			const onUnhandled = vi.fn();
 			const handler: NativeHandler = {
-				method: 'GET',
-				urlPattern: '/test',
 				handlerFn: vi.fn().mockResolvedValue(new Response('ok')),
 			};
 
@@ -143,8 +141,6 @@ describe('NativeFetchInterceptor', () => {
 			const adapter = new NativeFetchInterceptor();
 			const onUnhandled = vi.fn();
 			const handler: NativeHandler = {
-				method: 'GET',
-				urlPattern: '/test',
 				handlerFn: vi.fn().mockResolvedValue(undefined),
 			};
 
@@ -168,8 +164,8 @@ describe('NativeFetchInterceptor', () => {
 			const adapter = new NativeFetchInterceptor();
 			const first = vi.fn().mockResolvedValue(undefined); // no match
 			const second = vi.fn().mockResolvedValue(new Response('second'));
-			const handler1: NativeHandler = { method: 'GET', urlPattern: '/test', handlerFn: first };
-			const handler2: NativeHandler = { method: 'GET', urlPattern: '/test', handlerFn: second };
+			const handler1: NativeHandler = { handlerFn: first };
+			const handler2: NativeHandler = { handlerFn: second };
 
 			adapter.activate(noopOptions);
 			adapter.use(handler1);
@@ -185,14 +181,10 @@ describe('NativeFetchInterceptor', () => {
 	describe('timeout', () => {
 		// The interceptor tries every handler for every request, so each one checks its path.
 		const neverResolves: NativeHandler = {
-			method: 'GET',
-			urlPattern: '/slow',
 			handlerFn: (req) =>
 				new URL(req.url).pathname === '/slow' ? new Promise(() => {}) : Promise.resolve(undefined),
 		};
 		const respondsOk: NativeHandler = {
-			method: 'GET',
-			urlPattern: '/fast',
 			handlerFn: (req) =>
 				Promise.resolve(new URL(req.url).pathname === '/fast' ? new Response('ok') : undefined),
 		};
@@ -292,8 +284,6 @@ describe('NativeFetchInterceptor', () => {
 			const adapter = new NativeFetchInterceptor();
 			let capturedRequest = null as Request | null; // assigned in the handler
 			const handler: NativeHandler = {
-				method: 'GET',
-				urlPattern: '/test',
 				handlerFn: vi.fn((req) => {
 					capturedRequest = req;
 					return Promise.resolve(new Response('ok'));
@@ -317,8 +307,6 @@ describe('NativeFetchInterceptor', () => {
 			const adapter = new NativeFetchInterceptor();
 			let capturedRequest = null as Request | null; // assigned in the handler
 			const handler: NativeHandler = {
-				method: 'GET',
-				urlPattern: '/test',
 				handlerFn: vi.fn((req) => {
 					capturedRequest = req;
 					return Promise.resolve(new Response('ok'));

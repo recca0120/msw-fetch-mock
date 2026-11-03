@@ -12,21 +12,23 @@ type V1Resolver = Parameters<LegacyRestMethod>[1];
 function createMockRestApi(): LegacyRestApi & { _resolvers: Map<string, V1Resolver> } {
 	const resolvers = new Map<string, V1Resolver>();
 
-	const createMethod = (httpMethod: string) => (url: string | RegExp, resolver: V1Resolver) => {
-		const key = `${httpMethod} ${url}`;
-		resolvers.set(key, resolver);
-		return { key, method: httpMethod, url };
-	};
-
 	return {
-		get: createMethod('GET'),
-		post: createMethod('POST'),
-		put: createMethod('PUT'),
-		delete: createMethod('DELETE'),
-		patch: createMethod('PATCH'),
-		all: createMethod('ALL'),
+		all: (url: string | RegExp, resolver: V1Resolver) => {
+			const key = `ALL ${url}`;
+			resolvers.set(key, resolver);
+			return { key, url };
+		},
 		_resolvers: resolvers,
 	};
+}
+
+/** Registers `handlerFn` as the catch-all and returns the MSW v1 resolver it installed. */
+function registerCatchAll(
+	restApi: ReturnType<typeof createMockRestApi>,
+	handlerFn: (request: Request) => Promise<Response | undefined>,
+): V1Resolver {
+	createLegacyHandlerFactory(restApi).createCatchAllHandler(handlerFn);
+	return restApi._resolvers.get('ALL *')!;
 }
 
 function createMockV1Request(options: {
@@ -134,36 +136,14 @@ describe('legacyHandlerFactory', () => {
 		});
 	});
 
-	describe('createHandler', () => {
-		it('should register handler using the correct REST method', () => {
+	describe('createCatchAllHandler', () => {
+		it('should register one MSW v1 handler for every request via rest.all("*")', () => {
 			const restApi = createMockRestApi();
 			const factory = createLegacyHandlerFactory(restApi);
 
-			const handlerFn = vi.fn().mockResolvedValue(undefined);
-			factory.createHandler('GET', '/api/data', handlerFn);
+			factory.createCatchAllHandler(vi.fn().mockResolvedValue(undefined));
 
-			expect(restApi._resolvers.has('GET /api/data')).toBe(true);
-		});
-
-		it('should register handler for POST method', () => {
-			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
-
-			const handlerFn = vi.fn().mockResolvedValue(undefined);
-			factory.createHandler('POST', '/api/data', handlerFn);
-
-			expect(restApi._resolvers.has('POST /api/data')).toBe(true);
-		});
-
-		it('should support RegExp URL patterns', () => {
-			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
-			const pattern = /^http:\/\/example\.com/;
-
-			const handlerFn = vi.fn().mockResolvedValue(undefined);
-			factory.createHandler('GET', pattern, handlerFn);
-
-			expect(restApi._resolvers.has(`GET ${pattern}`)).toBe(true);
+			expect([...restApi._resolvers.keys()]).toEqual(['ALL *']);
 		});
 
 		it('should convert legacy request to standard Request and call handlerFn', async () => {
@@ -171,9 +151,7 @@ describe('legacyHandlerFactory', () => {
 			const factory = createLegacyHandlerFactory(restApi);
 
 			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			factory.createHandler('POST', '/api/data', handlerFn);
-
-			const resolver = restApi._resolvers.get('POST /api/data')!;
+			const resolver = registerCatchAll(restApi, handlerFn);
 			const req = createMockV1Request({
 				url: 'http://localhost/api/data',
 				method: 'POST',
@@ -196,9 +174,7 @@ describe('legacyHandlerFactory', () => {
 			const factory = createLegacyHandlerFactory(restApi);
 
 			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			factory.createHandler('POST', '/api/data', handlerFn);
-
-			const resolver = restApi._resolvers.get('POST /api/data')!;
+			const resolver = registerCatchAll(restApi, handlerFn);
 			const req = createMockV1Request({
 				url: 'http://localhost/api/data',
 				method: 'POST',
@@ -218,9 +194,7 @@ describe('legacyHandlerFactory', () => {
 			const factory = createLegacyHandlerFactory(restApi);
 
 			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			factory.createHandler('POST', '/api/data', handlerFn);
-
-			const resolver = restApi._resolvers.get('POST /api/data')!;
+			const resolver = registerCatchAll(restApi, handlerFn);
 			const req = createMockV1Request({
 				url: 'http://localhost/api/data',
 				method: 'POST',
@@ -240,9 +214,7 @@ describe('legacyHandlerFactory', () => {
 			const factory = createLegacyHandlerFactory(restApi);
 
 			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			factory.createHandler('GET', '/api/data', handlerFn);
-
-			const resolver = restApi._resolvers.get('GET /api/data')!;
+			const resolver = registerCatchAll(restApi, handlerFn);
 			const req = createMockV1Request({
 				url: 'http://localhost/api/data',
 				method: 'GET',
@@ -261,9 +233,7 @@ describe('legacyHandlerFactory', () => {
 			const factory = createLegacyHandlerFactory(restApi);
 
 			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			factory.createHandler('GET', '/api/data', handlerFn);
-
-			const resolver = restApi._resolvers.get('GET /api/data')!;
+			const resolver = registerCatchAll(restApi, handlerFn);
 			const req = createMockV1Request({ url: 'http://localhost/api/data', method: 'GET' });
 			const { res, collected } = createMockV1Res();
 			const ctx = createMockV1Ctx();
@@ -283,9 +253,7 @@ describe('legacyHandlerFactory', () => {
 			const handlerFn = vi
 				.fn()
 				.mockResolvedValue(factory.buildResponse(200, { ok: true }, headers));
-			factory.createHandler('GET', '/api/data', handlerFn);
-
-			const resolver = restApi._resolvers.get('GET /api/data')!;
+			const resolver = registerCatchAll(restApi, handlerFn);
 			const req = createMockV1Request({ url: 'http://localhost/api/data', method: 'GET' });
 			const { res, collected } = createMockV1Res();
 			const ctx = createMockV1Ctx();
@@ -297,12 +265,9 @@ describe('legacyHandlerFactory', () => {
 
 		it('should return undefined for passthrough when handlerFn returns undefined', async () => {
 			const restApi = createMockRestApi();
-			const factory = createLegacyHandlerFactory(restApi);
 
 			const handlerFn = vi.fn().mockResolvedValue(undefined);
-			factory.createHandler('GET', '/api/data', handlerFn);
-
-			const resolver = restApi._resolvers.get('GET /api/data')!;
+			const resolver = registerCatchAll(restApi, handlerFn);
 			const req = createMockV1Request({ url: 'http://localhost/api/data', method: 'GET' });
 			const { res } = createMockV1Res();
 			const ctx = createMockV1Ctx();
@@ -317,9 +282,7 @@ describe('legacyHandlerFactory', () => {
 			const factory = createLegacyHandlerFactory(restApi);
 
 			const handlerFn = vi.fn().mockResolvedValue(factory.buildErrorResponse());
-			factory.createHandler('GET', '/api/fail', handlerFn);
-
-			const resolver = restApi._resolvers.get('GET /api/fail')!;
+			const resolver = registerCatchAll(restApi, handlerFn);
 			const req = createMockV1Request({ url: 'http://localhost/api/fail', method: 'GET' });
 			const { res } = createMockV1Res();
 			const ctx = createMockV1Ctx();
@@ -334,9 +297,7 @@ describe('legacyHandlerFactory', () => {
 			const factory = createLegacyHandlerFactory(restApi);
 
 			const handlerFn = vi.fn().mockResolvedValue(factory.buildResponse(200, { ok: true }));
-			factory.createHandler('GET', '/api/data', handlerFn);
-
-			const resolver = restApi._resolvers.get('GET /api/data')!;
+			const resolver = registerCatchAll(restApi, handlerFn);
 			const req = createMockV1Request({
 				url: 'http://localhost/api/data',
 				method: 'GET',

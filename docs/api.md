@@ -126,9 +126,11 @@ const fetchMock = new FetchMock(new NativeFetchInterceptor());
 
 ```typescript
 await fetchMock.activate(options?); // start intercepting (async — browser needs worker.start())
-fetchMock.deactivate();             // stop intercepting
+await fetchMock.deactivate();       // stop intercepting
 ```
 
+> `deactivate()` returns `Promise<void>` that settles once the interceptor has stopped (MSW v3's `worker.stop()` is async). Cleanup happens synchronously, so not awaiting it still works.
+>
 > `activate()` returns `Promise<void>`. In Node.js, the promise resolves synchronously. In the browser, it waits for the Service Worker to start. Vitest and Jest handle async `beforeAll` natively.
 >
 > **Conflict detection (Node only):** In standalone mode, `activate()` checks whether `globalThis.fetch` is already patched by MSW. If so, it throws an error guiding you to use `new FetchMock(new NodeFetchInterceptor(server))` instead.

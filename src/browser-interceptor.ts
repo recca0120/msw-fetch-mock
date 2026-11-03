@@ -1,9 +1,12 @@
 import { installFetchOptions } from './fetch-options';
+import { toMswListenOptions } from './msw-listen-options';
 import { type FetchInterceptor, type ResolvedActivateOptions, type SetupWorkerLike } from './types';
 
 export class BrowserFetchInterceptor implements FetchInterceptor {
 	private readonly worker: SetupWorkerLike;
 	private removeFetchOptions: () => void = () => {};
+	/** Whether activate() started the worker (so deactivate() should stop it). */
+	private startedByUs = false;
 
 	constructor(worker: SetupWorkerLike) {
 		this.worker = worker;
@@ -22,15 +25,22 @@ export class BrowserFetchInterceptor implements FetchInterceptor {
 	}
 
 	async activate(options: ResolvedActivateOptions): Promise<void> {
-		await this.worker.start({
-			onUnhandledRequest: options.onUnhandledRequest,
-		});
+		// MSW v3 throws when start() is called on an already started worker (v2
+		// only warned), e.g. one the user started themselves. v3 exposes
+		// `readyState` (0 = disabled); v2 has none (undefined), so both mean "start it".
+		if (!this.worker.readyState) {
+			await this.worker.start(toMswListenOptions(options.onUnhandledRequest));
+			this.startedByUs = true;
+		}
 		this.removeFetchOptions = installFetchOptions(options);
 	}
 
-	deactivate(): void {
+	/** Stops the worker only if activate() started it; a worker the user started keeps running. */
+	deactivate(): void | Promise<void> {
 		this.removeFetchOptions();
 		this.removeFetchOptions = () => {};
-		this.worker.stop();
+		if (!this.startedByUs) return;
+		this.startedByUs = false;
+		return this.worker.stop();
 	}
 }

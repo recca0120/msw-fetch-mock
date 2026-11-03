@@ -231,11 +231,19 @@ export class FetchMock {
 		this._callHistoryEnabled = false;
 	}
 
-	deactivate(): void {
+	/**
+	 * Stops intercepting. Cleanup happens synchronously; the returned Promise settles
+	 * once the interceptor has fully stopped (MSW v3's `worker.stop()` is async).
+	 */
+	deactivate(): Promise<void> {
 		this.registry.clear();
 		this._calls.clear();
 		this.catchAllHandler = undefined;
-		this.interceptor.deactivate();
+		const stopped = Promise.resolve(this.interceptor.deactivate());
+		// Before 0.7.0 deactivate() returned void, so callers did not await it: a failed
+		// stop must not become an unhandled rejection for them. Awaiting callers still get it.
+		stopped.catch(() => {});
+		return stopped;
 	}
 
 	reset(): void {

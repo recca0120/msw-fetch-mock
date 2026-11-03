@@ -11,7 +11,12 @@ export class NativeFetchInterceptor implements FetchInterceptor {
 	activate(options: ResolvedActivateOptions): void {
 		this.options = options;
 		this.originalFetch = globalThis.fetch;
-		globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+		// A named function: the duplicate-MSW-server guard treats an anonymous
+		// globalThis.fetch as MSW v3's patch, and this is not an MSW server.
+		const nativeFetchMock = async (
+			input: RequestInfo | URL,
+			init?: RequestInit,
+		): Promise<Response> => {
 			const modifiedInit = this.options.forceConnectionClose
 				? withConnectionClose(input, init)
 				: init;
@@ -23,6 +28,7 @@ export class NativeFetchInterceptor implements FetchInterceptor {
 				init?.signal,
 			);
 		};
+		globalThis.fetch = nativeFetchMock;
 	}
 
 	private async handleRequest(
