@@ -136,6 +136,21 @@ describe('[AC-9] a worker the user already started (MSW v3)', () => {
 		}
 	});
 
+	it('deactivate() leaves the worker running, since fetchMock did not start it', async () => {
+		const worker = createServerBackedWorker({ v3: true });
+		await worker.start(); // the user's own setup
+		const fm = createFetchMock(worker);
+		await fm.activate({ onUnhandledRequest: 'bypass' });
+
+		await fm.deactivate();
+
+		expect(worker.readyState).toBe(1);
+		// like an external server: once the user resets, their own handlers answer
+		worker.resetHandlers(http.get(`${ORIGIN}/user`, () => HttpResponse.text('user handler')));
+		expect(await (await fetch(`${ORIGIN}/user`)).text()).toBe('user handler');
+		worker.stop();
+	});
+
 	it('can be activated again after deactivate()', async () => {
 		const worker = createServerBackedWorker({ v3: true });
 		const fm = createFetchMock(worker);

@@ -5,6 +5,8 @@ import { type FetchInterceptor, type ResolvedActivateOptions, type SetupWorkerLi
 export class BrowserFetchInterceptor implements FetchInterceptor {
 	private readonly worker: SetupWorkerLike;
 	private removeFetchOptions: () => void = () => {};
+	/** Whether activate() started the worker (so deactivate() should stop it). */
+	private startedByUs = false;
 
 	constructor(worker: SetupWorkerLike) {
 		this.worker = worker;
@@ -28,13 +30,17 @@ export class BrowserFetchInterceptor implements FetchInterceptor {
 		// `readyState` (0 = disabled); v2 has none (undefined), so both mean "start it".
 		if (!this.worker.readyState) {
 			await this.worker.start(toMswListenOptions(options.onUnhandledRequest));
+			this.startedByUs = true;
 		}
 		this.removeFetchOptions = installFetchOptions(options);
 	}
 
+	/** Stops the worker only if activate() started it; a worker the user started keeps running. */
 	deactivate(): void | Promise<void> {
 		this.removeFetchOptions();
 		this.removeFetchOptions = () => {};
+		if (!this.startedByUs) return;
+		this.startedByUs = false;
 		return this.worker.stop();
 	}
 }

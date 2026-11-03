@@ -82,5 +82,39 @@ describe('BrowserFetchInterceptor', () => {
 			await result;
 			expect(settled).toHaveBeenCalledOnce();
 		});
+
+		describe('when worker.stop() fails', () => {
+			function createFailingStopWorker(): SetupWorkerLike {
+				return {
+					...createStubWorker(),
+					// a plain function: vi.fn() would attach handlers to the returned promise
+					// to record its result, hiding an unhandled rejection
+					stop: () => Promise.reject(new Error('stop failed')),
+				};
+			}
+
+			it('an awaited deactivate() rejects with the error', async () => {
+				const fm = createFetchMock(createFailingStopWorker());
+				await fm.activate();
+
+				await expect(fm.deactivate()).rejects.toThrow('stop failed');
+			});
+
+			it('an unawaited deactivate() (fine before 0.7.0) causes no unhandled rejection', async () => {
+				const fm = createFetchMock(createFailingStopWorker());
+				await fm.activate();
+				const unhandled = vi.fn();
+				process.on('unhandledRejection', unhandled);
+				try {
+					void fm.deactivate();
+					// unhandled rejections are reported after the microtask queue drains
+					await new Promise((resolve) => setTimeout(resolve, 10));
+
+					expect(unhandled).not.toHaveBeenCalled();
+				} finally {
+					process.off('unhandledRejection', unhandled);
+				}
+			});
+		});
 	});
 });
