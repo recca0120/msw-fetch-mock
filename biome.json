@@ -84,7 +84,13 @@
 	},
 	"overrides": [
 		{
-			"includes": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "e2e/**/*.test.*"],
+			"includes": [
+				"**/*.test.ts",
+				"**/*.test.tsx",
+				"**/*.spec.ts",
+				"**/*.contract.ts",
+				"e2e/**/*.test.*"
+			],
 			"linter": {
 				"rules": {
 					"suspicious": { "noConsole": "off" },
