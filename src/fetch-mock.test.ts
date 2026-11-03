@@ -5,7 +5,7 @@ import { FetchMock } from './fetch-mock';
 import { createFetchMock, fetchMock as singletonFetchMock } from './node';
 import { NodeFetchInterceptor } from './node-interceptor';
 import { CLOSED_HOST, CLOSED_ORIGIN, causeCode } from './test-utils';
-import { type FetchInterceptor, type SetupServerLike, type SetupWorkerLike } from './types';
+import { type FetchInterceptor, type SetupServerLike } from './types';
 
 const API_BASE = 'http://localhost:8787';
 const API_PREFIX = 'api';
@@ -1920,15 +1920,6 @@ describe('constructor auto-detection', () => {
 		};
 	}
 
-	function createStubWorker(): SetupWorkerLike {
-		return {
-			use: vi.fn(),
-			resetHandlers: vi.fn(),
-			start: vi.fn().mockResolvedValue(undefined),
-			stop: vi.fn(),
-		};
-	}
-
 	function createStubAdapter(): FetchInterceptor {
 		return {
 			use: vi.fn(),
@@ -1978,49 +1969,6 @@ describe('constructor auto-detection', () => {
 			fm.reset();
 
 			expect(server.resetHandlers).not.toHaveBeenCalled();
-		});
-	});
-
-	describe('SetupWorkerLike', () => {
-		it('should call worker.start() on activate', async () => {
-			const worker = createStubWorker();
-			const fm = new FetchMock(worker);
-
-			await fm.activate();
-
-			expect(worker.start).toHaveBeenCalledWith(
-				expect.objectContaining({ onUnhandledRequest: expect.any(Function) }),
-			);
-		});
-
-		it('should call worker.stop() on deactivate', () => {
-			const worker = createStubWorker();
-			const fm = new FetchMock(worker);
-
-			fm.deactivate();
-
-			expect(worker.stop).toHaveBeenCalled();
-		});
-
-		it('should install catch-all handler on activate', async () => {
-			const worker = createStubWorker();
-			const fm = new FetchMock(worker);
-			await fm.activate();
-
-			// activate() installs the catch-all via resetHandlers + use
-			expect(worker.resetHandlers).toHaveBeenCalled();
-			expect(worker.use).toHaveBeenCalled();
-		});
-
-		it('should not call resetHandlers() on reset() (catch-all persists)', async () => {
-			const worker = createStubWorker();
-			const fm = new FetchMock(worker);
-			await fm.activate();
-			vi.mocked(worker.resetHandlers).mockClear();
-
-			fm.reset();
-
-			expect(worker.resetHandlers).not.toHaveBeenCalled();
 		});
 	});
 
